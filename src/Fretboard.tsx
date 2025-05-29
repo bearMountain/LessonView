@@ -5,36 +5,54 @@ interface FretboardProps {
 }
 
 const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
-  // Calculate position for a dot on the fretboard based on the actual image
+  // Calculate position for a dot on the fretboard based on the reference image
   const getDotPosition = (fret: number, stringIndex: number) => {
-    // These values should be adjusted based on your actual fretboard.png dimensions and layout
-    const imageWidth = 1172; // Original image width from your upload
-    const imageHeight = 152; // Original image height from your upload
+    // Image dimensions (same as original fretboard)
+    const imageWidth = 1172; // Original image width
+    const imageHeight = 152; // Original image height
     const displayWidth = 800; // Our display width
     const displayHeight = 120; // Our display height
     
     const scaleX = displayWidth / imageWidth;
     const scaleY = displayHeight / imageHeight;
     
-    // Approximate positions based on the fretboard image layout
-    // You may need to adjust these values to match your specific image
-    const nutX = 95 * scaleX; // Where the nut/beginning starts
-    const fretSpacing = 85 * scaleX; // Spacing between frets
-    const firstStringY = 30 * scaleY; // Y position of first string (Hi D)
-    const stringSpacing = 30 * scaleY; // Spacing between strings
+    // Based on the reference image with red dots:
+    // Analyzing the vertical positions of the 3 dots on the 0th fret
+    const stringPositionsY = [
+      40 * scaleY,  // Hi D (top string, index 2 in our data)
+      75 * scaleY,  // A (middle string, index 1 in our data)  
+      110 * scaleY  // Low D (bottom string, index 0 in our data)
+    ];
+    
+    // Analyzing the horizontal positions from the dots across the top string
+    const openStringX = 285 * scaleX; // Position for open string (0th fret)
+    const fretPositions = [
+      285 * scaleX,   // 0th fret (open)
+      375 * scaleX,   // 1st fret
+      455 * scaleX,   // 2nd fret
+      525 * scaleX,   // 3rd fret
+      590 * scaleX,   // 4th fret
+      650 * scaleX,   // 5th fret
+      705 * scaleX,   // 6th fret
+      755 * scaleX,   // 7th fret
+      800 * scaleX,   // 8th fret
+      840 * scaleX,   // 9th fret
+      875 * scaleX,   // 10th fret
+      905 * scaleX,   // 11th fret
+      935 * scaleX    // 12th fret
+    ];
     
     let x: number;
-    if (fret === 0) {
-      // Open string - place dot just before the nut
-      x = nutX - 15;
+    if (fret <= 12 && fret >= 0) {
+      x = fretPositions[fret];
     } else {
-      // Fretted note - place dot in the middle of the fret space
-      x = nutX + (fret - 1) * fretSpacing + (fretSpacing / 2);
+      // Fallback for frets beyond 12
+      x = fretPositions[12] + (fret - 12) * 25 * scaleX;
     }
     
-    // Reverse the string order to match our data structure (Hi D = index 2 -> top string)
+    // Get the Y position for this string (reverse index since Hi D = index 2 but top string)
     const visualStringIndex = 2 - stringIndex;
-    const y = firstStringY + (visualStringIndex * stringSpacing);
+    const y = stringPositionsY[visualStringIndex];
     
     return { x, y };
   };
