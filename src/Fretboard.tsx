@@ -5,25 +5,32 @@ interface FretboardProps {
 }
 
 const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
-  // Calculate position for a dot on the fretboard based on the uploaded image
+  // Calculate position for a dot on the fretboard based on the image proportions
   const getDotPosition = (fret: number, stringIndex: number) => {
-    const fretboardStartX = 60; // Where the actual fretboard starts in the image
-    const fretWidth = 70; // Width between frets in the image
-    const stringSpacing = 35; // Vertical spacing between strings
-    const firstStringY = 45; // Y position of the first string (Hi D)
+    // Image dimensions and layout (adjust these based on actual image)
+    const imageWidth = 1172;
+    const imageHeight = 152;
+    const scaleFactorX = 800 / imageWidth; // Scale to fit our display size
+    const scaleFactorY = 120 / imageHeight;
+    
+    // Approximate positions based on the fretboard image layout
+    const nutPosition = 95 * scaleFactorX; // Where the nut starts
+    const fretSpacing = 85 * scaleFactorX; // Approximate spacing between frets
+    const stringStartY = 25 * scaleFactorY; // Y position of first string
+    const stringSpacing = 35 * scaleFactorY; // Spacing between strings
     
     let x: number;
     if (fret === 0) {
-      // Open string - place dot at the very beginning of the fretboard
-      x = 20; 
+      // Open string - place dot just before the nut
+      x = nutPosition - 20;
     } else {
-      // Fretted note - place dot between frets (in the middle of the fret space)
-      x = fretboardStartX + (fret - 1) * fretWidth + (fretWidth / 2);
+      // Fretted note - place dot in the middle of the fret space
+      x = nutPosition + (fret - 1) * fretSpacing + (fretSpacing / 2);
     }
     
     // Reverse the string order to match our data structure (Hi D = index 2 -> top string)
     const visualStringIndex = 2 - stringIndex;
-    const y = firstStringY + (visualStringIndex * stringSpacing);
+    const y = stringStartY + (visualStringIndex * stringSpacing);
     
     return { x, y };
   };
@@ -32,66 +39,89 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
     <div style={{ padding: '20px' }}>
       <h3>Fretboard</h3>
       <div style={{ position: 'relative', display: 'inline-block' }}>
-        {/* SVG fretboard as fallback */}
-        <svg width="800" height="150" style={{ border: '1px solid #ccc' }}>
-          {/* Draw nut (thick line at the beginning) */}
-          <line
-            x1={50}
-            y1={20}
-            x2={50}
-            y2={130}
-            stroke="#000"
-            strokeWidth="6"
-          />
+        {/* Create an inline SVG with fretboard design similar to the uploaded image */}
+        <svg width="800" height="120" style={{ border: '1px solid #ccc', backgroundColor: '#f5f5f5' }}>
+          {/* Fretboard background */}
+          <rect x="0" y="0" width="800" height="120" fill="url(#woodGrain)" />
           
-          {/* Draw fret lines */}
+          {/* Define wood grain pattern */}
+          <defs>
+            <pattern id="woodGrain" x="0" y="0" width="100%" height="100%">
+              <rect width="100%" height="100%" fill="#d4a574" />
+              <path d="M0,20 Q200,25 400,20 T800,20" stroke="#c49660" strokeWidth="1" fill="none" opacity="0.3" />
+              <path d="M0,40 Q250,45 500,40 T800,40" stroke="#c49660" strokeWidth="1" fill="none" opacity="0.3" />
+              <path d="M0,60 Q300,65 600,60 T800,60" stroke="#c49660" strokeWidth="1" fill="none" opacity="0.3" />
+              <path d="M0,80 Q350,85 700,80 T800,80" stroke="#c49660" strokeWidth="1" fill="none" opacity="0.3" />
+            </pattern>
+          </defs>
+          
+          {/* Nut */}
+          <rect x="90" y="10" width="8" height="100" fill="#f8f8f8" stroke="#ddd" strokeWidth="1" />
+          
+          {/* Fret wires */}
           {Array.from({ length: 12 }, (_, i) => i + 1).map((fret) => (
             <line
               key={fret}
-              x1={50 + fret * 70}
-              y1={20}
-              x2={50 + fret * 70}
-              y2={130}
-              stroke="#666"
-              strokeWidth="2"
+              x1={90 + fret * 52}
+              y1={10}
+              x2={90 + fret * 52}
+              y2={110}
+              stroke="#c0c0c0"
+              strokeWidth="3"
             />
           ))}
           
-          {/* Draw strings */}
+          {/* Strings */}
           {['Hi D', 'A', 'Low D'].map((string, index) => (
             <line
               key={string}
-              x1={50}
-              y1={45 + index * 35}
-              x2={890}
-              y2={45 + index * 35}
-              stroke="#333"
+              x1={98}
+              y1={30 + index * 30}
+              x2={750}
+              y2={30 + index * 30}
+              stroke="#e6e6e6"
               strokeWidth="2"
             />
           ))}
           
-          {/* Draw fret numbers */}
+          {/* Fret position dots */}
+          {[3, 5, 7, 9].map((fret) => (
+            <circle
+              key={`dot-${fret}`}
+              cx={90 + (fret - 0.5) * 52}
+              cy={60}
+              r="4"
+              fill="#fff"
+              opacity="0.6"
+            />
+          ))}
+          
+          {/* 12th fret double dots */}
+          <circle cx={90 + 11.5 * 52} cy={45} r="4" fill="#fff" opacity="0.6" />
+          <circle cx={90 + 11.5 * 52} cy={75} r="4" fill="#fff" opacity="0.6" />
+          
+          {/* Fret numbers */}
           {Array.from({ length: 12 }, (_, i) => i + 1).map((fret) => (
             <text
-              key={fret}
-              x={50 + (fret - 1) * 70 + 35}
-              y={165}
+              key={`num-${fret}`}
+              x={90 + (fret - 0.5) * 52}
+              y={125}
               textAnchor="middle"
-              fontSize="14"
+              fontSize="12"
               fill="#666"
             >
               {fret}
             </text>
           ))}
           
-          {/* Draw string labels */}
+          {/* String labels */}
           {['Hi D', 'A', 'Low D'].map((string, index) => (
             <text
               key={string}
-              x={35}
-              y={50 + index * 35}
+              x={75}
+              y={35 + index * 30}
               textAnchor="end"
-              fontSize="14"
+              fontSize="12"
               fill="#333"
               fontWeight="bold"
             >
@@ -99,22 +129,7 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
             </text>
           ))}
           
-          {/* Draw position markers (dots at 3rd, 5th, 7th, 9th frets) */}
-          {[3, 5, 7, 9].map((fret) => (
-            <circle
-              key={`marker-${fret}`}
-              cx={50 + (fret - 1) * 70 + 35}
-              cy={80}
-              r="4"
-              fill="#ddd"
-            />
-          ))}
-          
-          {/* Draw 12th fret double dots */}
-          <circle cx={50 + 11 * 70 + 35} cy={65} r="4" fill="#ddd" />
-          <circle cx={50 + 11 * 70 + 35} cy={95} r="4" fill="#ddd" />
-          
-          {/* Draw dots for currently playing notes */}
+          {/* Playing dots */}
           {currentlyPlaying.map((note, index) => {
             const { x, y } = getDotPosition(note.fret, note.stringIndex);
             return (
@@ -122,10 +137,10 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
                 key={index}
                 cx={x}
                 cy={y}
-                r="10"
-                fill="#ff4444"
-                stroke="#cc0000"
-                strokeWidth="3"
+                r="8"
+                fill="#ff0000"
+                stroke="#990000"
+                strokeWidth="2"
                 opacity="0.9"
               />
             );
