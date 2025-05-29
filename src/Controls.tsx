@@ -27,32 +27,32 @@ const Controls: React.FC<ControlsProps> = ({ tabData }) => {
     const baseNotes = ['D3', 'A3', 'D4'];
     const baseNote = baseNotes[stringIndex];
     
-    // Create a reverb effect for more realistic sound
+    // Create a reverb effect with longer decay for more sustain
     const reverb = new Tone.Reverb({
-      decay: 2,
-      preDelay: 0.01,
-      wet: 0.3
+      decay: 4,
+      preDelay: 0.02,
+      wet: 0.4
     }).toDestination();
     
-    // Create a pluck synth for guitar-like sound
+    // Create a pluck synth with longer sustain
     const pluckSynth = new Tone.PluckSynth({
-      attackNoise: 1,
-      dampening: 4000,
-      resonance: 0.7
+      attackNoise: 0.8,
+      dampening: 8000,  // Higher dampening = less damping = longer sustain
+      resonance: 0.9    // Higher resonance for more ring
     }).connect(reverb);
     
     // Calculate the note based on the fret number using our diatonic mapping
     const semitones = getSemitones(fret);
     const note = Tone.Frequency(baseNote).transpose(semitones).toNote();
     
-    // Play the note with a longer sustain for guitar-like sound
-    pluckSynth.triggerAttackRelease(note, "4n");
+    // Play the note with much longer sustain
+    pluckSynth.triggerAttackRelease(note, "1n");  // Whole note duration
     
-    // Clean up the synth and reverb after the note finishes
+    // Clean up the synth and reverb after a longer time
     setTimeout(() => {
       pluckSynth.dispose();
       reverb.dispose();
-    }, 2000);
+    }, 4000);
   };
 
   const handlePlay = async () => {
