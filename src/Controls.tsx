@@ -27,32 +27,60 @@ const Controls: React.FC<ControlsProps> = ({ tabData }) => {
     const baseNotes = ['D3', 'A3', 'D4'];
     const baseNote = baseNotes[stringIndex];
     
-    // Create a reverb effect with longer decay for more sustain
+    // Create a reverb effect
     const reverb = new Tone.Reverb({
-      decay: 4,
-      preDelay: 0.02,
-      wet: 0.4
+      decay: 5,
+      preDelay: 0.01,
+      wet: 0.25
     }).toDestination();
     
-    // Create a pluck synth with longer sustain
-    const pluckSynth = new Tone.PluckSynth({
-      attackNoise: 0.8,
-      dampening: 8000,  // Higher dampening = less damping = longer sustain
-      resonance: 0.9    // Higher resonance for more ring
+    // Add subtle distortion for pick-like attack
+    const distortion = new Tone.Distortion(0.05).connect(reverb);
+    
+    // Create a synth that sounds like a picked guitar string
+    const synth = new Tone.Synth({
+      oscillator: {
+        type: "sawtooth"  // Rich harmonics like guitar strings
+      },
+      envelope: {
+        attack: 0.005,    // Very sharp attack to simulate pick
+        decay: 0.1,       // Quick initial decay
+        sustain: 0.7,     // Good sustain level
+        release: 3.5      // Long release for ring-out
+      }
+    }).connect(distortion);
+    
+    // Create a second layer for the "body" resonance
+    const bodyResonance = new Tone.Synth({
+      oscillator: {
+        type: "triangle"
+      },
+      envelope: {
+        attack: 0.02,
+        decay: 0.3,
+        sustain: 0.4,
+        release: 4
+      }
     }).connect(reverb);
     
     // Calculate the note based on the fret number using our diatonic mapping
     const semitones = getSemitones(fret);
     const note = Tone.Frequency(baseNote).transpose(semitones).toNote();
     
-    // Play the note with much longer sustain
-    pluckSynth.triggerAttackRelease(note, "1n");  // Whole note duration
-    
-    // Clean up the synth and reverb after a longer time
+    // Play both the picked string and body resonance
+    synth.triggerAttackRelease(note, "2n");
+    // Body resonance at lower volume and slightly delayed
     setTimeout(() => {
-      pluckSynth.dispose();
+      bodyResonance.triggerAttackRelease(note, "2n", "+0.01", 0.3);
+    }, 5);
+    
+    // Clean up after the sound dies out
+    setTimeout(() => {
+      synth.dispose();
+      bodyResonance.dispose();
+      distortion.dispose();
       reverb.dispose();
-    }, 4000);
+    }, 6000);
   };
 
   const handlePlay = async () => {
