@@ -7,6 +7,11 @@ interface FretboardProps {
 const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
   // Calculate position for a dot on the fretboard based on the reference image
   const getDotPosition = (fret: number, stringIndex: number) => {
+    // === ADJUSTABLE POSITIONING VARIABLES ===
+    const horizontalStartOffset = 100; // How much to shift all positions left (increase = more left)
+    const stringSpacing = 30; // Vertical distance between strings (increase = more spread out)
+    const horizontalScaleFactor = 1.2; // Multiply fret spacing (increase = more spread out horizontally)
+    
     // Image dimensions (same as original fretboard)
     const imageWidth = 1172; // Original image width
     const imageHeight = 152; // Original image height
@@ -16,37 +21,36 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
     const scaleX = displayWidth / imageWidth;
     const scaleY = displayHeight / imageHeight;
     
-    // Adjusted vertical positions - closer together
+    // String positions - calculated from center with adjustable spacing
+    const centerY = 75 * scaleY; // Center string (A)
     const stringPositionsY = [
-      45 * scaleY,  // Hi D (top string, index 2 in our data)
-      75 * scaleY,  // A (middle string, index 1 in our data)  
-      105 * scaleY  // Low D (bottom string, index 0 in our data)
+      (centerY - stringSpacing) * scaleY,  // Hi D (top string, index 2 in our data)
+      centerY * scaleY,                    // A (middle string, index 1 in our data)  
+      (centerY + stringSpacing) * scaleY   // Low D (bottom string, index 0 in our data)
     ];
     
-    // Shifted horizontal positions - moved to the left
-    const leftShift = 20 * scaleX; // Amount to shift left
-    const fretPositions = [
-      (285 - leftShift) * scaleX,   // 0th fret (open)
-      (375 - leftShift) * scaleX,   // 1st fret
-      (455 - leftShift) * scaleX,   // 2nd fret
-      (525 - leftShift) * scaleX,   // 3rd fret
-      (590 - leftShift) * scaleX,   // 4th fret
-      (650 - leftShift) * scaleX,   // 5th fret
-      (705 - leftShift) * scaleX,   // 6th fret
-      (755 - leftShift) * scaleX,   // 7th fret
-      (800 - leftShift) * scaleX,   // 8th fret
-      (840 - leftShift) * scaleX,   // 9th fret
-      (875 - leftShift) * scaleX,   // 10th fret
-      (905 - leftShift) * scaleX,   // 11th fret
-      (935 - leftShift) * scaleX    // 12th fret
-    ];
+    // Base fret positions before scaling and shifting
+    const baseFretPositions = [285, 375, 455, 525, 590, 650, 705, 755, 800, 840, 875, 905, 935];
+    
+    // Apply horizontal scaling and shifting
+    const fretPositions = baseFretPositions.map((basePos, index) => {
+      if (index === 0) {
+        // Open string position (0th fret) - only apply start offset
+        return (basePos - horizontalStartOffset) * scaleX;
+      } else {
+        // Fretted positions - apply both scaling and offset
+        const scaledDistance = (basePos - baseFretPositions[0]) * horizontalScaleFactor;
+        return (baseFretPositions[0] + scaledDistance - horizontalStartOffset) * scaleX;
+      }
+    });
     
     let x: number;
     if (fret <= 12 && fret >= 0) {
       x = fretPositions[fret];
     } else {
       // Fallback for frets beyond 12
-      x = fretPositions[12] + (fret - 12) * 25 * scaleX;
+      const lastFretSpacing = (fretPositions[12] - fretPositions[11]);
+      x = fretPositions[12] + (fret - 12) * lastFretSpacing;
     }
     
     // Get the Y position for this string (reverse index since Hi D = index 2 but top string)
