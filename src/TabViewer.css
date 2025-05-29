@@ -1,77 +1,53 @@
 .tab-viewer {
-  font-family: monospace;
+  font-family: 'Courier New', monospace;
   font-size: 16px;
-  line-height: 1.5;
   padding: 20px;
+  background: white;
 }
 
-.tab-content {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.tab-svg {
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
 }
 
-.string-row {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.string-label {
-  width: 20px;
-  text-align: center;
-  font-weight: bold;
+.string-label-svg {
+  font-family: 'Courier New', monospace;
   font-size: 18px;
+  font-weight: bold;
+  fill: #333;
 }
 
-.measures-row {
-  display: flex;
-  gap: 30px;
-  align-items: flex-start;
-}
-
-.measure {
-  display: flex;
-  gap: 20px;
-  border-left: 2px solid #000;
-  padding-left: 10px;
-}
-
-.beat {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.fret {
-  width: 60px;
-  text-align: center;
-  border-bottom: 1px solid #ccc;
-  padding: 2px 0;
-}
-
-.fret-input {
-  width: 40px;
+.fret-input-svg {
+  width: 28px;
+  height: 22px;
   text-align: center;
   border: none;
   background: transparent;
-  font-family: monospace;
-  font-size: 16px;
-  padding: 2px;
-}
-
-.fret-input:focus {
-  outline: 2px solid #007bff;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  outline: none;
   border-radius: 2px;
 }
 
+.fret-input-svg:focus {
+  background: #f0f8ff;
+  box-shadow: 0 0 0 2px #007bff;
+}
+
+.fret-input-svg:hover {
+  background: #f9f9f9;
+}
+
 /* Hide number input spinners */
-.fret-input::-webkit-inner-spin-button,
-.fret-input::-webkit-outer-spin-button {
+.fret-input-svg::-webkit-inner-spin-button,
+.fret-input-svg::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.fret-input[type=number] {
+.fret-input-svg[type=number] {
   -moz-appearance: textfield;
 } 
