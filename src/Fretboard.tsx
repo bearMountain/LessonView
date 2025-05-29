@@ -31,7 +31,7 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
     ];
     
     // Base fret positions before scaling and shifting
-    const baseFretPositions = [285, 375, 455, 490, 560, 620, 655, 680, 710, 840, 875, 905, 935];
+    const baseFretPositions = [275, 365, 445, 490, 560, 620, 655, 680, 705, 840, 875, 905, 935];
     
     // Apply horizontal scaling and shifting
     const fretPositions = baseFretPositions.map((basePos, index) => {

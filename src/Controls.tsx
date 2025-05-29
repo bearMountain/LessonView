@@ -32,94 +32,142 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
   };
 
   const playNote = async (fret: number, stringIndex: number) => {
+    // === CENTRAL SUSTAIN CONTROL ===
+    // Adjust this single value to make notes ring longer (higher) or shorter (lower)
+    // 1.0 = normal, 0.5 = half as long, 2.0 = twice as long
+    const sustainMultiplier = 0.5;
+    
     // Define the base notes for each string (Low D, A, Hi D)
     const baseNotes = ['D3', 'A3', 'D4'];
     const baseNote = baseNotes[stringIndex];
     
-    // Create a reverb effect
+    // REVERB: Simulates the acoustic space/room
     const reverb = new Tone.Reverb({
-      decay: 4.5, // Reduced from 5 (10% shorter)
-      preDelay: 0.01,
-      wet: 0.25
+      decay: 1.5 * sustainMultiplier,     // How long reverb lasts (shorter = drier, longer = more spacious)
+      preDelay: 0.01, // Delay before reverb starts (simulates room size)
+      wet: 0.2        // How much reverb vs dry signal (0 = no reverb, 1 = only reverb)
     }).toDestination();
     
-    // Add subtle distortion for pick-like attack
-    const distortion = new Tone.Distortion(0.08).connect(reverb); // Slightly more distortion
+    // DISTORTION: Adds harmonic saturation like tube amps/pickup saturation
+    const distortion = new Tone.Distortion(0.15).connect(reverb); // Amount of saturation (0-1)
     
-    // Add chorus for richer guitar sound
-    const chorus = new Tone.Chorus({
-      frequency: 2,
-      delayTime: 2.5,
-      depth: 0.3,
-      wet: 0.2
+    // LOW PASS FILTER: Simulates the natural frequency response of guitar body/pickups
+    const filter = new Tone.Filter({
+      frequency: 3500,  // Cutoff frequency - higher = brighter, lower = warmer
+      type: "lowpass",  // Removes frequencies above the cutoff
+      rolloff: -12      // How steep the cutoff is (-12dB, -24dB, etc.)
     }).connect(distortion);
     
-    // Create the main guitar synth with multiple oscillators for richness
-    const mainSynth = new Tone.Synth({
-      oscillator: {
-        type: "sawtooth8"  // More harmonics than basic sawtooth
-      },
-      envelope: {
-        attack: 0.003,    // Even sharper pick attack
-        decay: 0.08,      // Quick initial decay
-        sustain: 0.6,     // Good sustain level
-        release: 3.15     // Reduced from 3.5 (10% shorter)
-      }
+    // CHORUS: Creates slight pitch/timing variations for richer sound
+    const chorus = new Tone.Chorus({
+      frequency: 3,    // Speed of modulation (Hz)
+      delayTime: 2.5,  // Base delay time (ms)
+      depth: 0.4,      // How deep the modulation goes (0-1)
+      wet: 0.3         // How much chorus effect vs dry (0-1)
+    }).connect(filter);
+    
+    // VIBRATO: Adds subtle pitch wobble to make it less mechanically perfect
+    const vibrato = new Tone.Vibrato({
+      frequency: 4.5,   // Speed of vibrato (Hz) - faster = more nervous
+      depth: 0.08       // Depth of pitch variation (0-1) - higher = more wobbly
     }).connect(chorus);
     
-    // Create a harmonic layer for guitar body resonance
+    // MAIN GUITAR SYNTH: Primary tone generator
+    const mainSynth = new Tone.Synth({
+      oscillator: {
+        type: "sawtooth"  // Rich in harmonics (sawtooth = bright, square = hollow, sine = pure)
+      },
+      detune: -2,         // Slightly flat for realism (cents, -100 to 100)
+      envelope: {
+        attack: 0.001,    // Pick attack time - shorter = sharper pick attack
+        decay: 0.05,      // Initial volume drop after attack
+        sustain: 0.2,     // Sustained volume level (0-1)
+        release: 2.8 * sustainMultiplier      // How long note takes to fade out
+      }
+    }).connect(vibrato);
+    
+    // HARMONIC LAYER: Adds upper harmonics for steel string brightness
     const harmonicSynth = new Tone.Synth({
       oscillator: {
-        type: "triangle4"  // Rich harmonic content
+        type: "square4"  // Square wave with 4 harmonics - adds metallic brightness
       },
+      detune: 3,         // Slightly sharp to create beating with main oscillator
       envelope: {
-        attack: 0.015,
-        decay: 0.2,
-        sustain: 0.3,
-        release: 3.6      // Reduced from 4 (10% shorter)
+        attack: 0.002,
+        decay: 0.15,
+        sustain: 0.4,     // Lower sustain than main - harmonics fade faster
+        release: 3.2 * sustainMultiplier
+      }
+    }).connect(filter);
+    
+    // SUB-HARMONIC: Adds body/depth like guitar body resonance
+    const subSynth = new Tone.Synth({
+      oscillator: {
+        type: "triangle" // Warm, round tone for body
+      },
+      detune: 1,         // Slight detuning for realism
+      envelope: {
+        attack: 0.005,    // Slower attack - body resonance builds up
+        decay: 0.3,
+        sustain: 0.2,     // Quiet but present
+        release: 2.5 * sustainMultiplier
       }
     }).connect(reverb);
     
-    // Create a subtle sub-harmonic for depth
-    const subSynth = new Tone.Synth({
-      oscillator: {
-        type: "sine"
-      },
-      envelope: {
-        attack: 0.02,
-        decay: 0.4,
-        sustain: 0.15,
-        release: 2.7      // Reduced from 3 (10% shorter)
-      }
-    }).connect(reverb);
+    // PICK NOISE: Simulates the actual pick hitting the string
+    const noise = new Tone.Noise({
+      type: "pink"      // Pink noise has more low-end than white noise
+    }).connect(
+      new Tone.Filter({
+        frequency: 2000,  // Filter noise to sound like pick scrape
+        type: "bandpass"  // Only frequencies around 2000Hz pass through
+      }).connect(
+        new Tone.Gain(0.03).connect(reverb) // Very quiet pick noise
+      )
+    );
     
     // Calculate the note based on the fret number using our diatonic mapping
     const semitones = getSemitones(fret);
     const note = Tone.Frequency(baseNote).transpose(semitones).toNote();
     const subNote = Tone.Frequency(baseNote).transpose(semitones - 12).toNote(); // One octave lower
+    const harmonicNote = Tone.Frequency(baseNote).transpose(semitones + 12).toNote(); // One octave higher
     
-    // Play the main guitar sound
-    mainSynth.triggerAttackRelease(note, "2n");
+    // Calculate note durations based on sustain multiplier
+    const mainDuration = Tone.Time("2n").toSeconds() * sustainMultiplier;
+    const harmonicDuration = Tone.Time("1.5n").toSeconds() * sustainMultiplier;
+    const subDuration = Tone.Time("2n").toSeconds() * sustainMultiplier;
     
-    // Add harmonic layer slightly delayed for realism
+    // TRIGGER THE SOUNDS:
+    
+    // Pick noise first (very brief)
+    noise.start();
+    noise.stop("+0.005"); // Stop after 5ms
+    
+    // Main guitar sound
+    mainSynth.triggerAttackRelease(note, mainDuration);
+    
+    // Add harmonic layer slightly delayed (simulates string settling)
     setTimeout(() => {
-      harmonicSynth.triggerAttackRelease(note, "2n", "+0.005", 0.25);
-    }, 2);
+      harmonicSynth.triggerAttackRelease(harmonicNote, harmonicDuration, "+0.002", 0.2);
+    }, 1);
     
-    // Add subtle sub-harmonic for body resonance
+    // Add body resonance slightly delayed
     setTimeout(() => {
-      subSynth.triggerAttackRelease(subNote, "2n", "+0.01", 0.1);
-    }, 5);
+      subSynth.triggerAttackRelease(subNote, subDuration, "+0.008", 0.15);
+    }, 3);
     
-    // Clean up after the sound dies out (reduced cleanup time by 10%)
+    // Clean up after the sound dies out (scaled with sustain)
     setTimeout(() => {
       mainSynth.dispose();
       harmonicSynth.dispose();
       subSynth.dispose();
+      noise.dispose();
+      vibrato.dispose();
       chorus.dispose();
+      filter.dispose();
       distortion.dispose();
       reverb.dispose();
-    }, 5400); // Reduced from 6000
+    }, 4500 * sustainMultiplier);
   };
 
   const handlePlay = async () => {
