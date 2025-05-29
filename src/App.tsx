@@ -1,0 +1,55 @@
+import { useState } from 'react'
+import './App.css'
+import TabViewer from './TabViewer'
+import Fretboard from './Fretboard'
+import Controls from './Controls'
+
+// Initial tab data - each array represents a measure, each inner array represents a beat
+const initialTabData = [
+  // Measure 1
+  [
+    [null, null, 0],  // First beat
+    [null, null, 2],  // Second beat
+    [null, null, 4],  // Third beat
+    [null, null, 5],  // Fourth beat
+  ],
+  // Measure 2
+  [
+    [null, null, 4],  // First beat
+    [null, null, 2],  // Second beat
+    [null, null, 0],  // Third beat
+    [null, null, 0],  // Fourth beat
+  ],
+];
+
+function App() {
+  const [tabData, setTabData] = useState<(number | null)[][][]>(initialTabData);
+
+  const updateTabData = (measureIndex: number, beatIndex: number, stringIndex: number, value: number | null) => {
+    setTabData(prevData => {
+      const newData = [...prevData];
+      newData[measureIndex] = [...newData[measureIndex]];
+      newData[measureIndex][beatIndex] = [...newData[measureIndex][beatIndex]];
+      newData[measureIndex][beatIndex][stringIndex] = value;
+      return newData;
+    });
+  };
+
+  return (
+    <div className="app-container">
+      <h1>Strumstick Tab Viewer</h1>
+      <div style={{ display: 'flex', gap: '2rem' }}>
+        <div>
+          <TabViewer 
+            tabData={tabData} 
+            onUpdateTab={updateTabData}
+          />
+          <Controls tabData={tabData} />
+        </div>
+        <Fretboard />
+      </div>
+    </div>
+  )
+}
+
+export default App
