@@ -16,30 +16,29 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
     const scaleX = displayWidth / imageWidth;
     const scaleY = displayHeight / imageHeight;
     
-    // Based on the reference image with red dots:
-    // Analyzing the vertical positions of the 3 dots on the 0th fret
+    // Adjusted vertical positions - closer together
     const stringPositionsY = [
-      40 * scaleY,  // Hi D (top string, index 2 in our data)
+      45 * scaleY,  // Hi D (top string, index 2 in our data)
       75 * scaleY,  // A (middle string, index 1 in our data)  
-      110 * scaleY  // Low D (bottom string, index 0 in our data)
+      105 * scaleY  // Low D (bottom string, index 0 in our data)
     ];
     
-    // Analyzing the horizontal positions from the dots across the top string
-    const openStringX = 285 * scaleX; // Position for open string (0th fret)
+    // Shifted horizontal positions - moved to the left
+    const leftShift = 20 * scaleX; // Amount to shift left
     const fretPositions = [
-      285 * scaleX,   // 0th fret (open)
-      375 * scaleX,   // 1st fret
-      455 * scaleX,   // 2nd fret
-      525 * scaleX,   // 3rd fret
-      590 * scaleX,   // 4th fret
-      650 * scaleX,   // 5th fret
-      705 * scaleX,   // 6th fret
-      755 * scaleX,   // 7th fret
-      800 * scaleX,   // 8th fret
-      840 * scaleX,   // 9th fret
-      875 * scaleX,   // 10th fret
-      905 * scaleX,   // 11th fret
-      935 * scaleX    // 12th fret
+      (285 - leftShift) * scaleX,   // 0th fret (open)
+      (375 - leftShift) * scaleX,   // 1st fret
+      (455 - leftShift) * scaleX,   // 2nd fret
+      (525 - leftShift) * scaleX,   // 3rd fret
+      (590 - leftShift) * scaleX,   // 4th fret
+      (650 - leftShift) * scaleX,   // 5th fret
+      (705 - leftShift) * scaleX,   // 6th fret
+      (755 - leftShift) * scaleX,   // 7th fret
+      (800 - leftShift) * scaleX,   // 8th fret
+      (840 - leftShift) * scaleX,   // 9th fret
+      (875 - leftShift) * scaleX,   // 10th fret
+      (905 - leftShift) * scaleX,   // 11th fret
+      (935 - leftShift) * scaleX    // 12th fret
     ];
     
     let x: number;
