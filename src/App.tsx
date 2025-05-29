@@ -24,6 +24,7 @@ const initialTabData = [
 
 function App() {
   const [tabData, setTabData] = useState<(number | null)[][][]>(initialTabData);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
 
   const updateTabData = (measureIndex: number, beatIndex: number, stringIndex: number, value: number | null) => {
     setTabData(prevData => {
@@ -35,18 +36,25 @@ function App() {
     });
   };
 
+  const handleNotesPlaying = (notes: { fret: number; stringIndex: number }[]) => {
+    setCurrentlyPlaying(notes);
+  };
+
   return (
     <div className="app-container">
       <h1>Strumstick Tab Viewer</h1>
-      <div style={{ display: 'flex', gap: '2rem' }}>
+      <div style={{ display: 'flex', gap: '2rem', flexDirection: 'column' }}>
         <div>
           <TabViewer 
             tabData={tabData} 
             onUpdateTab={updateTabData}
           />
-          <Controls tabData={tabData} />
+          <Controls 
+            tabData={tabData} 
+            onNotesPlaying={handleNotesPlaying}
+          />
         </div>
-        <Fretboard />
+        <Fretboard currentlyPlaying={currentlyPlaying} />
       </div>
     </div>
   )

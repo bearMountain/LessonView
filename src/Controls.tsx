@@ -3,9 +3,10 @@ import * as Tone from 'tone';
 
 interface ControlsProps {
   tabData: (number | null)[][][];
+  onNotesPlaying?: (notes: { fret: number; stringIndex: number }[]) => void;
 }
 
-const Controls: React.FC<ControlsProps> = ({ tabData }) => {
+const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Map fret numbers to semitones (0-D, 1-E, 2-F#, 3-G, 4-A, 5-B, 6-C, 7-C#, 8-D, etc.)
@@ -91,15 +92,29 @@ const Controls: React.FC<ControlsProps> = ({ tabData }) => {
       // Play through all measures
       for (const measure of tabData) {
         for (const beat of measure) {
+          // Collect currently playing notes
+          const currentNotes: { fret: number; stringIndex: number }[] = [];
+          
           // Play all non-null notes in the beat simultaneously
           beat.forEach((fret, stringIndex) => {
             if (fret !== null) {
               playNote(fret, stringIndex);
+              currentNotes.push({ fret, stringIndex });
             }
           });
           
+          // Show dots on fretboard
+          if (onNotesPlaying) {
+            onNotesPlaying(currentNotes);
+          }
+          
           // Wait for the duration of a beat (quarter note)
           await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Clear dots after beat
+          if (onNotesPlaying) {
+            onNotesPlaying([]);
+          }
         }
       }
       
@@ -110,6 +125,9 @@ const Controls: React.FC<ControlsProps> = ({ tabData }) => {
   const handlePause = () => {
     Tone.Transport.stop();
     setIsPlaying(false);
+    if (onNotesPlaying) {
+      onNotesPlaying([]);
+    }
   };
 
   return (

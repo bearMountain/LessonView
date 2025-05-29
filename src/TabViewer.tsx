@@ -32,23 +32,28 @@ const TabViewer: React.FC<TabViewerProps> = ({ tabData, onUpdateTab }) => {
         ))}
       </div>
       <div className="tab-content">
-        {tabData.map((measure, measureIndex) => (
-          <div key={measureIndex} className="measure">
-            {measure.map((beat, beatIndex) => (
-              <div key={beatIndex} className="beat">
-                {/* Display strings in reverse order */}
-                {beat.slice().reverse().map((fret, displayStringIndex) => (
-                  <div key={displayStringIndex} className="fret">
-                    <input
-                      type="number"
-                      min="0"
-                      max="12"
-                      value={fret === null ? '' : fret}
-                      onChange={(e) => handleFretChange(measureIndex, beatIndex, displayStringIndex, e)}
-                      className="fret-input"
-                    />
-                  </div>
-                ))}
+        {/* Display each string as a row */}
+        {stringNames.map((stringName, displayStringIndex) => (
+          <div key={stringName} className="measures-row">
+            {tabData.map((measure, measureIndex) => (
+              <div key={measureIndex} className="measure">
+                {measure.map((beat, beatIndex) => {
+                  // Get the fret for this string (reversed)
+                  const dataStringIndex = 2 - displayStringIndex;
+                  const fret = beat[dataStringIndex];
+                  return (
+                    <div key={beatIndex} className="fret">
+                      <input
+                        type="number"
+                        min="0"
+                        max="12"
+                        value={fret === null ? '' : fret}
+                        onChange={(e) => handleFretChange(measureIndex, beatIndex, displayStringIndex, e)}
+                        className="fret-input"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
