@@ -6,8 +6,8 @@ interface TabViewerProps {
   onUpdateTab: (measureIndex: number, beatIndex: number, stringIndex: number, value: number | null) => void;
 }
 
-// Strings in reverse order (Hi D on top)
-const stringNames = ['Hi D', 'A', 'Low D'];
+// Strings in reverse order (Hi D on top) with simplified notation
+const stringLabels = ['d', 'A', 'D'];
 
 const TabViewer: React.FC<TabViewerProps> = ({ tabData, onUpdateTab }) => {
   const handleFretChange = (
@@ -26,36 +26,34 @@ const TabViewer: React.FC<TabViewerProps> = ({ tabData, onUpdateTab }) => {
 
   return (
     <div className="tab-viewer">
-      <div className="tab-header">
-        {stringNames.map((name) => (
-          <div key={name} className="string-name">{name}</div>
-        ))}
-      </div>
       <div className="tab-content">
         {/* Display each string as a row */}
-        {stringNames.map((stringName, displayStringIndex) => (
-          <div key={stringName} className="measures-row">
-            {tabData.map((measure, measureIndex) => (
-              <div key={measureIndex} className="measure">
-                {measure.map((beat, beatIndex) => {
-                  // Get the fret for this string (reversed)
-                  const dataStringIndex = 2 - displayStringIndex;
-                  const fret = beat[dataStringIndex];
-                  return (
-                    <div key={beatIndex} className="fret">
-                      <input
-                        type="number"
-                        min="0"
-                        max="12"
-                        value={fret === null ? '' : fret}
-                        onChange={(e) => handleFretChange(measureIndex, beatIndex, displayStringIndex, e)}
-                        className="fret-input"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+        {stringLabels.map((stringLabel, displayStringIndex) => (
+          <div key={stringLabel} className="string-row">
+            <div className="string-label">{stringLabel}</div>
+            <div className="measures-row">
+              {tabData.map((measure, measureIndex) => (
+                <div key={measureIndex} className="measure">
+                  {measure.map((beat, beatIndex) => {
+                    // Get the fret for this string (reversed)
+                    const dataStringIndex = 2 - displayStringIndex;
+                    const fret = beat[dataStringIndex];
+                    return (
+                      <div key={beatIndex} className="fret">
+                        <input
+                          type="number"
+                          min="0"
+                          max="12"
+                          value={fret === null ? '' : fret}
+                          onChange={(e) => handleFretChange(measureIndex, beatIndex, displayStringIndex, e)}
+                          className="fret-input"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>

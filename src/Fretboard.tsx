@@ -8,9 +8,10 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
   // Calculate position for a dot on the fretboard based on the reference image
   const getDotPosition = (fret: number, stringIndex: number) => {
     // === ADJUSTABLE POSITIONING VARIABLES ===
-    const horizontalStartOffset = 100; // How much to shift all positions left (increase = more left)
-    const stringSpacing = 30; // Vertical distance between strings (increase = more spread out)
-    const horizontalScaleFactor = 1.2; // Multiply fret spacing (increase = more spread out horizontally)
+    const horizontalStartOffset = 55; // How much to shift all positions left (increase = more left)
+    const verticalStartOffset = 10; // How much to shift all positions up/down (positive = down, negative = up)
+    const stringSpacing = 20; // Vertical distance between strings (increase = more spread out)
+    const horizontalScaleFactor = 1.5; // Multiply fret spacing (increase = more spread out horizontally)
     
     // Image dimensions (same as original fretboard)
     const imageWidth = 1172; // Original image width
@@ -21,16 +22,16 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
     const scaleX = displayWidth / imageWidth;
     const scaleY = displayHeight / imageHeight;
     
-    // String positions - calculated from center with adjustable spacing
+    // String positions - calculated from center with adjustable spacing and offset
     const centerY = 75 * scaleY; // Center string (A)
     const stringPositionsY = [
-      (centerY - stringSpacing) * scaleY,  // Hi D (top string, index 2 in our data)
-      centerY * scaleY,                    // A (middle string, index 1 in our data)  
-      (centerY + stringSpacing) * scaleY   // Low D (bottom string, index 0 in our data)
+      (centerY - stringSpacing + verticalStartOffset) * scaleY,  // Hi D (top string, index 2 in our data)
+      (centerY + verticalStartOffset) * scaleY,                  // A (middle string, index 1 in our data)  
+      (centerY + stringSpacing + verticalStartOffset) * scaleY   // Low D (bottom string, index 0 in our data)
     ];
     
     // Base fret positions before scaling and shifting
-    const baseFretPositions = [285, 375, 455, 525, 590, 650, 705, 755, 800, 840, 875, 905, 935];
+    const baseFretPositions = [285, 375, 455, 490, 560, 620, 655, 680, 710, 840, 875, 905, 935];
     
     // Apply horizontal scaling and shifting
     const fretPositions = baseFretPositions.map((basePos, index) => {

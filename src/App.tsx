@@ -25,6 +25,7 @@ const initialTabData = [
 function App() {
   const [tabData, setTabData] = useState<(number | null)[][][]>(initialTabData);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
+  const [tempo, setTempo] = useState<number>(120); // Default 120 BPM
 
   const updateTabData = (measureIndex: number, beatIndex: number, stringIndex: number, value: number | null) => {
     setTabData(prevData => {
@@ -40,6 +41,10 @@ function App() {
     setCurrentlyPlaying(notes);
   };
 
+  const handleTempoChange = (newTempo: number) => {
+    setTempo(newTempo);
+  };
+
   return (
     <div className="app-container">
       <h1>Strumstick Tab Viewer</h1>
@@ -52,6 +57,8 @@ function App() {
           <Controls 
             tabData={tabData} 
             onNotesPlaying={handleNotesPlaying}
+            tempo={tempo}
+            onTempoChange={handleTempoChange}
           />
         </div>
         <Fretboard currentlyPlaying={currentlyPlaying} />

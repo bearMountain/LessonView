@@ -5,21 +5,23 @@
   padding: 20px;
 }
 
-.tab-header {
-  display: flex;
-  margin-bottom: 10px;
-}
-
-.string-name {
-  width: 60px;
-  text-align: center;
-  font-weight: bold;
-}
-
 .tab-content {
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.string-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.string-label {
+  width: 20px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 18px;
 }
 
 .measures-row {

@@ -4,9 +4,11 @@ import * as Tone from 'tone';
 interface ControlsProps {
   tabData: (number | null)[][][];
   onNotesPlaying?: (notes: { fret: number; stringIndex: number }[]) => void;
+  tempo: number;
+  onTempoChange: (tempo: number) => void;
 }
 
-const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying }) => {
+const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onTempoChange }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Map fret numbers to semitones (0-D, 1-E, 2-F#, 3-G, 4-A, 5-B, 6-C, 7-C#, 8-D, etc.)
@@ -21,6 +23,12 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying }) => {
     const semitones = firstOctaveMap[position];
     // Add 12 semitones for each octave
     return semitones + (octave * 12);
+  };
+
+  // Calculate beat duration in milliseconds based on BPM
+  const getBeatDuration = () => {
+    // 60,000 ms per minute / BPM = ms per beat
+    return 60000 / tempo;
   };
 
   const playNote = async (fret: number, stringIndex: number) => {
@@ -119,6 +127,8 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying }) => {
       await Tone.start();
       setIsPlaying(true);
       
+      const beatDuration = getBeatDuration();
+      
       // Play through all measures
       for (const measure of tabData) {
         for (const beat of measure) {
@@ -138,8 +148,8 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying }) => {
             onNotesPlaying(currentNotes);
           }
           
-          // Wait for the duration of a beat (quarter note)
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Wait for the duration of a beat based on tempo
+          await new Promise(resolve => setTimeout(resolve, beatDuration));
           
           // Clear dots after beat
           if (onNotesPlaying) {
@@ -160,8 +170,34 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying }) => {
     }
   };
 
+  const handleTempoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTempo = Math.max(30, Math.min(300, parseInt(e.target.value) || 120));
+    onTempoChange(newTempo);
+  };
+
   return (
     <div style={{ marginTop: 16 }}>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ marginRight: 8 }}>
+          Tempo (BPM):
+          <input
+            type="number"
+            value={tempo}
+            onChange={handleTempoChange}
+            min="30"
+            max="300"
+            step="1"
+            style={{ 
+              marginLeft: 8, 
+              width: 60, 
+              padding: 4,
+              border: '1px solid #ccc',
+              borderRadius: 4
+            }}
+          />
+        </label>
+      </div>
+      
       <button onClick={handlePlay} disabled={isPlaying}>Play</button>
       <button onClick={handlePause} disabled={!isPlaying}>Pause</button>
     </div>
