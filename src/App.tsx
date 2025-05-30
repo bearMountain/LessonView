@@ -50,11 +50,7 @@ function App() {
       return newData;
     });
     
-    // Move cursor to next position
-    setCursorPosition(prev => ({
-      ...prev,
-      timeIndex: prev.timeIndex + 1
-    }));
+    // Don't automatically move cursor - let TabViewer control cursor movement explicitly
   };
 
   const moveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
@@ -88,6 +84,30 @@ function App() {
     setTempo(newTempo);
   };
 
+  const removeNote = () => {
+    setTabData(prevData => {
+      const newData = [...prevData];
+      
+      // If there's no time position at cursor, nothing to remove
+      if (cursorPosition.timeIndex >= newData.length) {
+        return prevData;
+      }
+      
+      const timePosition = newData[cursorPosition.timeIndex];
+      
+      // Remove any existing note on this string at this time position
+      const filteredNotes = timePosition.notes.filter(note => note.stringIndex !== cursorPosition.stringIndex);
+      
+      // Update the time position with filtered notes
+      newData[cursorPosition.timeIndex] = {
+        notes: filteredNotes,
+        duration: getLongestDuration(filteredNotes)
+      };
+      
+      return newData;
+    });
+  };
+
   return (
     <div className="app-container">
       <h1>Strumstick Tab Viewer</h1>
@@ -97,6 +117,7 @@ function App() {
             tabData={tabData} 
             cursorPosition={cursorPosition}
             onAddNote={addNote}
+            onRemoveNote={removeNote}
             onMoveCursor={moveCursor}
             onCursorClick={(timeIndex: number, stringIndex: number) => setCursorPosition({ timeIndex, stringIndex })}
           />

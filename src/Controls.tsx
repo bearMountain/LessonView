@@ -187,156 +187,126 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
   const playTab = async () => {
     if (tabData.length === 0) return;
     
-    console.log('=== STARTING PLAYBACK ===');
+    console.log('=== STARTING METRONOME PLAYBACK ===');
     await Tone.start();
     
-    // Clear any existing part and transport FIRST
+    // Clear any existing transport scheduling
     console.log('Stopping and clearing existing transport...');
     Tone.Transport.stop();
     Tone.Transport.cancel();
-    if (partRef.current) {
-      partRef.current.dispose();
-      partRef.current = null;
-    }
-    
-    // Reset transport position to ensure clean state
     Tone.Transport.position = 0;
     
-    // Set tempo directly and verify
-    console.log(`Setting tempo from ${Tone.Transport.bpm.value} to ${tempo} BPM`);
+    // Set tempo - Transport will handle BPM changes automatically
+    console.log(`Setting tempo to ${tempo} BPM`);
     Tone.Transport.bpm.value = tempo;
     
-    // Wait a moment to ensure tempo is applied
-    await new Promise(resolve => setTimeout(resolve, 100));
-    console.log(`Tempo confirmed: ${Tone.Transport.bpm.value} BPM`);
-    
     setIsPlaying(true);
-
-    // Simple sequential approach - create an event for EVERY time position
-    const events: Array<{
-      time: number; // Time in beats
-      notes: Array<{ fret: number; stringIndex: number; duration: number }>;
-      timeIndex: number;
-    }> = [];
     
-    let currentTime = 0;
+    // Metronome state - using closure variables that persist across ticks
+    let currentSixteenthNote = 0; // Track position in sixteenth notes
+    let tabCursor = 0; // Which time position we're at in tabData
+    let positionStartBeat = 0; // When current position started (in sixteenth notes)
     
-    // Walk through EVERY time position, regardless of whether it has notes
-    tabData.forEach((timePosition, timeIndex) => {
-      const notesToPlay = timePosition.notes.filter(note => note.type === 'note' && note.fret !== null);
-      
-      // Create an event for every time position (even if no notes to play)
-      events.push({
-        time: currentTime,
-        notes: notesToPlay.map(note => ({
-          fret: note.fret!,
-          stringIndex: note.stringIndex,
-          duration: DURATION_VALUES[note.duration]
-        })),
-        timeIndex
-      });
-      
-      // Move forward by the time position's duration
-      const stepDuration = DURATION_VALUES[timePosition.duration];
-      console.log(`Position ${timeIndex + 1}: scheduled at ${currentTime} beats, step duration ${stepDuration} beats, ${notesToPlay.length} notes`);
-      currentTime += stepDuration;
+    // Calculate total duration in sixteenth notes for completion detection
+    const totalSixteenthNotes = tabData.reduce((total, timePos) => {
+      return total + (DURATION_VALUES[timePos.duration] * 4); // Convert quarter notes to sixteenth notes
+    }, 0);
+    
+    console.log(`Tab has ${tabData.length} positions, ${totalSixteenthNotes} total sixteenth notes`);
+    
+    // Log the timing plan
+    let planBeat = 0;
+    tabData.forEach((timePos, index) => {
+      const durationSixteenths = DURATION_VALUES[timePos.duration] * 4;
+      const notesToPlay = timePos.notes.filter(note => note.type === 'note' && note.fret !== null);
+      console.log(`Position ${index + 1}: starts at 16th ${planBeat}, duration ${durationSixteenths} 16ths, ${notesToPlay.length} notes`);
+      planBeat += durationSixteenths;
     });
-
-    console.log(`Created ${events.length} events for ${tabData.length} time positions`);
-    console.log(`Total duration: ${currentTime} beats at ${tempo} BPM = ${(currentTime * 60/tempo).toFixed(2)} seconds`);
     
-    // Log event timing details
-    events.forEach((event, index) => {
-      const expectedTimeMs = (event.time * 60 * 1000) / tempo; // Convert beats to milliseconds
-      console.log(`Event ${index + 1}: ${event.time} beats = ${expectedTimeMs.toFixed(0)}ms from start`);
-    });
-
-    let startTimeMs = 0;
-    let lastEventTimeMs = 0;
-
-    // Create and start part
-    partRef.current = new Tone.Part((time, event) => {
-      const nowMs = Date.now();
-      if (startTimeMs === 0) {
-        startTimeMs = nowMs;
-        lastEventTimeMs = nowMs;
+    // The metronome: fires every sixteenth note
+    const metronomeId = Tone.Transport.scheduleRepeat((time) => {
+      console.log(`🎵 Tick ${currentSixteenthNote}: cursor=${tabCursor}, posStart=${positionStartBeat}`);
+      
+      // Check if we're at the start of the current time position
+      if (currentSixteenthNote === positionStartBeat && tabCursor < tabData.length) {
+        const currentTimePos = tabData[tabCursor];
+        const notesToPlay = currentTimePos.notes.filter(note => note.type === 'note' && note.fret !== null);
+        
+        setCurrentTimeIndex(tabCursor);
+        
+        if (notesToPlay.length > 0) {
+          console.log(`  🎸 Playing ${notesToPlay.length} notes at position ${tabCursor + 1}`);
+          
+          // Play all notes at this position using the exact scheduled time
+          notesToPlay.forEach(note => {
+            console.log(`    Note: fret ${note.fret} on string ${note.stringIndex} (duration: ${note.duration})`);
+            playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
+          });
+          
+          // Update visual feedback
+          const playingNotes = notesToPlay.map(note => ({
+            fret: note.fret!,
+            stringIndex: note.stringIndex
+          }));
+          onNotesPlaying(playingNotes);
+          
+          // Clear visual feedback after a short time
+          setTimeout(() => {
+            onNotesPlaying([]);
+          }, 300);
+        } else {
+          console.log(`  ⏸️ Rest at position ${tabCursor + 1}`);
+        }
+        
+        // Move to next position
+        const currentPosDuration = DURATION_VALUES[currentTimePos.duration] * 4; // Convert to sixteenth notes
+        positionStartBeat += currentPosDuration;
+        tabCursor++;
+        
+        console.log(`  ➡️ Advanced to cursor ${tabCursor}, next position starts at 16th ${positionStartBeat}`);
       }
       
-      const elapsedMs = nowMs - startTimeMs;
-      const deltaSinceLastMs = nowMs - lastEventTimeMs;
-      const expectedElapsedMs = (event.time * 60 * 1000) / tempo;
-      const timingError = elapsedMs - expectedElapsedMs;
-      
-      console.log(`🎵 Position ${event.timeIndex + 1}: elapsed=${elapsedMs}ms, expected=${expectedElapsedMs.toFixed(0)}ms, error=${timingError.toFixed(0)}ms, delta=${deltaSinceLastMs}ms, scheduleTime=${time}`);
-      
-      lastEventTimeMs = nowMs;
-      setCurrentTimeIndex(event.timeIndex);
-      
-      if (event.notes.length > 0) {
-        // Play all notes at this time position using the scheduled time
-        event.notes.forEach(noteData => {
-          console.log(`  🎸 Playing fret ${noteData.fret} on string ${noteData.stringIndex} (duration: ${noteData.duration}) at schedule time ${time}`);
-          playNote(noteData.fret, noteData.stringIndex, noteData.duration, time);
-        });
-        
-        // Update visual feedback with all playing notes
-        const playingNotes = event.notes.map(noteData => ({
-          fret: noteData.fret,
-          stringIndex: noteData.stringIndex
-        }));
-        onNotesPlaying(playingNotes);
-        
-        // Clear visual feedback after a short time
-        setTimeout(() => {
-          onNotesPlaying([]);
-        }, 500);
-      } else {
-        console.log(`  ⏸️ Rest/empty position`);
+      // Check if we've reached the end
+      if (tabCursor >= tabData.length) {
+        console.log('🏁 Reached end of tab, stopping...');
+        stopPlayback();
+        return;
       }
       
-      // Check if this is the last event
-      if (event.timeIndex === tabData.length - 1) {
-        console.log('🏁 Last position reached - stopping UI, letting notes ring...');
-        setIsPlaying(false);
-        setCurrentTimeIndex(-1);
-        
-        setTimeout(() => {
-          console.log('🧹 Cleaning up transport');
-          Tone.Transport.stop();
-          Tone.Transport.cancel();
-          if (partRef.current) {
-            partRef.current.dispose();
-            partRef.current = null;
-          }
-          onNotesPlaying([]);
-        }, 1000);
-      }
-    }, events);
-
-    // Final verification before starting
-    console.log(`🚀 About to start - Transport BPM: ${Tone.Transport.bpm.value}, Transport position: ${Tone.Transport.position}, Events: ${events.length}`);
+      // Advance the metronome
+      currentSixteenthNote++;
+      
+    }, "16n"); // Fire every sixteenth note
     
-    // Start playback
-    partRef.current.start();
+    // Store the metronome ID for cleanup
+    partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) } as any;
+    
+    // Start the transport
     Tone.Transport.start();
     
-    console.log(`✅ Playback started at ${Date.now()}`);
+    console.log(`✅ Metronome started at ${tempo} BPM`);
     console.log('=== PLAYBACK RUNNING ===');
   };
 
   const stopPlayback = () => {
-    console.log('Manually stopping playback');
+    console.log('🛑 Manually stopping metronome playback');
+    
+    // Stop and clear the transport
     Tone.Transport.stop();
     Tone.Transport.cancel();
     
+    // Clean up the metronome callback
     if (partRef.current) {
       partRef.current.dispose();
       partRef.current = null;
     }
     
+    // Reset UI state
     setIsPlaying(false);
     setCurrentTimeIndex(-1);
     onNotesPlaying([]);
+    
+    console.log('✅ Playback stopped and cleaned up');
   };
 
   // Count total notes for display

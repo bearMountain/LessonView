@@ -7,6 +7,7 @@ interface TabViewerProps {
   tabData: TabData;
   cursorPosition: CursorPosition;
   onAddNote: (fret: number | null, duration: NoteDuration, type: 'note' | 'rest') => void;
+  onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
   onCursorClick: (timeIndex: number, stringIndex: number) => void;
 }
@@ -19,11 +20,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
   tabData, 
   cursorPosition, 
   onAddNote, 
+  onRemoveNote,
   onMoveCursor,
   onCursorClick 
 }) => {
   const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter');
   const [selectedNoteType, setSelectedNoteType] = useState<'note' | 'rest'>('note');
+  const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
   
   // Calculate dimensions
@@ -36,12 +39,21 @@ const TabViewer: React.FC<TabViewerProps> = ({
   
   // Calculate total width based on time position durations
   const calculateTotalWidth = () => {
-    if (tabData.length === 0) return minWidth;
-    
     let totalWidth = leftMargin + rightMargin;
-    tabData.forEach(timePos => {
-      totalWidth += DURATION_VALUES[timePos.duration] * baseBeatWidth;
-    });
+    
+    if (tabData.length === 0) {
+      // Empty tab: allocate space for many beat positions to maintain full width
+      totalWidth += 16 * baseBeatWidth; // Space for 16 quarter note positions
+    } else {
+      // Calculate width based on existing notes
+      tabData.forEach(timePos => {
+        totalWidth += DURATION_VALUES[timePos.duration] * baseBeatWidth;
+      });
+      
+      // Always ensure we have space for at least 8 more beat positions beyond existing content
+      const minExtraBeats = 8;
+      totalWidth += minExtraBeats * baseBeatWidth;
+    }
     
     return Math.max(minWidth, totalWidth);
   };
@@ -66,12 +78,47 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
   // Get cursor position in pixels
   const getCursorX = () => {
-    return getTimeX(cursorPosition.timeIndex);
+    // Match note positioning: position cursor at center of time position
+    if (cursorPosition.timeIndex < tabData.length) {
+      // If we're at an existing time position, center the cursor within that duration
+      const timePosition = tabData[cursorPosition.timeIndex];
+      return getTimeX(cursorPosition.timeIndex) + DURATION_VALUES[timePosition.duration] * baseBeatWidth / 2;
+    } else {
+      // If we're at a new position, center within a default quarter note duration
+      return getTimeX(cursorPosition.timeIndex) + DURATION_VALUES['quarter'] * baseBeatWidth / 2;
+    }
   };
 
   const getCursorY = () => {
     return getStringY(cursorPosition.stringIndex);
   };
+
+  // Load existing note into currentFretInput when cursor moves to it
+  const loadExistingNote = () => {
+    // Check if there's a note at the current cursor position
+    if (cursorPosition.timeIndex < tabData.length) {
+      const timePosition = tabData[cursorPosition.timeIndex];
+      const existingNote = timePosition.notes.find(
+        note => note.stringIndex === cursorPosition.stringIndex && note.type === 'note' && note.fret !== null
+      );
+      
+      if (existingNote && existingNote.fret !== null) {
+        // Load the existing fret value into input for editing
+        setCurrentFretInput(existingNote.fret.toString());
+      } else {
+        // No note at this position, clear input
+        setCurrentFretInput('');
+      }
+    } else {
+      // Position beyond existing data, clear input
+      setCurrentFretInput('');
+    }
+  };
+
+  // Load existing note when cursor position changes
+  useEffect(() => {
+    loadExistingNote();
+  }, [cursorPosition, tabData]);
 
   // Handle keyboard input
   useEffect(() => {
@@ -94,33 +141,95 @@ const TabViewer: React.FC<TabViewerProps> = ({
           onMoveCursor('down');
           break;
         case 'Enter':
+          e.preventDefault();
+          if (selectedNoteType === 'rest') {
+            onAddNote(null, selectedDuration, 'rest');
+            onMoveCursor('down'); // Move down after placing rest
+          } else if (currentFretInput) {
+            // Finalize the current note and move down
+            setCurrentFretInput('');
+            onMoveCursor('down');
+          } else {
+            // No current input, add a default note and move down
+            onAddNote(0, selectedDuration, 'note');
+            onMoveCursor('down'); // Move down after placing note
+          }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          if (selectedNoteType === 'rest') {
+            onAddNote(null, selectedDuration, 'rest');
+            onMoveCursor('right'); // Move right after placing rest
+          } else if (currentFretInput) {
+            // Finalize the current note and move right
+            setCurrentFretInput('');
+            onMoveCursor('right');
+          } else {
+            // No current input, just move right
+            onMoveCursor('right');
+          }
+          break;
         case ' ':
           e.preventDefault();
           if (selectedNoteType === 'rest') {
             onAddNote(null, selectedDuration, 'rest');
+            onMoveCursor('right'); // Move right after placing rest
           } else {
-            // For now, add a default fret 0 - this could be enhanced with fret selection
             onAddNote(0, selectedDuration, 'note');
+            onMoveCursor('right'); // Move right after placing note
           }
+          setCurrentFretInput('');
           break;
         case '0': case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9':
           e.preventDefault();
-          const fret = parseInt(e.key);
-          if (fret <= 12) {
-            onAddNote(fret, selectedDuration, 'note');
+          
+          const newInput = currentFretInput + e.key;
+          const potentialFret = parseInt(newInput);
+          
+          // Only allow up to 2 digits and frets up to 24
+          if (newInput.length <= 2 && potentialFret <= 24) {
+            setCurrentFretInput(newInput);
+            
+            // If this is the first digit, create a new note
+            if (currentFretInput === '') {
+              onAddNote(potentialFret, selectedDuration, 'note');
+            } else {
+              // Update existing note by calling onAddNote again (it will replace the note at current position)
+              onAddNote(potentialFret, selectedDuration, 'note');
+            }
           }
+          break;
+        case 'Backspace':
+          e.preventDefault();
+          if (currentFretInput.length > 0) {
+            const newInput = currentFretInput.slice(0, -1);
+            setCurrentFretInput(newInput);
+            
+            if (newInput.length > 0) {
+              const fret = parseInt(newInput);
+              onAddNote(fret, selectedDuration, 'note');
+            } else {
+              // No digits left, remove the note entirely
+              onRemoveNote();
+            }
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setCurrentFretInput('');
           break;
         case 'r':
           e.preventDefault();
           onAddNote(null, selectedDuration, 'rest');
+          setCurrentFretInput('');
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedDuration, selectedNoteType, onAddNote, onMoveCursor]);
+  }, [selectedDuration, selectedNoteType, currentFretInput, onAddNote, onMoveCursor, onRemoveNote]);
 
   // Handle SVG click
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -158,6 +267,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
     }
     
     onCursorClick(timeIndex, closestStringIndex);
+    
+    // Focus the SVG element so keyboard input works after mouse click
+    svgRef.current.focus();
   };
 
   // Render note stem based on duration
@@ -242,7 +354,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
         </div>
         
         <div className="instructions">
-          <p>Click to place cursor • Arrow keys to navigate • Number keys (0-9) or Enter to add notes • 'R' for rest • Stack notes vertically!</p>
+          <p>Click to place cursor • Arrow keys to navigate • Type digits to create/edit fret numbers • Enter to move down • Tab to move right • Backspace to edit • 'R' for rest</p>
         </div>
       </div>
 
@@ -273,7 +385,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
         {/* Horizontal string lines */}
         {stringIndices.map((stringIndex) => {
           const y = getStringY(stringIndex);
-          const endX = tabData.length > 0 ? getTimeX(tabData.length) : totalWidth - rightMargin;
+          const endX = totalWidth - rightMargin; // Always extend to full width
           
           return (
             <line
