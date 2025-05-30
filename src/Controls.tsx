@@ -5,12 +5,13 @@ import { DURATION_VALUES } from './types';
 
 interface ControlsProps {
   tabData: TabData;
+  cursorPosition: { timeIndex: number; stringIndex: number };
   onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
 }
 
-const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onTempoChange }) => {
+const Controls: React.FC<ControlsProps> = ({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeIndex, setCurrentTimeIndex] = useState<number>(-1);
   const partRef = useRef<Tone.Part | null>(null);
@@ -188,6 +189,7 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
     if (tabData.length === 0) return;
     
     console.log('=== STARTING METRONOME PLAYBACK ===');
+    console.log(`Starting from cursor position: timeIndex=${cursorPosition.timeIndex}`);
     await Tone.start();
     
     // Clear any existing transport scheduling
@@ -202,10 +204,16 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
     
     setIsPlaying(true);
     
-    // Metronome state - using closure variables that persist across ticks
-    let currentSixteenthNote = 0; // Track position in sixteenth notes
-    let tabCursor = 0; // Which time position we're at in tabData
-    let positionStartBeat = 0; // When current position started (in sixteenth notes)
+    // Calculate starting position in sixteenth notes
+    let startingSixteenthNote = 0;
+    for (let i = 0; i < Math.min(cursorPosition.timeIndex, tabData.length); i++) {
+      startingSixteenthNote += DURATION_VALUES[tabData[i].duration] * 4; // Convert to sixteenth notes
+    }
+    
+    // Metronome state - starting from cursor position
+    let currentSixteenthNote = startingSixteenthNote;
+    let tabCursor = cursorPosition.timeIndex; // Start from cursor position
+    let positionStartBeat = startingSixteenthNote; // When current position started
     
     // Calculate total duration in sixteenth notes for completion detection
     const totalSixteenthNotes = tabData.reduce((total, timePos) => {
@@ -213,15 +221,17 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
     }, 0);
     
     console.log(`Tab has ${tabData.length} positions, ${totalSixteenthNotes} total sixteenth notes`);
+    console.log(`Starting at sixteenth note ${startingSixteenthNote}, cursor at position ${tabCursor}`);
     
-    // Log the timing plan
-    let planBeat = 0;
-    tabData.forEach((timePos, index) => {
+    // Log the timing plan from cursor position onward
+    let planBeat = startingSixteenthNote;
+    for (let i = cursorPosition.timeIndex; i < tabData.length; i++) {
+      const timePos = tabData[i];
       const durationSixteenths = DURATION_VALUES[timePos.duration] * 4;
       const notesToPlay = timePos.notes.filter(note => note.type === 'note' && note.fret !== null);
-      console.log(`Position ${index + 1}: starts at 16th ${planBeat}, duration ${durationSixteenths} 16ths, ${notesToPlay.length} notes`);
+      console.log(`Position ${i + 1}: starts at 16th ${planBeat}, duration ${durationSixteenths} 16ths, ${notesToPlay.length} notes`);
       planBeat += durationSixteenths;
-    });
+    }
     
     // The metronome: fires every sixteenth note
     const metronomeId = Tone.Transport.scheduleRepeat((time) => {
@@ -332,7 +342,7 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
       
       <div>
         <button onClick={isPlaying ? stopPlayback : playTab} disabled={tabData.length === 0}>
-          {isPlaying ? 'Stop' : 'Play Tab'}
+          {isPlaying ? 'Stop' : `Play from position ${cursorPosition.timeIndex + 1}`}
         </button>
       </div>
       

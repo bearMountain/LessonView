@@ -123,6 +123,7 @@ function App() {
           />
           <Controls 
             tabData={tabData} 
+            cursorPosition={cursorPosition}
             onNotesPlaying={handleNotesPlaying}
             tempo={tempo}
             onTempoChange={handleTempoChange}
