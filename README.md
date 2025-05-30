@@ -1,12 +1,127 @@
 # Strumstick Tab Viewer
 
-An interactive web app for learning and playing strumstick tabs. Built with React + TypeScript.
+An interactive strumstick tablature viewer and editor with advanced note duration support, visual stems, and realistic audio playback.
 
 ## Features
-- Tab viewer for strumstick (3-string) instrument
-- SVG fretboard visualization
-- Playback controls (play, pause, step)
-- (Coming soon) Audio playback and YouTube sync
+
+### Enhanced Tab Editing
+- **Note Duration Support**: Create tabs with different note durations (whole, half, quarter, eighth, sixteenth notes)
+- **Visual Note Stems**: Notes display with proper stems and flags just like sheet music
+- **Duration Selector**: Easy-to-use radio button interface for selecting note durations
+- **Real-time Editing**: Click on any fret position to edit notes in-place
+
+### Visual Elements
+- **Note Heads**: Different visual styles for different durations
+  - Whole notes: Open circles with no stems
+  - Half notes: Open circles with stems
+  - Quarter notes: Filled circles with stems
+  - Eighth notes: Filled circles with stems and single flags
+  - Sixteenth notes: Filled circles with stems and double flags
+- **String Layout**: Three-string strumstick layout (Hi D, A, Low D) with simplified notation
+- **Measure Separators**: Clear visual separation between measures
+
+### Audio Playback
+- **Realistic Guitar Sound**: Multi-layer synthesis with:
+  - Sawtooth wave for brightness
+  - Square wave harmonics for metallic string character
+  - Triangle wave sub-harmonics for body resonance
+  - Pick noise simulation
+- **Audio Effects Chain**:
+  - Reverb for spatial depth
+  - Distortion for harmonic saturation
+  - Chorus for richness
+  - Vibrato for realism
+  - Low-pass filtering for natural frequency response
+- **Duration-Aware Playback**: Note sustain scales with duration values
+- **Tempo Control**: Adjustable BPM (30-300) with real-time tempo changes
+
+### Interactive Fretboard
+- **Visual Feedback**: Red dots show finger positions during playback
+- **Precise Positioning**: Accurate fret positioning based on actual strumstick measurements
+- **Real-time Updates**: Fretboard updates dynamically during playback
+
+## Usage
+
+### Editing Notes
+1. Select a note duration using the radio buttons at the top
+2. Click on any fret input field in the tablature
+3. Enter a fret number (0-12) or leave blank for no note
+4. The note will automatically use the selected duration and display appropriate visual elements
+
+### Note Durations
+- **Whole Note (4 beats)**: No stem, open circle
+- **Half Note (2 beats)**: Stem, open circle
+- **Quarter Note (1 beat)**: Stem, filled circle
+- **Eighth Note (0.5 beats)**: Stem with single flag, filled circle
+- **Sixteenth Note (0.25 beats)**: Stem with double flag, filled circle
+
+### Playback Controls
+- **Play/Pause**: Start or stop playback
+- **Tempo Control**: Adjust playback speed (BPM)
+- **Visual Feedback**: Watch the fretboard light up with current finger positions
+
+## Technical Implementation
+
+### Data Structure
+```typescript
+interface Note {
+  fret: number | null;
+  duration: NoteDuration;
+}
+
+type NoteDuration = 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth';
+type TabData = Note[][][][]; // [measure][beat][string][note]
+```
+
+### Duration Values
+- Whole: 4 quarter note beats
+- Half: 2 quarter note beats  
+- Quarter: 1 quarter note beat
+- Eighth: 0.5 quarter note beats
+- Sixteenth: 0.25 quarter note beats
+
+### Audio Synthesis
+The audio engine uses Tone.js with a sophisticated multi-layer approach:
+- **Main Synth**: Sawtooth oscillator for primary tone
+- **Harmonic Layer**: Square wave for upper harmonics
+- **Sub Layer**: Triangle wave for body resonance
+- **Effects Chain**: Reverb → Distortion → Chorus → Vibrato → Filter
+
+## Development
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+
+### Installation
+```bash
+npm install
+```
+
+### Development Server
+```bash
+npm run dev
+```
+
+### Build
+```bash
+npm run build
+```
+
+## Technologies Used
+- **React 18** with TypeScript
+- **Vite** for build tooling
+- **Tone.js** for audio synthesis
+- **SVG** for tablature rendering
+- **CSS3** for styling
+
+## Future Enhancements
+- Multiple notes per beat (chords)
+- Triplets and other complex rhythms
+- Export to MIDI/MusicXML
+- Import from standard tablature formats
+- Advanced audio effects
+- Multiple instrument support
 
 ## Getting Started
 

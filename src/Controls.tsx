@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import * as Tone from 'tone';
+import type { TabData } from './types';
+import { DURATION_VALUES } from './types';
 
 interface ControlsProps {
-  tabData: (number | null)[][][];
-  onNotesPlaying?: (notes: { fret: number; stringIndex: number }[]) => void;
+  tabData: TabData;
+  onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
 }
 
 const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onTempoChange }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTimeIndex, setCurrentTimeIndex] = useState<number>(-1);
+  const partRef = useRef<Tone.Part | null>(null);
 
+  // String tuning (in Hz) - Strumstick is tuned to D-A-D
+  const stringFrequencies = [146.83, 220.00, 293.66]; // Low D, A, Hi D
+  
   // Map fret numbers to semitones (0-D, 1-E, 2-F#, 3-G, 4-A, 5-B, 6-C, 7-C#, 8-D, etc.)
   const getSemitones = (fret: number): number => {
     // First octave mapping
@@ -25,21 +32,18 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
     return semitones + (octave * 12);
   };
 
-  // Calculate beat duration in milliseconds based on BPM
-  const getBeatDuration = () => {
-    // 60,000 ms per minute / BPM = ms per beat
-    return 60000 / tempo;
-  };
-
-  const playNote = async (fret: number, stringIndex: number) => {
+  const playNote = async (fret: number, stringIndex: number, duration: number, scheduleTime?: number) => {
     // === CENTRAL SUSTAIN CONTROL ===
-    // Adjust this single value to make notes ring longer (higher) or shorter (lower)
-    // 1.0 = normal, 0.5 = half as long, 2.0 = twice as long
-    const sustainMultiplier = 0.5;
+    // More natural scaling: quarter note = 1.0, whole note = 2.0, sixteenth = 0.5
+    const baseSustainMultiplier = 0.8; // Base sustain factor
+    const sustainMultiplier = baseSustainMultiplier * Math.sqrt(duration); // Square root for more natural scaling
     
     // Define the base notes for each string (Low D, A, Hi D)
     const baseNotes = ['D3', 'A3', 'D4'];
     const baseNote = baseNotes[stringIndex];
+    
+    // Use the scheduled time if provided (for accurate timing)
+    const when = scheduleTime !== undefined ? scheduleTime : "+0";
     
     // REVERB: Simulates the acoustic space/room
     const reverb = new Tone.Reverb({
@@ -132,30 +136,40 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
     const subNote = Tone.Frequency(baseNote).transpose(semitones - 12).toNote(); // One octave lower
     const harmonicNote = Tone.Frequency(baseNote).transpose(semitones + 12).toNote(); // One octave higher
     
-    // Calculate note durations based on sustain multiplier
-    const mainDuration = Tone.Time("2n").toSeconds() * sustainMultiplier;
-    const harmonicDuration = Tone.Time("1.5n").toSeconds() * sustainMultiplier;
-    const subDuration = Tone.Time("2n").toSeconds() * sustainMultiplier;
+    // Calculate note durations based on sustain multiplier and note duration
+    // Use fixed durations that don't change with tempo - tempo should only affect spacing
+    const baseDuration = 0.5; // Fixed base duration in seconds (independent of tempo)
+    const mainDuration = baseDuration * sustainMultiplier;
+    const harmonicDuration = baseDuration * 0.75 * sustainMultiplier;
+    const subDuration = baseDuration * sustainMultiplier;
     
-    // TRIGGER THE SOUNDS:
+    // TRIGGER THE SOUNDS using scheduled time:
+    
+    // Convert time to number if it's a string for calculations
+    const timeAsNumber = typeof when === 'string' ? 0 : when;
     
     // Pick noise first (very brief)
-    noise.start();
-    noise.stop("+0.005"); // Stop after 5ms
+    noise.start(when);
+    if (typeof when === 'number') {
+      noise.stop(when + 0.005);
+    } else {
+      noise.stop("+0.005");
+    }
     
     // Main guitar sound
-    mainSynth.triggerAttackRelease(note, mainDuration);
+    mainSynth.triggerAttackRelease(note, mainDuration, when);
     
     // Add harmonic layer slightly delayed (simulates string settling)
-    setTimeout(() => {
+    if (typeof when === 'number') {
+      harmonicSynth.triggerAttackRelease(harmonicNote, harmonicDuration, when + 0.002, 0.2);
+      // Add body resonance slightly delayed
+      subSynth.triggerAttackRelease(subNote, subDuration, when + 0.008, 0.15);
+    } else {
       harmonicSynth.triggerAttackRelease(harmonicNote, harmonicDuration, "+0.002", 0.2);
-    }, 1);
-    
-    // Add body resonance slightly delayed
-    setTimeout(() => {
+      // Add body resonance slightly delayed
       subSynth.triggerAttackRelease(subNote, subDuration, "+0.008", 0.15);
-    }, 3);
-    
+    }
+
     // Clean up after the sound dies out (scaled with sustain)
     setTimeout(() => {
       mainSynth.dispose();
@@ -170,86 +184,207 @@ const Controls: React.FC<ControlsProps> = ({ tabData, onNotesPlaying, tempo, onT
     }, 4500 * sustainMultiplier);
   };
 
-  const handlePlay = async () => {
-    if (!isPlaying) {
-      await Tone.start();
-      setIsPlaying(true);
+  const playTab = async () => {
+    if (tabData.length === 0) return;
+    
+    console.log('=== STARTING PLAYBACK ===');
+    await Tone.start();
+    
+    // Clear any existing part and transport FIRST
+    console.log('Stopping and clearing existing transport...');
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    if (partRef.current) {
+      partRef.current.dispose();
+      partRef.current = null;
+    }
+    
+    // Reset transport position to ensure clean state
+    Tone.Transport.position = 0;
+    
+    // Set tempo directly and verify
+    console.log(`Setting tempo from ${Tone.Transport.bpm.value} to ${tempo} BPM`);
+    Tone.Transport.bpm.value = tempo;
+    
+    // Wait a moment to ensure tempo is applied
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log(`Tempo confirmed: ${Tone.Transport.bpm.value} BPM`);
+    
+    setIsPlaying(true);
+
+    // Simple sequential approach - create an event for EVERY time position
+    const events: Array<{
+      time: number; // Time in beats
+      notes: Array<{ fret: number; stringIndex: number; duration: number }>;
+      timeIndex: number;
+    }> = [];
+    
+    let currentTime = 0;
+    
+    // Walk through EVERY time position, regardless of whether it has notes
+    tabData.forEach((timePosition, timeIndex) => {
+      const notesToPlay = timePosition.notes.filter(note => note.type === 'note' && note.fret !== null);
       
-      const beatDuration = getBeatDuration();
+      // Create an event for every time position (even if no notes to play)
+      events.push({
+        time: currentTime,
+        notes: notesToPlay.map(note => ({
+          fret: note.fret!,
+          stringIndex: note.stringIndex,
+          duration: DURATION_VALUES[note.duration]
+        })),
+        timeIndex
+      });
       
-      // Play through all measures
-      for (const measure of tabData) {
-        for (const beat of measure) {
-          // Collect currently playing notes
-          const currentNotes: { fret: number; stringIndex: number }[] = [];
-          
-          // Play all non-null notes in the beat simultaneously
-          beat.forEach((fret, stringIndex) => {
-            if (fret !== null) {
-              playNote(fret, stringIndex);
-              currentNotes.push({ fret, stringIndex });
-            }
-          });
-          
-          // Show dots on fretboard
-          if (onNotesPlaying) {
-            onNotesPlaying(currentNotes);
-          }
-          
-          // Wait for the duration of a beat based on tempo
-          await new Promise(resolve => setTimeout(resolve, beatDuration));
-          
-          // Clear dots after beat
-          if (onNotesPlaying) {
-            onNotesPlaying([]);
-          }
-        }
+      // Move forward by the time position's duration
+      const stepDuration = DURATION_VALUES[timePosition.duration];
+      console.log(`Position ${timeIndex + 1}: scheduled at ${currentTime} beats, step duration ${stepDuration} beats, ${notesToPlay.length} notes`);
+      currentTime += stepDuration;
+    });
+
+    console.log(`Created ${events.length} events for ${tabData.length} time positions`);
+    console.log(`Total duration: ${currentTime} beats at ${tempo} BPM = ${(currentTime * 60/tempo).toFixed(2)} seconds`);
+    
+    // Log event timing details
+    events.forEach((event, index) => {
+      const expectedTimeMs = (event.time * 60 * 1000) / tempo; // Convert beats to milliseconds
+      console.log(`Event ${index + 1}: ${event.time} beats = ${expectedTimeMs.toFixed(0)}ms from start`);
+    });
+
+    let startTimeMs = 0;
+    let lastEventTimeMs = 0;
+
+    // Create and start part
+    partRef.current = new Tone.Part((time, event) => {
+      const nowMs = Date.now();
+      if (startTimeMs === 0) {
+        startTimeMs = nowMs;
+        lastEventTimeMs = nowMs;
       }
       
-      setIsPlaying(false);
-    }
+      const elapsedMs = nowMs - startTimeMs;
+      const deltaSinceLastMs = nowMs - lastEventTimeMs;
+      const expectedElapsedMs = (event.time * 60 * 1000) / tempo;
+      const timingError = elapsedMs - expectedElapsedMs;
+      
+      console.log(`🎵 Position ${event.timeIndex + 1}: elapsed=${elapsedMs}ms, expected=${expectedElapsedMs.toFixed(0)}ms, error=${timingError.toFixed(0)}ms, delta=${deltaSinceLastMs}ms, scheduleTime=${time}`);
+      
+      lastEventTimeMs = nowMs;
+      setCurrentTimeIndex(event.timeIndex);
+      
+      if (event.notes.length > 0) {
+        // Play all notes at this time position using the scheduled time
+        event.notes.forEach(noteData => {
+          console.log(`  🎸 Playing fret ${noteData.fret} on string ${noteData.stringIndex} (duration: ${noteData.duration}) at schedule time ${time}`);
+          playNote(noteData.fret, noteData.stringIndex, noteData.duration, time);
+        });
+        
+        // Update visual feedback with all playing notes
+        const playingNotes = event.notes.map(noteData => ({
+          fret: noteData.fret,
+          stringIndex: noteData.stringIndex
+        }));
+        onNotesPlaying(playingNotes);
+        
+        // Clear visual feedback after a short time
+        setTimeout(() => {
+          onNotesPlaying([]);
+        }, 500);
+      } else {
+        console.log(`  ⏸️ Rest/empty position`);
+      }
+      
+      // Check if this is the last event
+      if (event.timeIndex === tabData.length - 1) {
+        console.log('🏁 Last position reached - stopping UI, letting notes ring...');
+        setIsPlaying(false);
+        setCurrentTimeIndex(-1);
+        
+        setTimeout(() => {
+          console.log('🧹 Cleaning up transport');
+          Tone.Transport.stop();
+          Tone.Transport.cancel();
+          if (partRef.current) {
+            partRef.current.dispose();
+            partRef.current = null;
+          }
+          onNotesPlaying([]);
+        }, 1000);
+      }
+    }, events);
+
+    // Final verification before starting
+    console.log(`🚀 About to start - Transport BPM: ${Tone.Transport.bpm.value}, Transport position: ${Tone.Transport.position}, Events: ${events.length}`);
+    
+    // Start playback
+    partRef.current.start();
+    Tone.Transport.start();
+    
+    console.log(`✅ Playback started at ${Date.now()}`);
+    console.log('=== PLAYBACK RUNNING ===');
   };
 
-  const handlePause = () => {
+  const stopPlayback = () => {
+    console.log('Manually stopping playback');
     Tone.Transport.stop();
-    setIsPlaying(false);
-    if (onNotesPlaying) {
-      onNotesPlaying([]);
+    Tone.Transport.cancel();
+    
+    if (partRef.current) {
+      partRef.current.dispose();
+      partRef.current = null;
     }
+    
+    setIsPlaying(false);
+    setCurrentTimeIndex(-1);
+    onNotesPlaying([]);
   };
 
-  const handleTempoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTempo = Math.max(30, Math.min(300, parseInt(e.target.value) || 120));
-    onTempoChange(newTempo);
-  };
+  // Count total notes for display
+  const totalNotes = tabData.reduce((count, timePos) => count + timePos.notes.length, 0);
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ marginRight: 8 }}>
-          Tempo (BPM):
+    <div className="controls">
+      <h3>Playback Controls</h3>
+      
+      <div style={{ marginBottom: '1rem' }}>
+        <label>
+          Tempo: {tempo} BPM
           <input
-            type="number"
-            value={tempo}
-            onChange={handleTempoChange}
+            type="range"
             min="30"
-            max="300"
-            step="1"
-            style={{ 
-              marginLeft: 8, 
-              width: 60, 
-              padding: 4,
-              border: '1px solid #ccc',
-              borderRadius: 4
-            }}
+            max="400"
+            value={tempo}
+            onChange={(e) => onTempoChange(parseInt(e.target.value))}
+            style={{ marginLeft: '10px', width: '200px' }}
           />
         </label>
       </div>
       
-      <button onClick={handlePlay} disabled={isPlaying}>Play</button>
-      <button onClick={handlePause} disabled={!isPlaying}>Pause</button>
+      <div>
+        <button onClick={isPlaying ? stopPlayback : playTab} disabled={tabData.length === 0}>
+          {isPlaying ? 'Stop' : 'Play Tab'}
+        </button>
+      </div>
+      
+      {isPlaying && currentTimeIndex >= 0 && (
+        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#666' }}>
+          Playing time position {currentTimeIndex + 1} of {tabData.length}
+        </div>
+      )}
+      
+      {tabData.length === 0 && (
+        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#999' }}>
+          Add some notes to the tab to enable playback
+        </div>
+      )}
+      
+      {tabData.length > 0 && (
+        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#666' }}>
+          {tabData.length} time positions, {totalNotes} total notes
+        </div>
+      )}
     </div>
   );
 };
 
-export default Controls; 
+export default Controls;
