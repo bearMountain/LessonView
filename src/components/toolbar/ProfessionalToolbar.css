@@ -1,0 +1,392 @@
+/* Professional Toolbar Styles */
+.professional-toolbar {
+  display: flex;
+  align-items: stretch;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-ui);
+  gap: var(--spacing-md);
+  min-height: 80px;
+  overflow-x: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: fit-content;
+}
+
+.toolbar-section__header {
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--spacing-sm);
+  width: 100%;
+  text-align: center;
+}
+
+.toolbar-section__title {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toolbar-section__content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.toolbar-section-separator {
+  width: 1px;
+  background-color: var(--color-border);
+  margin: 0 var(--spacing-sm);
+  align-self: stretch;
+}
+
+/* Toolbar Button Styles */
+.toolbar-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  min-width: 60px;
+  text-align: center;
+}
+
+.toolbar-button:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+}
+
+.toolbar-button:active {
+  background-color: var(--color-bg-active);
+  transform: translateY(1px);
+}
+
+.toolbar-button__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.toolbar-button__text {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background-color: var(--color-border);
+  margin: 0 var(--spacing-xs);
+}
+
+/* Note Value Palette Styles */
+.note-value-palette {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.note-value-palette__label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.note-value-palette__buttons {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.note-value-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--spacing-xs);
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  min-width: 42px;
+  min-height: 42px;
+  justify-content: center;
+}
+
+.note-value-button:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--primary-blue);
+}
+
+.note-value-button--active {
+  background-color: var(--primary-blue);
+  border-color: var(--primary-blue);
+  color: var(--color-text-inverse);
+}
+
+.note-value-button__symbol {
+  font-size: 18px;
+  line-height: 1;
+  font-family: 'Times New Roman', serif;
+}
+
+.note-value-button__text {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: capitalize;
+  line-height: 1;
+}
+
+/* Time Signature Selector Styles */
+.time-signature-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.time-signature-selector__label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.time-signature-dropdown {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.time-signature-dropdown__select {
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  min-width: 60px;
+  text-align: center;
+}
+
+.time-signature-dropdown__select:hover {
+  border-color: var(--primary-blue);
+}
+
+.time-signature-dropdown__select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.time-signature-display {
+  margin-top: var(--spacing-xs);
+}
+
+.time-signature-display__value {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-family: 'Times New Roman', serif;
+}
+
+/* Tempo Controls Styles */
+.tempo-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 200px;
+}
+
+.tempo-controls__label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.tempo-controls__main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.tempo-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  color: var(--color-text-primary);
+}
+
+.tempo-button:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--primary-blue);
+}
+
+.tempo-button:active {
+  background-color: var(--color-bg-active);
+  transform: translateY(1px);
+}
+
+.tempo-button__icon {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tempo-display {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  min-width: 80px;
+  justify-content: center;
+}
+
+.tempo-display:hover {
+  border-color: var(--primary-blue);
+}
+
+.tempo-display__value {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.tempo-display__input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  width: 40px;
+  text-align: center;
+}
+
+.tempo-display__unit {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.tempo-marking {
+  margin-top: var(--spacing-xs);
+}
+
+.tempo-marking__text {
+  font-size: var(--font-size-xs);
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.tempo-presets {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--spacing-xs);
+}
+
+.tempo-preset {
+  padding: 2px var(--spacing-xs);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.tempo-preset:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.tempo-preset--active {
+  background-color: var(--primary-blue);
+  color: var(--color-text-inverse);
+  border-color: var(--primary-blue);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .professional-toolbar {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: 70px;
+  }
+  
+  .toolbar-button {
+    min-width: 50px;
+    padding: var(--spacing-xs);
+  }
+  
+  .toolbar-button__text {
+    font-size: 10px;
+  }
+  
+  .tempo-controls {
+    min-width: 160px;
+  }
+  
+  .tempo-presets {
+    display: none; /* Hide tempo presets on smaller screens */
+  }
+}
+
+@media (max-width: 768px) {
+  .professional-toolbar {
+    gap: var(--spacing-sm);
+  }
+  
+  .toolbar-section__content {
+    gap: 2px;
+  }
+  
+  .note-value-palette__buttons {
+    gap: 2px;
+  }
+  
+  .note-value-button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  
+  .tempo-controls {
+    min-width: 140px;
+  }
+} 

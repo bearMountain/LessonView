@@ -6,11 +6,14 @@ import { DURATION_VISUALS, DURATION_VALUES, calculateTimePosition, getMeasureBou
 interface TabViewerProps {
   tabData: TabData;
   cursorPosition: CursorPosition;
-  onAddNote: (fret: number | null, duration: NoteDuration, type: 'note' | 'rest') => void;
+  onAddNote: (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => void;
   onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
   onCursorClick: (timeIndex: number, stringIndex: number) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
+  selectedDuration: NoteDuration;
+  onPlayFromCursor?: () => void;
+  onResetCursor?: () => void;
 }
 
 // String labels (reversed order - Hi D on top)
@@ -24,9 +27,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
   onRemoveNote,
   onMoveCursor,
   onCursorClick,
-  onPlayPreviewNote
+  onPlayPreviewNote,
+  selectedDuration,
+  onPlayFromCursor,
+  onResetCursor
 }) => {
-  const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter');
   const [selectedNoteType, setSelectedNoteType] = useState<'note' | 'rest'>('note');
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
@@ -121,10 +126,12 @@ const TabViewer: React.FC<TabViewerProps> = ({
     }
   };
 
-  // Load existing note when cursor position changes
+  // Load existing note when cursor position changes and input is clear
   useEffect(() => {
-    loadExistingNote();
-  }, [cursorPosition, tabData]);
+    if (currentFretInput === '') {
+      loadExistingNote();
+    }
+  }, [cursorPosition]);
 
   // Handle keyboard input
   useEffect(() => {
@@ -132,59 +139,60 @@ const TabViewer: React.FC<TabViewerProps> = ({
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
+          setCurrentFretInput(''); // Clear input when moving
           onMoveCursor('left');
           break;
         case 'ArrowRight':
           e.preventDefault();
+          setCurrentFretInput(''); // Clear input when moving
           onMoveCursor('right');
           break;
         case 'ArrowUp':
           e.preventDefault();
+          setCurrentFretInput(''); // Clear input when moving
           onMoveCursor('up');
           break;
         case 'ArrowDown':
           e.preventDefault();
+          setCurrentFretInput(''); // Clear input when moving
           onMoveCursor('down');
           break;
         case 'Enter':
           e.preventDefault();
-          if (selectedNoteType === 'rest') {
+          if (e.metaKey || e.ctrlKey) {
+            // Cmd+Enter / Ctrl+Enter: Reset cursor to start (no loadExistingNote call)
+            if (onResetCursor) {
+              onResetCursor();
+            }
+          } else if (selectedNoteType === 'rest') {
             onAddNote(null, selectedDuration, 'rest');
+            setCurrentFretInput(''); // Clear input when moving
             onMoveCursor('down'); // Move down after placing rest
           } else if (currentFretInput) {
             // Finalize the current note and move down
-            setCurrentFretInput('');
+            setCurrentFretInput(''); // Clear input when moving
             onMoveCursor('down');
           } else {
             // No current input, add a default note and move down
             onAddNote(0, selectedDuration, 'note');
+            setCurrentFretInput(''); // Clear input when moving
             onMoveCursor('down'); // Move down after placing note
           }
           break;
         case 'Tab':
           e.preventDefault();
+          setCurrentFretInput(''); // Always clear input when moving with Tab
           if (selectedNoteType === 'rest') {
             onAddNote(null, selectedDuration, 'rest');
-            onMoveCursor('right'); // Move right after placing rest
-          } else if (currentFretInput) {
-            // Finalize the current note and move right
-            setCurrentFretInput('');
-            onMoveCursor('right');
-          } else {
-            // No current input, just move right
-            onMoveCursor('right');
           }
+          onMoveCursor('right'); // Move right
           break;
         case ' ':
           e.preventDefault();
-          if (selectedNoteType === 'rest') {
-            onAddNote(null, selectedDuration, 'rest');
-            onMoveCursor('right'); // Move right after placing rest
-          } else {
-            onAddNote(0, selectedDuration, 'note');
-            onMoveCursor('right'); // Move right after placing note
+          // Space bar: Play from current cursor position
+          if (onPlayFromCursor) {
+            onPlayFromCursor();
           }
-          setCurrentFretInput('');
           break;
         case '0': case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9':
@@ -299,6 +307,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
     
     onCursorClick(timeIndex, closestStringIndex);
     
+    // Clear input when clicking to new position
+    setCurrentFretInput('');
+    
     // Focus the SVG element so keyboard input works after mouse click
     svgRef.current.focus();
   };
@@ -353,11 +364,15 @@ const TabViewer: React.FC<TabViewerProps> = ({
                 name="duration"
                 value={duration}
                 checked={selectedDuration === duration}
-                onChange={(e) => setSelectedDuration(e.target.value as NoteDuration)}
+                onChange={() => {}} // Read-only, controlled by toolbar
+                disabled={true}
               />
               {duration}
             </label>
           ))}
+          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+            Duration controlled by toolbar above
+          </div>
         </div>
         
         <div className="note-type-selector">
@@ -385,7 +400,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
         </div>
         
         <div className="instructions">
-          <p>Click to place cursor • Arrow keys to navigate • Type digits to create/edit fret numbers • Enter to move down • Tab to move right • Backspace to edit • 'R' for rest</p>
+          <p>Click to place cursor • Arrow keys to navigate • Type digits to create/edit fret numbers • Enter to move down • Tab to move right • Backspace to edit • 'R' for rest • <strong>Space to play from cursor • Cmd+Enter to reset to start</strong></p>
         </div>
       </div>
 

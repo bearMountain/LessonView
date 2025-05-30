@@ -381,6 +381,13 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
             if (notesToPlay.length > 0) {
               console.log(`  🎸 Playing ${notesToPlay.length} notes at position ${tabCursor + 1}`);
               
+              // Update visual feedback first (clear previous notes)
+              const playingNotes = notesToPlay.map(note => ({
+                fret: note.fret!,
+                stringIndex: note.stringIndex
+              }));
+              onNotesPlaying(playingNotes);
+              
               // Play all notes at this position using the exact scheduled time
               notesToPlay.forEach(note => {
                 console.log(`    Note: fret ${note.fret} on string ${note.stringIndex} (duration: ${note.duration})`);
@@ -391,19 +398,10 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                 }
               });
               
-              // Update visual feedback
-              const playingNotes = notesToPlay.map(note => ({
-                fret: note.fret!,
-                stringIndex: note.stringIndex
-              }));
-              onNotesPlaying(playingNotes);
-              
-              // Clear visual feedback after a short time
-              setTimeout(() => {
-                onNotesPlaying([]);
-              }, 200); // Reduced from 300ms for high BPM
             } else {
               console.log(`  ⏸️ Rest at position ${tabCursor + 1}`);
+              // Clear visual feedback for rests
+              onNotesPlaying([]);
             }
             
             // Move to next position
@@ -477,7 +475,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
       setCurrentTimeIndex(-1);
-      onNotesPlaying([]);
+      onNotesPlaying([]); // Clear any remaining visual feedback
       
       // Dispose reusable synths
       disposeSynths();

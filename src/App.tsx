@@ -5,6 +5,7 @@ import Fretboard from './Fretboard'
 import Controls from './Controls'
 import MainLayout from './components/layout/MainLayout'
 import PlaybackBar from './components/transport/PlaybackBar'
+import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, CursorPosition, TabData, TimePosition } from './types'
 import { getLongestDuration } from './types'
@@ -20,9 +21,13 @@ function App() {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isLooping, setIsLooping] = useState<boolean>(false);
   const [showFretboard, setShowFretboard] = useState<boolean>(true);
+  const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter'); // Default note duration
+  const [timeSignature, setTimeSignature] = useState<string>('4/4'); // Default time signature
   const controlsRef = useRef<ControlsRef>(null);
 
-  const addNote = (fret: number | null, duration: NoteDuration, type: 'note' | 'rest' = 'note') => {
+  const addNote = (fret: number | null, duration?: NoteDuration, type: 'note' | 'rest' = 'note') => {
+    const noteDuration = duration || selectedDuration; // Use provided duration or selected from toolbar
+    
     setTabData(prevData => {
       const newData = [...prevData];
       
@@ -38,7 +43,7 @@ function App() {
       const newNote: Note = {
         type,
         fret: type === 'rest' ? null : fret,
-        duration,
+        duration: noteDuration,
         stringIndex: cursorPosition.stringIndex
       };
       
@@ -138,6 +143,19 @@ function App() {
     setIsPlaying(playing);
   };
 
+  // Handle play from cursor (space bar shortcut)
+  const handlePlayFromCursor = () => {
+    if (!isPlaying) {
+      controlsRef.current?.playTab();
+      setIsPlaying(true);
+    }
+  };
+
+  // Handle reset cursor to start (cmd+enter shortcut) 
+  const handleResetCursor = () => {
+    setCursorPosition({ timeIndex: 0, stringIndex: 2 }); // Reset to start, Hi D string
+  };
+
   // Calculate current time display (simplified for now)
   const currentTime = "0:00";
   const totalTime = tabData.length > 0 ? `0:${Math.floor(tabData.length / 4).toString().padStart(2, '0')}` : "0:00";
@@ -145,11 +163,14 @@ function App() {
   return (
     <MainLayout
       toolbar={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h1 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>
-            Strumstick Tab Editor
-          </h1>
-        </div>
+        <ProfessionalToolbar
+          selectedDuration={selectedDuration}
+          onDurationChange={setSelectedDuration}
+          tempo={tempo}
+          onTempoChange={setTempo}
+          timeSignature={timeSignature}
+          onTimeSignatureChange={setTimeSignature}
+        />
       }
       leftSidebar={
         <div>
@@ -171,6 +192,9 @@ function App() {
             onMoveCursor={moveCursor}
             onCursorClick={(timeIndex: number, stringIndex: number) => setCursorPosition({ timeIndex, stringIndex })}
             onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
+            selectedDuration={selectedDuration}
+            onPlayFromCursor={handlePlayFromCursor}
+            onResetCursor={handleResetCursor}
           />
         </div>
       }
