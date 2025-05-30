@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
 import Controls from './Controls'
+import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, CursorPosition, TabData, TimePosition } from './types'
 import { getLongestDuration } from './types'
 
@@ -14,6 +15,7 @@ function App() {
   const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ timeIndex: 0, stringIndex: 2 }); // Start on Hi D string
   const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
   const [tempo, setTempo] = useState<number>(120); // Default 120 BPM
+  const controlsRef = useRef<ControlsRef>(null);
 
   const addNote = (fret: number | null, duration: NoteDuration, type: 'note' | 'rest' = 'note') => {
     setTabData(prevData => {
@@ -120,8 +122,10 @@ function App() {
             onRemoveNote={removeNote}
             onMoveCursor={moveCursor}
             onCursorClick={(timeIndex: number, stringIndex: number) => setCursorPosition({ timeIndex, stringIndex })}
+            onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
           />
           <Controls 
+            ref={controlsRef}
             tabData={tabData} 
             cursorPosition={cursorPosition}
             onNotesPlaying={handleNotesPlaying}

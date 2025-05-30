@@ -10,6 +10,7 @@ interface TabViewerProps {
   onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
   onCursorClick: (timeIndex: number, stringIndex: number) => void;
+  onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
 }
 
 // String labels (reversed order - Hi D on top)
@@ -22,7 +23,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
   onAddNote, 
   onRemoveNote,
   onMoveCursor,
-  onCursorClick 
+  onCursorClick,
+  onPlayPreviewNote
 }) => {
   const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter');
   const [selectedNoteType, setSelectedNoteType] = useState<'note' | 'rest'>('note');
@@ -105,6 +107,10 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (existingNote && existingNote.fret !== null) {
         // Load the existing fret value into input for editing
         setCurrentFretInput(existingNote.fret.toString());
+        // Play preview sound for the existing note
+        if (onPlayPreviewNote) {
+          onPlayPreviewNote(existingNote.fret, cursorPosition.stringIndex);
+        }
       } else {
         // No note at this position, clear input
         setCurrentFretInput('');
@@ -194,9 +200,17 @@ const TabViewer: React.FC<TabViewerProps> = ({
             // If this is the first digit, create a new note
             if (currentFretInput === '') {
               onAddNote(potentialFret, selectedDuration, 'note');
+              // Play preview sound for the new note
+              if (onPlayPreviewNote) {
+                onPlayPreviewNote(potentialFret, cursorPosition.stringIndex);
+              }
             } else {
               // Update existing note by calling onAddNote again (it will replace the note at current position)
               onAddNote(potentialFret, selectedDuration, 'note');
+              // Play preview sound for the updated note
+              if (onPlayPreviewNote) {
+                onPlayPreviewNote(potentialFret, cursorPosition.stringIndex);
+              }
             }
           }
           break;
@@ -252,18 +266,35 @@ const TabViewer: React.FC<TabViewerProps> = ({
       }
     });
     
-    // Determine time position
+    // Determine time position by finding the closest note center
     let timeIndex = 0;
-    if (tabData.length > 0) {
-      // Find closest time position
-      for (let i = 0; i <= tabData.length; i++) {
-        const timeX = getTimeX(i);
-        if (x < timeX + baseBeatWidth / 2) {
-          timeIndex = i;
-          break;
-        }
-        timeIndex = i + 1;
+    let timeMinDistance = Infinity;
+    
+    // Check distance to each existing time position
+    for (let i = 0; i < tabData.length; i++) {
+      const centerX = getTimeX(i) + DURATION_VALUES[tabData[i].duration] * baseBeatWidth / 2;
+      const distance = Math.abs(x - centerX);
+      
+      if (distance < timeMinDistance) {
+        timeMinDistance = distance;
+        timeIndex = i;
       }
+    }
+    
+    // Also check distance to the next potential position (after all existing notes)
+    if (tabData.length > 0) {
+      const nextPositionX = getTimeX(tabData.length);
+      const nextCenterX = nextPositionX + DURATION_VALUES['quarter'] * baseBeatWidth / 2; // Assume quarter note for new position
+      const distanceToNext = Math.abs(x - nextCenterX);
+      
+      if (distanceToNext < timeMinDistance) {
+        timeIndex = tabData.length;
+      }
+    } else {
+      // No existing data, check if click is close to the first potential position
+      const firstPositionX = getTimeX(0);
+      const firstCenterX = firstPositionX + DURATION_VALUES['quarter'] * baseBeatWidth / 2;
+      timeIndex = 0; // Default to first position when no data exists
     }
     
     onCursorClick(timeIndex, closestStringIndex);

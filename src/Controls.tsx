@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as Tone from 'tone';
 import type { TabData } from './types';
 import { DURATION_VALUES } from './types';
@@ -9,12 +9,45 @@ interface ControlsProps {
   onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
+  onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
 }
 
-const Controls: React.FC<ControlsProps> = ({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange }) => {
+export interface ControlsRef {
+  playPreviewNote: (fret: number, stringIndex: number) => void;
+}
+
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlayPreviewNote }, ref) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeIndex, setCurrentTimeIndex] = useState<number>(-1);
   const partRef = useRef<Tone.Part | null>(null);
+  const synthsRef = useRef<{
+    strings: Array<{
+      main: Tone.Synth | null;
+      harmonic: Tone.Synth | null;
+      sub: Tone.Synth | null;
+      noise: Tone.Noise | null;
+    }>;
+    effects: {
+      reverb: Tone.Reverb | null;
+      distortion: Tone.Distortion | null;
+      filter: Tone.Filter | null;
+      chorus: Tone.Chorus | null;
+      vibrato: Tone.Vibrato | null;
+    };
+  }>({
+    strings: [
+      { main: null, harmonic: null, sub: null, noise: null }, // String 0
+      { main: null, harmonic: null, sub: null, noise: null }, // String 1
+      { main: null, harmonic: null, sub: null, noise: null }, // String 2
+    ],
+    effects: {
+      reverb: null,
+      distortion: null,
+      filter: null,
+      chorus: null,
+      vibrato: null,
+    }
+  });
 
   // String tuning (in Hz) - Strumstick is tuned to D-A-D
   const stringFrequencies = [146.83, 220.00, 293.66]; // Low D, A, Hi D
@@ -33,294 +66,439 @@ const Controls: React.FC<ControlsProps> = ({ tabData, cursorPosition, onNotesPla
     return semitones + (octave * 12);
   };
 
-  const playNote = async (fret: number, stringIndex: number, duration: number, scheduleTime?: number) => {
-    // === CENTRAL SUSTAIN CONTROL ===
-    // More natural scaling: quarter note = 1.0, whole note = 2.0, sixteenth = 0.5
-    const baseSustainMultiplier = 0.8; // Base sustain factor
-    const sustainMultiplier = baseSustainMultiplier * Math.sqrt(duration); // Square root for more natural scaling
+  // Initialize reusable synth instances
+  const initializeSynths = () => {
+    if (synthsRef.current.strings[0].main) return; // Already initialized
     
-    // Define the base notes for each string (Low D, A, Hi D)
-    const baseNotes = ['D3', 'A3', 'D4'];
-    const baseNote = baseNotes[stringIndex];
-    
-    // Use the scheduled time if provided (for accurate timing)
-    const when = scheduleTime !== undefined ? scheduleTime : "+0";
-    
-    // REVERB: Simulates the acoustic space/room
-    const reverb = new Tone.Reverb({
-      decay: 1.5 * sustainMultiplier,     // How long reverb lasts (shorter = drier, longer = more spacious)
-      preDelay: 0.01, // Delay before reverb starts (simulates room size)
-      wet: 0.2        // How much reverb vs dry signal (0 = no reverb, 1 = only reverb)
-    }).toDestination();
-    
-    // DISTORTION: Adds harmonic saturation like tube amps/pickup saturation
-    const distortion = new Tone.Distortion(0.15).connect(reverb); // Amount of saturation (0-1)
-    
-    // LOW PASS FILTER: Simulates the natural frequency response of guitar body/pickups
-    const filter = new Tone.Filter({
-      frequency: 3500,  // Cutoff frequency - higher = brighter, lower = warmer
-      type: "lowpass",  // Removes frequencies above the cutoff
-      rolloff: -12      // How steep the cutoff is (-12dB, -24dB, etc.)
-    }).connect(distortion);
-    
-    // CHORUS: Creates slight pitch/timing variations for richer sound
-    const chorus = new Tone.Chorus({
-      frequency: 3,    // Speed of modulation (Hz)
-      delayTime: 2.5,  // Base delay time (ms)
-      depth: 0.4,      // How deep the modulation goes (0-1)
-      wet: 0.3         // How much chorus effect vs dry (0-1)
-    }).connect(filter);
-    
-    // VIBRATO: Adds subtle pitch wobble to make it less mechanically perfect
-    const vibrato = new Tone.Vibrato({
-      frequency: 4.5,   // Speed of vibrato (Hz) - faster = more nervous
-      depth: 0.08       // Depth of pitch variation (0-1) - higher = more wobbly
-    }).connect(chorus);
-    
-    // MAIN GUITAR SYNTH: Primary tone generator
-    const mainSynth = new Tone.Synth({
-      oscillator: {
-        type: "sawtooth"  // Rich in harmonics (sawtooth = bright, square = hollow, sine = pure)
-      },
-      detune: -2,         // Slightly flat for realism (cents, -100 to 100)
-      envelope: {
-        attack: 0.001,    // Pick attack time - shorter = sharper pick attack
-        decay: 0.05,      // Initial volume drop after attack
-        sustain: 0.2,     // Sustained volume level (0-1)
-        release: 2.8 * sustainMultiplier      // How long note takes to fade out
+    try {
+      // Create effects chain (shared by all strings)
+      const reverb = new Tone.Reverb({
+        decay: 1.5,
+        preDelay: 0.01,
+        wet: 0.2
+      }).toDestination();
+      
+      const distortion = new Tone.Distortion(0.15).connect(reverb);
+      const filter = new Tone.Filter({
+        frequency: 3500,
+        type: "lowpass",
+        rolloff: -12
+      }).connect(distortion);
+      
+      const chorus = new Tone.Chorus({
+        frequency: 3,
+        delayTime: 2.5,
+        depth: 0.4,
+        wet: 0.3
+      }).connect(filter);
+      
+      const vibrato = new Tone.Vibrato({
+        frequency: 4.5,
+        depth: 0.08
+      }).connect(chorus);
+      
+      // Store shared effects
+      synthsRef.current.effects = { reverb, distortion, filter, chorus, vibrato };
+      
+      // Create synths for each string (0, 1, 2)
+      for (let stringIndex = 0; stringIndex < 3; stringIndex++) {
+        const mainSynth = new Tone.Synth({
+          oscillator: { type: "sawtooth" },
+          detune: -2,
+          envelope: {
+            attack: 0.001,
+            decay: 0.05,
+            sustain: 0.2,
+            release: 2.8
+          }
+        }).connect(vibrato);
+        
+        const harmonicSynth = new Tone.Synth({
+          oscillator: { type: "square4" },
+          detune: 3,
+          envelope: {
+            attack: 0.002,
+            decay: 0.15,
+            sustain: 0.4,
+            release: 3.2
+          }
+        }).connect(filter);
+        
+        const subSynth = new Tone.Synth({
+          oscillator: { type: "triangle" },
+          detune: 1,
+          envelope: {
+            attack: 0.005,
+            decay: 0.3,
+            sustain: 0.2,
+            release: 2.5
+          }
+        }).connect(reverb);
+        
+        const noise = new Tone.Noise({ type: "pink" }).connect(
+          new Tone.Filter({
+            frequency: 2000,
+            type: "bandpass"
+          }).connect(
+            new Tone.Gain(0.03).connect(reverb)
+          )
+        );
+        
+        // Store synths for this string
+        synthsRef.current.strings[stringIndex] = { 
+          main: mainSynth, 
+          harmonic: harmonicSynth, 
+          sub: subSynth, 
+          noise: noise 
+        };
       }
-    }).connect(vibrato);
-    
-    // HARMONIC LAYER: Adds upper harmonics for steel string brightness
-    const harmonicSynth = new Tone.Synth({
-      oscillator: {
-        type: "square4"  // Square wave with 4 harmonics - adds metallic brightness
-      },
-      detune: 3,         // Slightly sharp to create beating with main oscillator
-      envelope: {
-        attack: 0.002,
-        decay: 0.15,
-        sustain: 0.4,     // Lower sustain than main - harmonics fade faster
-        release: 3.2 * sustainMultiplier
-      }
-    }).connect(filter);
-    
-    // SUB-HARMONIC: Adds body/depth like guitar body resonance
-    const subSynth = new Tone.Synth({
-      oscillator: {
-        type: "triangle" // Warm, round tone for body
-      },
-      detune: 1,         // Slight detuning for realism
-      envelope: {
-        attack: 0.005,    // Slower attack - body resonance builds up
-        decay: 0.3,
-        sustain: 0.2,     // Quiet but present
-        release: 2.5 * sustainMultiplier
-      }
-    }).connect(reverb);
-    
-    // PICK NOISE: Simulates the actual pick hitting the string
-    const noise = new Tone.Noise({
-      type: "pink"      // Pink noise has more low-end than white noise
-    }).connect(
-      new Tone.Filter({
-        frequency: 2000,  // Filter noise to sound like pick scrape
-        type: "bandpass"  // Only frequencies around 2000Hz pass through
-      }).connect(
-        new Tone.Gain(0.03).connect(reverb) // Very quiet pick noise
-      )
-    );
-    
-    // Calculate the note based on the fret number using our diatonic mapping
-    const semitones = getSemitones(fret);
-    const note = Tone.Frequency(baseNote).transpose(semitones).toNote();
-    const subNote = Tone.Frequency(baseNote).transpose(semitones - 12).toNote(); // One octave lower
-    const harmonicNote = Tone.Frequency(baseNote).transpose(semitones + 12).toNote(); // One octave higher
-    
-    // Calculate note durations based on sustain multiplier and note duration
-    // Use fixed durations that don't change with tempo - tempo should only affect spacing
-    const baseDuration = 0.5; // Fixed base duration in seconds (independent of tempo)
-    const mainDuration = baseDuration * sustainMultiplier;
-    const harmonicDuration = baseDuration * 0.75 * sustainMultiplier;
-    const subDuration = baseDuration * sustainMultiplier;
-    
-    // TRIGGER THE SOUNDS using scheduled time:
-    
-    // Convert time to number if it's a string for calculations
-    const timeAsNumber = typeof when === 'string' ? 0 : when;
-    
-    // Pick noise first (very brief)
-    noise.start(when);
-    if (typeof when === 'number') {
-      noise.stop(when + 0.005);
-    } else {
-      noise.stop("+0.005");
+      
+      console.log('✅ Synths initialized for all 3 strings');
+    } catch (error) {
+      console.error('Error initializing synths:', error);
     }
-    
-    // Main guitar sound
-    mainSynth.triggerAttackRelease(note, mainDuration, when);
-    
-    // Add harmonic layer slightly delayed (simulates string settling)
-    if (typeof when === 'number') {
-      harmonicSynth.triggerAttackRelease(harmonicNote, harmonicDuration, when + 0.002, 0.2);
-      // Add body resonance slightly delayed
-      subSynth.triggerAttackRelease(subNote, subDuration, when + 0.008, 0.15);
-    } else {
-      harmonicSynth.triggerAttackRelease(harmonicNote, harmonicDuration, "+0.002", 0.2);
-      // Add body resonance slightly delayed
-      subSynth.triggerAttackRelease(subNote, subDuration, "+0.008", 0.15);
-    }
-
-    // Clean up after the sound dies out (scaled with sustain)
-    setTimeout(() => {
-      mainSynth.dispose();
-      harmonicSynth.dispose();
-      subSynth.dispose();
-      noise.dispose();
-      vibrato.dispose();
-      chorus.dispose();
-      filter.dispose();
-      distortion.dispose();
-      reverb.dispose();
-    }, 4500 * sustainMultiplier);
   };
+
+  // Cleanup synth instances
+  const disposeSynths = () => {
+    try {
+      const synths = synthsRef.current;
+      
+      // Dispose synths for each string
+      for (let stringIndex = 0; stringIndex < 3; stringIndex++) {
+        const stringSynths = synths.strings[stringIndex];
+        if (stringSynths.main) stringSynths.main.dispose();
+        if (stringSynths.harmonic) stringSynths.harmonic.dispose();
+        if (stringSynths.sub) stringSynths.sub.dispose();
+        if (stringSynths.noise) stringSynths.noise.dispose();
+        
+        // Reset this string's references
+        synths.strings[stringIndex] = { main: null, harmonic: null, sub: null, noise: null };
+      }
+      
+      // Dispose shared effects
+      const effects = synths.effects;
+      if (effects.reverb) effects.reverb.dispose();
+      if (effects.distortion) effects.distortion.dispose();
+      if (effects.filter) effects.filter.dispose();
+      if (effects.chorus) effects.chorus.dispose();
+      if (effects.vibrato) effects.vibrato.dispose();
+      
+      // Reset effects references
+      synths.effects = {
+        reverb: null,
+        distortion: null,
+        filter: null,
+        chorus: null,
+        vibrato: null,
+      };
+      
+      console.log('✅ Synths disposed for all strings');
+    } catch (error) {
+      console.error('Error disposing synths:', error);
+    }
+  };
+
+  const playNote = async (fret: number, stringIndex: number, duration: number, scheduleTime?: number) => {
+    // Ensure synths are initialized
+    if (!synthsRef.current.strings[stringIndex].main) {
+      console.error(`Synths for string ${stringIndex} not initialized`);
+      return;
+    }
+    
+    try {
+      // Calculate sustain multiplier
+      const baseSustainMultiplier = 0.8;
+      const sustainMultiplier = baseSustainMultiplier * Math.sqrt(duration);
+      
+      // Define the base notes for each string (Low D, A, Hi D)
+      const baseNotes = ['D3', 'A3', 'D4'];
+      const baseNote = baseNotes[stringIndex];
+      
+      // Use the scheduled time if provided (for accurate timing)
+      const when = scheduleTime !== undefined ? scheduleTime : "+0";
+      
+      // Calculate notes
+      const semitones = getSemitones(fret);
+      const note = Tone.Frequency(baseNote).transpose(semitones).toNote();
+      const subNote = Tone.Frequency(baseNote).transpose(semitones - 12).toNote();
+      const harmonicNote = Tone.Frequency(baseNote).transpose(semitones + 12).toNote();
+      
+      // Calculate durations (tempo-independent)
+      const baseDuration = 0.5;
+      const mainDuration = baseDuration * sustainMultiplier;
+      const harmonicDuration = baseDuration * 0.75 * sustainMultiplier;
+      const subDuration = baseDuration * sustainMultiplier;
+      
+      // Get synth references
+      const synths = synthsRef.current;
+      
+      // Play pick noise
+      if (synths.strings[stringIndex].noise) {
+        synths.strings[stringIndex].noise.start(when);
+        const stopTime = typeof when === 'number' ? when + 0.005 : "+0.005";
+        synths.strings[stringIndex].noise.stop(stopTime);
+      }
+      
+      // Play main note
+      if (synths.strings[stringIndex].main) {
+        synths.strings[stringIndex].main.triggerAttackRelease(note, mainDuration, when);
+      }
+      
+      // Play harmonic layer
+      if (synths.strings[stringIndex].harmonic) {
+        const harmonicTime = typeof when === 'number' ? when + 0.002 : "+0.002";
+        synths.strings[stringIndex].harmonic.triggerAttackRelease(harmonicNote, harmonicDuration, harmonicTime, 0.2);
+      }
+      
+      // Play sub layer
+      if (synths.strings[stringIndex].sub) {
+        const subTime = typeof when === 'number' ? when + 0.008 : "+0.008";
+        synths.strings[stringIndex].sub.triggerAttackRelease(subNote, subDuration, subTime, 0.15);
+      }
+      
+    } catch (error) {
+      console.error(`Error in playNote for string ${stringIndex}:`, error);
+    }
+  };
+
+  const playPreviewNote = async (fret: number, stringIndex: number) => {
+    // Ensure synths are initialized
+    if (!synthsRef.current.strings[stringIndex]?.main) {
+      // Initialize synths if not already done
+      await Tone.start();
+      initializeSynths();
+    }
+    
+    // Quick preview with shorter duration for immediate feedback
+    try {
+      const baseDuration = 0.8; // Longer than playback notes for clear preview
+      
+      // Define the base notes for each string (Low D, A, Hi D)
+      const baseNotes = ['D3', 'A3', 'D4'];
+      const baseNote = baseNotes[stringIndex];
+      
+      // Calculate notes
+      const semitones = getSemitones(fret);
+      const note = Tone.Frequency(baseNote).transpose(semitones).toNote();
+      
+      // Get synth references
+      const synths = synthsRef.current.strings[stringIndex];
+      
+      // Play main note immediately for preview
+      if (synths.main) {
+        synths.main.triggerAttackRelease(note, baseDuration);
+      }
+      
+      // Shorter harmonic for preview
+      if (synths.harmonic) {
+        const harmonicNote = Tone.Frequency(baseNote).transpose(semitones + 12).toNote();
+        synths.harmonic.triggerAttackRelease(harmonicNote, baseDuration * 0.7, "+0.002", 0.15);
+      }
+      
+    } catch (error) {
+      console.error(`Error in preview note for string ${stringIndex}:`, error);
+    }
+  };
+
+  // Expose preview function to parent component
+  useImperativeHandle(ref, () => ({
+    playPreviewNote: playPreviewNote,
+  }));
 
   const playTab = async () => {
     if (tabData.length === 0) return;
     
     console.log('=== STARTING METRONOME PLAYBACK ===');
     console.log(`Starting from cursor position: timeIndex=${cursorPosition.timeIndex}`);
-    await Tone.start();
     
-    // Clear any existing transport scheduling
-    console.log('Stopping and clearing existing transport...');
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    Tone.Transport.position = 0;
-    
-    // Set tempo - Transport will handle BPM changes automatically
-    console.log(`Setting tempo to ${tempo} BPM`);
-    Tone.Transport.bpm.value = tempo;
-    
-    setIsPlaying(true);
-    
-    // Calculate starting position in sixteenth notes
-    let startingSixteenthNote = 0;
-    for (let i = 0; i < Math.min(cursorPosition.timeIndex, tabData.length); i++) {
-      startingSixteenthNote += DURATION_VALUES[tabData[i].duration] * 4; // Convert to sixteenth notes
-    }
-    
-    // Metronome state - starting from cursor position
-    let currentSixteenthNote = startingSixteenthNote;
-    let tabCursor = cursorPosition.timeIndex; // Start from cursor position
-    let positionStartBeat = startingSixteenthNote; // When current position started
-    
-    // Calculate total duration in sixteenth notes for completion detection
-    const totalSixteenthNotes = tabData.reduce((total, timePos) => {
-      return total + (DURATION_VALUES[timePos.duration] * 4); // Convert quarter notes to sixteenth notes
-    }, 0);
-    
-    console.log(`Tab has ${tabData.length} positions, ${totalSixteenthNotes} total sixteenth notes`);
-    console.log(`Starting at sixteenth note ${startingSixteenthNote}, cursor at position ${tabCursor}`);
-    
-    // Log the timing plan from cursor position onward
-    let planBeat = startingSixteenthNote;
-    for (let i = cursorPosition.timeIndex; i < tabData.length; i++) {
-      const timePos = tabData[i];
-      const durationSixteenths = DURATION_VALUES[timePos.duration] * 4;
-      const notesToPlay = timePos.notes.filter(note => note.type === 'note' && note.fret !== null);
-      console.log(`Position ${i + 1}: starts at 16th ${planBeat}, duration ${durationSixteenths} 16ths, ${notesToPlay.length} notes`);
-      planBeat += durationSixteenths;
-    }
-    
-    // The metronome: fires every sixteenth note
-    const metronomeId = Tone.Transport.scheduleRepeat((time) => {
-      console.log(`🎵 Tick ${currentSixteenthNote}: cursor=${tabCursor}, posStart=${positionStartBeat}`);
+    try {
+      await Tone.start();
       
-      // Check if we're at the start of the current time position
-      if (currentSixteenthNote === positionStartBeat && tabCursor < tabData.length) {
-        const currentTimePos = tabData[tabCursor];
-        const notesToPlay = currentTimePos.notes.filter(note => note.type === 'note' && note.fret !== null);
-        
-        setCurrentTimeIndex(tabCursor);
-        
-        if (notesToPlay.length > 0) {
-          console.log(`  🎸 Playing ${notesToPlay.length} notes at position ${tabCursor + 1}`);
+      // Initialize reusable synths
+      initializeSynths();
+      
+      // Clear any existing transport scheduling
+      console.log('Stopping and clearing existing transport...');
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      Tone.Transport.position = 0;
+      
+      // Set tempo - Transport will handle BPM changes automatically
+      console.log(`Setting tempo to ${tempo} BPM`);
+      Tone.Transport.bpm.value = tempo;
+      
+      setIsPlaying(true);
+      
+      // Calculate starting position in sixteenth notes
+      let startingSixteenthNote = 0;
+      for (let i = 0; i < Math.min(cursorPosition.timeIndex, tabData.length); i++) {
+        startingSixteenthNote += DURATION_VALUES[tabData[i].duration] * 4; // Convert to sixteenth notes
+      }
+      
+      // Metronome state - starting from cursor position
+      let currentSixteenthNote = startingSixteenthNote;
+      let tabCursor = cursorPosition.timeIndex; // Start from cursor position
+      let positionStartBeat = startingSixteenthNote; // When current position started
+      
+      // Calculate total duration in sixteenth notes for completion detection
+      const totalSixteenthNotes = tabData.reduce((total, timePos) => {
+        return total + (DURATION_VALUES[timePos.duration] * 4); // Convert quarter notes to sixteenth notes
+      }, 0);
+      
+      console.log(`Tab has ${tabData.length} positions, ${totalSixteenthNotes} total sixteenth notes`);
+      console.log(`Starting at sixteenth note ${startingSixteenthNote}, cursor at position ${tabCursor}`);
+      
+      // Log the timing plan from cursor position onward
+      let planBeat = startingSixteenthNote;
+      for (let i = cursorPosition.timeIndex; i < tabData.length; i++) {
+        const timePos = tabData[i];
+        const durationSixteenths = DURATION_VALUES[timePos.duration] * 4;
+        const notesToPlay = timePos.notes.filter(note => note.type === 'note' && note.fret !== null);
+        console.log(`Position ${i + 1}: starts at 16th ${planBeat}, duration ${durationSixteenths} 16ths, ${notesToPlay.length} notes`);
+        planBeat += durationSixteenths;
+      }
+      
+      // The metronome: fires every sixteenth note
+      const metronomeId = Tone.Transport.scheduleRepeat((time) => {
+        try {
+          console.log(`🎵 Tick ${currentSixteenthNote}: cursor=${tabCursor}, posStart=${positionStartBeat}`);
           
-          // Play all notes at this position using the exact scheduled time
-          notesToPlay.forEach(note => {
-            console.log(`    Note: fret ${note.fret} on string ${note.stringIndex} (duration: ${note.duration})`);
-            playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
-          });
+          // Check if we're at the start of the current time position
+          if (currentSixteenthNote === positionStartBeat && tabCursor < tabData.length) {
+            const currentTimePos = tabData[tabCursor];
+            const notesToPlay = currentTimePos.notes.filter(note => note.type === 'note' && note.fret !== null);
+            
+            setCurrentTimeIndex(tabCursor);
+            
+            if (notesToPlay.length > 0) {
+              console.log(`  🎸 Playing ${notesToPlay.length} notes at position ${tabCursor + 1}`);
+              
+              // Play all notes at this position using the exact scheduled time
+              notesToPlay.forEach(note => {
+                console.log(`    Note: fret ${note.fret} on string ${note.stringIndex} (duration: ${note.duration})`);
+                try {
+                  playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
+                } catch (noteError) {
+                  console.error(`Error playing note ${note.fret} on string ${note.stringIndex}:`, noteError);
+                }
+              });
+              
+              // Update visual feedback
+              const playingNotes = notesToPlay.map(note => ({
+                fret: note.fret!,
+                stringIndex: note.stringIndex
+              }));
+              onNotesPlaying(playingNotes);
+              
+              // Clear visual feedback after a short time
+              setTimeout(() => {
+                onNotesPlaying([]);
+              }, 200); // Reduced from 300ms for high BPM
+            } else {
+              console.log(`  ⏸️ Rest at position ${tabCursor + 1}`);
+            }
+            
+            // Move to next position
+            const currentPosDuration = DURATION_VALUES[currentTimePos.duration] * 4; // Convert to sixteenth notes
+            positionStartBeat += currentPosDuration;
+            tabCursor++;
+            
+            console.log(`  ➡️ Advanced to cursor ${tabCursor}, next position starts at 16th ${positionStartBeat}`);
+          }
           
-          // Update visual feedback
-          const playingNotes = notesToPlay.map(note => ({
-            fret: note.fret!,
-            stringIndex: note.stringIndex
-          }));
-          onNotesPlaying(playingNotes);
+          // Check if we've reached the end
+          if (tabCursor >= tabData.length) {
+            console.log('🏁 Reached end of tab, stopping...');
+            // Use setTimeout to avoid cleanup issues during callback
+            setTimeout(() => stopPlayback(), 10);
+            return;
+          }
           
-          // Clear visual feedback after a short time
-          setTimeout(() => {
-            onNotesPlaying([]);
-          }, 300);
-        } else {
-          console.log(`  ⏸️ Rest at position ${tabCursor + 1}`);
+          // Advance the metronome
+          currentSixteenthNote++;
+          
+        } catch (error) {
+          console.error('Error in metronome callback:', error);
+          // Stop playback on error to prevent further issues
+          setTimeout(() => stopPlayback(), 10);
         }
-        
-        // Move to next position
-        const currentPosDuration = DURATION_VALUES[currentTimePos.duration] * 4; // Convert to sixteenth notes
-        positionStartBeat += currentPosDuration;
-        tabCursor++;
-        
-        console.log(`  ➡️ Advanced to cursor ${tabCursor}, next position starts at 16th ${positionStartBeat}`);
+      }, "16n"); // Fire every sixteenth note
+      
+      // Store the metronome ID for cleanup
+      partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) } as any;
+      
+      // Start the transport
+      Tone.Transport.start();
+      
+      console.log(`✅ Metronome started at ${tempo} BPM`);
+      console.log('=== PLAYBACK RUNNING ===');
+    } catch (error) {
+      console.error('Error in playTab:', error);
+      // Force reset even if playback failed
+      setIsPlaying(false);
+      setCurrentTimeIndex(-1);
+      onNotesPlaying([]);
+      
+      // Try to force clean the transport
+      try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+      } catch (e) {
+        console.error('Failed to clean transport:', e);
       }
-      
-      // Check if we've reached the end
-      if (tabCursor >= tabData.length) {
-        console.log('🏁 Reached end of tab, stopping...');
-        stopPlayback();
-        return;
-      }
-      
-      // Advance the metronome
-      currentSixteenthNote++;
-      
-    }, "16n"); // Fire every sixteenth note
-    
-    // Store the metronome ID for cleanup
-    partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) } as any;
-    
-    // Start the transport
-    Tone.Transport.start();
-    
-    console.log(`✅ Metronome started at ${tempo} BPM`);
-    console.log('=== PLAYBACK RUNNING ===');
+    }
   };
 
   const stopPlayback = () => {
     console.log('🛑 Manually stopping metronome playback');
     
-    // Stop and clear the transport
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    
-    // Clean up the metronome callback
-    if (partRef.current) {
-      partRef.current.dispose();
-      partRef.current = null;
+    try {
+      // Stop and clear the transport
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      Tone.Transport.position = 0;
+      
+      // Clean up the metronome callback
+      if (partRef.current) {
+        partRef.current.dispose();
+        partRef.current = null;
+      }
+      
+      // Reset UI state
+      setIsPlaying(false);
+      setCurrentTimeIndex(-1);
+      onNotesPlaying([]);
+      
+      // Dispose reusable synths
+      disposeSynths();
+      
+      console.log('✅ Playback stopped and cleaned up');
+    } catch (error) {
+      console.error('Error during playback cleanup:', error);
+      // Force reset even if cleanup failed
+      setIsPlaying(false);
+      setCurrentTimeIndex(-1);
+      onNotesPlaying([]);
+      
+      // Try to force clean the transport
+      try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+      } catch (e) {
+        console.error('Failed to clean transport:', e);
+      }
     }
-    
-    // Reset UI state
-    setIsPlaying(false);
-    setCurrentTimeIndex(-1);
-    onNotesPlaying([]);
-    
-    console.log('✅ Playback stopped and cleaned up');
   };
 
   // Count total notes for display
   const totalNotes = tabData.reduce((count, timePos) => count + timePos.notes.length, 0);
+
+  useEffect(() => {
+    return () => {
+      stopPlayback();
+    };
+  }, []);
 
   return (
     <div className="controls">
@@ -365,6 +543,6 @@ const Controls: React.FC<ControlsProps> = ({ tabData, cursorPosition, onNotesPla
       )}
     </div>
   );
-};
+});
 
 export default Controls;
