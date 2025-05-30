@@ -10,13 +10,16 @@ interface ControlsProps {
   tempo: number;
   onTempoChange: (tempo: number) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
+  onPlaybackStateChange?: (isPlaying: boolean) => void;
 }
 
 export interface ControlsRef {
   playPreviewNote: (fret: number, stringIndex: number) => void;
+  playTab: () => void;
+  stopPlayback: () => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlayPreviewNote }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlayPreviewNote, onPlaybackStateChange }, ref) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeIndex, setCurrentTimeIndex] = useState<number>(-1);
   const partRef = useRef<Tone.Part | null>(null);
@@ -301,9 +304,11 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     }
   };
 
-  // Expose preview function to parent component
+  // Expose functions to parent component
   useImperativeHandle(ref, () => ({
     playPreviewNote: playPreviewNote,
+    playTab: playTab,
+    stopPlayback: stopPlayback,
   }));
 
   const playTab = async () => {
@@ -329,6 +334,8 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       Tone.Transport.bpm.value = tempo;
       
       setIsPlaying(true);
+      onPlaybackStateChange?.(true);
+      setCurrentTimeIndex(cursorPosition.timeIndex);
       
       // Calculate starting position in sixteenth notes
       let startingSixteenthNote = 0;
@@ -437,6 +444,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       console.error('Error in playTab:', error);
       // Force reset even if playback failed
       setIsPlaying(false);
+      onPlaybackStateChange?.(false);
       setCurrentTimeIndex(-1);
       onNotesPlaying([]);
       
@@ -467,6 +475,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       
       // Reset UI state
       setIsPlaying(false);
+      onPlaybackStateChange?.(false);
       setCurrentTimeIndex(-1);
       onNotesPlaying([]);
       
@@ -478,6 +487,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       console.error('Error during playback cleanup:', error);
       // Force reset even if cleanup failed
       setIsPlaying(false);
+      onPlaybackStateChange?.(false);
       setCurrentTimeIndex(-1);
       onNotesPlaying([]);
       

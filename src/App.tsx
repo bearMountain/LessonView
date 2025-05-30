@@ -117,10 +117,10 @@ function App() {
 
   const handlePlayPause = () => {
     if (isPlaying) {
-      // Stop functionality will be handled by the Controls component internally
+      controlsRef.current?.stopPlayback();
       setIsPlaying(false);
     } else {
-      // Start playback (the actual implementation is in Controls)
+      controlsRef.current?.playTab();
       setIsPlaying(true);
     }
   };
@@ -131,6 +131,11 @@ function App() {
 
   const handleFretboardToggle = () => {
     setShowFretboard(!showFretboard);
+  };
+
+  // Listen for playback state changes from Controls component
+  const handlePlaybackStateChange = (playing: boolean) => {
+    setIsPlaying(playing);
   };
 
   // Calculate current time display (simplified for now)
@@ -186,19 +191,7 @@ function App() {
       ) : null}
       bottomPanel={
         <>
-          {/* Hidden Controls component for audio functionality */}
-          <div style={{ display: 'none' }}>
-            <Controls 
-              ref={controlsRef}
-              tabData={tabData} 
-              cursorPosition={cursorPosition}
-              onNotesPlaying={handleNotesPlaying}
-              tempo={tempo}
-              onTempoChange={handleTempoChange}
-            />
-          </div>
-          
-          {/* New Professional Playback Bar */}
+          {/* Professional Playback Bar */}
           <PlaybackBar
             isPlaying={isPlaying}
             tempo={tempo}
@@ -212,6 +205,19 @@ function App() {
             isLooping={isLooping}
             showFretboard={showFretboard}
           />
+          
+          {/* Hidden Controls component for audio functionality */}
+          <div style={{ display: 'none' }}>
+            <Controls 
+              ref={controlsRef}
+              tabData={tabData} 
+              cursorPosition={cursorPosition}
+              onNotesPlaying={handleNotesPlaying}
+              tempo={tempo}
+              onTempoChange={handleTempoChange}
+              onPlaybackStateChange={handlePlaybackStateChange}
+            />
+          </div>
         </>
       }
     />
