@@ -1,0 +1,157 @@
+.main-layout {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
+  grid-template-areas:
+    "toolbar      toolbar      toolbar"
+    "left-sidebar center       right-sidebar"
+    "fretboard    fretboard    fretboard"
+    "bottom-panel bottom-panel bottom-panel";
+  
+  /* Ensure full viewport coverage with no offset */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  
+  /* Professional color scheme */
+  background-color: var(--color-bg-primary, #1e1e1e);
+  color: var(--color-text-primary, #ffffff);
+  
+  /* Typography */
+  font-family: var(--font-ui, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+}
+
+.main-layout__toolbar {
+  grid-area: toolbar;
+  background-color: var(--color-bg-secondary, #2d2d30);
+  border-bottom: 1px solid var(--color-border, #3e3e42);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  
+  /* Subtle shadow for depth */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.main-layout__left-sidebar {
+  grid-area: left-sidebar;
+  background-color: var(--color-bg-tertiary, #252526);
+  border-right: 1px solid var(--color-border, #3e3e42);
+  padding: 16px;
+  width: 280px;
+  overflow-y: auto;
+  
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scroll-thumb, #424242) transparent;
+}
+
+.main-layout__center-workspace {
+  grid-area: center;
+  background-color: var(--color-bg-workspace, #1e1e1e);
+  padding: 24px;
+  overflow: auto;
+  position: relative;
+  
+  /* Focus outline */
+  outline: none;
+}
+
+.main-layout__right-sidebar {
+  grid-area: right-sidebar;
+  background-color: var(--color-bg-tertiary, #252526);
+  border-left: 1px solid var(--color-border, #3e3e42);
+  padding: 16px;
+  width: 280px;
+  overflow-y: auto;
+  
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scroll-thumb, #424242) transparent;
+}
+
+.main-layout__fretboard {
+  grid-area: fretboard;
+  background-color: var(--color-bg-secondary, #2d2d30);
+  border-top: 1px solid var(--color-border, #3e3e42);
+  border-bottom: 1px solid var(--color-border, #3e3e42);
+  padding: 12px 16px;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Subtle shadow for depth */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 6;
+}
+
+.main-layout__bottom-panel {
+  grid-area: bottom-panel;
+  background-color: var(--color-bg-secondary, #2d2d30);
+  border-top: 1px solid var(--color-border, #3e3e42);
+  padding: 8px 16px;
+  min-height: 60px;
+  max-height: 80px;
+  
+  /* Subtle shadow for depth */
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+}
+
+/* Webkit scrollbar styling for better appearance */
+.main-layout__left-sidebar::-webkit-scrollbar,
+.main-layout__right-sidebar::-webkit-scrollbar,
+.main-layout__center-workspace::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-layout__left-sidebar::-webkit-scrollbar-track,
+.main-layout__right-sidebar::-webkit-scrollbar-track,
+.main-layout__center-workspace::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-layout__left-sidebar::-webkit-scrollbar-thumb,
+.main-layout__right-sidebar::-webkit-scrollbar-thumb,
+.main-layout__center-workspace::-webkit-scrollbar-thumb {
+  background-color: var(--color-scroll-thumb, #424242);
+  border-radius: 4px;
+}
+
+.main-layout__left-sidebar::-webkit-scrollbar-thumb:hover,
+.main-layout__right-sidebar::-webkit-scrollbar-thumb:hover,
+.main-layout__center-workspace::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-scroll-thumb-hover, #555555);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .main-layout {
+    grid-template-columns: 240px 1fr 240px;
+  }
+  
+  .main-layout__left-sidebar,
+  .main-layout__right-sidebar {
+    width: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-layout {
+    grid-template-columns: 200px 1fr 200px;
+  }
+  
+  .main-layout__left-sidebar,
+  .main-layout__right-sidebar {
+    width: 200px;
+    padding: 12px;
+  }
+} 

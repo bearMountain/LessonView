@@ -1,19 +1,29 @@
+/* Root element should take full viewport for our layout system */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
+/* Remove old component styles that are no longer needed */
+.app-container {
+  /* This class is no longer used with MainLayout */
+}
+
+/* Legacy styles for backwards compatibility if needed */
 .logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }

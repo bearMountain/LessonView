@@ -1,0 +1,134 @@
+/* Design System - Professional Music Notation Interface */
+
+:root {
+  /* Primary Colors */
+  --primary-blue: #2563eb;
+  --primary-blue-light: #3b82f6;
+  --primary-blue-dark: #1d4ed8;
+  
+  /* Background Colors */
+  --color-bg-primary: #1e1e1e;        /* Main background */
+  --color-bg-secondary: #2d2d30;      /* Toolbar, bottom panel */
+  --color-bg-tertiary: #252526;       /* Sidebars */
+  --color-bg-workspace: #1e1e1e;      /* Center workspace */
+  --color-bg-elevated: #3c3c3c;       /* Modals, popovers */
+  
+  /* Text Colors */
+  --color-text-primary: #ffffff;       /* Main text */
+  --color-text-secondary: #cccccc;     /* Secondary text */
+  --color-text-tertiary: #969696;      /* Disabled, placeholders */
+  --color-text-accent: #3b82f6;        /* Links, highlights */
+  
+  /* Border Colors */
+  --color-border: #3e3e42;             /* Standard borders */
+  --color-border-light: #4d4d52;       /* Lighter borders */
+  --color-border-focus: #2563eb;       /* Focus states */
+  
+  /* Scrollbar Colors */
+  --color-scroll-thumb: #424242;
+  --color-scroll-thumb-hover: #555555;
+  
+  /* Music Notation Colors */
+  --color-note-black: #000000;
+  --color-staff-line: #333333;
+  --color-cursor-red: #ef4444;
+  --color-selection-blue: #3b82f6;
+  --color-playhead-green: #10b981;
+  
+  /* Interactive States */
+  --color-hover-bg: rgba(255, 255, 255, 0.1);
+  --color-active-bg: rgba(255, 255, 255, 0.15);
+  --color-selected-bg: rgba(59, 130, 246, 0.2);
+  
+  /* Typography */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-music: 'Bravura', 'Emmentaler', serif;
+  --font-music-text: 'Academico', 'Times New Roman', serif;
+  
+  /* Font Sizes */
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-md: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  
+  /* Spacing (8px grid system) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-elevated: 0 1px 3px rgba(0, 0, 0, 0.2);
+  
+  /* Transitions */
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+  
+  /* Z-index layers */
+  --z-base: 0;
+  --z-toolbar: 10;
+  --z-sidebar: 5;
+  --z-modal: 50;
+  --z-tooltip: 100;
+}
+
+/* Light theme overrides (for future implementation) */
+[data-theme="light"] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f3f4f6;
+  --color-bg-tertiary: #f9fafb;
+  --color-bg-workspace: #ffffff;
+  --color-bg-elevated: #ffffff;
+  
+  --color-text-primary: #111827;
+  --color-text-secondary: #374151;
+  --color-text-tertiary: #6b7280;
+  
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  
+  --color-scroll-thumb: #d1d5db;
+  --color-scroll-thumb-hover: #9ca3af;
+  
+  --color-hover-bg: rgba(0, 0, 0, 0.05);
+  --color-active-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* Global base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  overflow: hidden; /* Prevent body scroll, layout handles scrolling */
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+} 

@@ -3,6 +3,8 @@ import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
 import Controls from './Controls'
+import MainLayout from './components/layout/MainLayout'
+import PlaybackBar from './components/transport/PlaybackBar'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, CursorPosition, TabData, TimePosition } from './types'
 import { getLongestDuration } from './types'
@@ -15,6 +17,9 @@ function App() {
   const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ timeIndex: 0, stringIndex: 2 }); // Start on Hi D string
   const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
   const [tempo, setTempo] = useState<number>(120); // Default 120 BPM
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
+  const [showFretboard, setShowFretboard] = useState<boolean>(true);
   const controlsRef = useRef<ControlsRef>(null);
 
   const addNote = (fret: number | null, duration: NoteDuration, type: 'note' | 'rest' = 'note') => {
@@ -110,10 +115,48 @@ function App() {
     });
   };
 
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      // Stop functionality will be handled by the Controls component internally
+      setIsPlaying(false);
+    } else {
+      // Start playback (the actual implementation is in Controls)
+      setIsPlaying(true);
+    }
+  };
+
+  const handleLoopToggle = () => {
+    setIsLooping(!isLooping);
+  };
+
+  const handleFretboardToggle = () => {
+    setShowFretboard(!showFretboard);
+  };
+
+  // Calculate current time display (simplified for now)
+  const currentTime = "0:00";
+  const totalTime = tabData.length > 0 ? `0:${Math.floor(tabData.length / 4).toString().padStart(2, '0')}` : "0:00";
+
   return (
-    <div className="app-container">
-      <h1>Strumstick Tab Viewer</h1>
-      <div style={{ display: 'flex', gap: '2rem', flexDirection: 'column' }}>
+    <MainLayout
+      toolbar={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>
+            Strumstick Tab Editor
+          </h1>
+        </div>
+      }
+      leftSidebar={
+        <div>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', color: 'var(--color-text-secondary)' }}>
+            Tools
+          </h3>
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
+            Note palettes and editing tools will go here
+          </p>
+        </div>
+      }
+      centerWorkspace={
         <div>
           <TabViewer 
             tabData={tabData} 
@@ -124,18 +167,54 @@ function App() {
             onCursorClick={(timeIndex: number, stringIndex: number) => setCursorPosition({ timeIndex, stringIndex })}
             onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
           />
-          <Controls 
-            ref={controlsRef}
-            tabData={tabData} 
-            cursorPosition={cursorPosition}
-            onNotesPlaying={handleNotesPlaying}
-            tempo={tempo}
-            onTempoChange={handleTempoChange}
-          />
         </div>
-        <Fretboard currentlyPlaying={currentlyPlaying} />
-      </div>
-    </div>
+      }
+      rightSidebar={
+        <div>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', color: 'var(--color-text-secondary)' }}>
+            Properties
+          </h3>
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
+            Note and measure properties will go here
+          </p>
+        </div>
+      }
+      fretboard={showFretboard ? (
+        <div style={{ width: '100%' }}>
+          <Fretboard currentlyPlaying={currentlyPlaying} />
+        </div>
+      ) : null}
+      bottomPanel={
+        <>
+          {/* Hidden Controls component for audio functionality */}
+          <div style={{ display: 'none' }}>
+            <Controls 
+              ref={controlsRef}
+              tabData={tabData} 
+              cursorPosition={cursorPosition}
+              onNotesPlaying={handleNotesPlaying}
+              tempo={tempo}
+              onTempoChange={handleTempoChange}
+            />
+          </div>
+          
+          {/* New Professional Playback Bar */}
+          <PlaybackBar
+            isPlaying={isPlaying}
+            tempo={tempo}
+            currentTime={currentTime}
+            totalTime={totalTime}
+            trackTitle="Untitled"
+            onPlayPause={handlePlayPause}
+            onTempoChange={handleTempoChange}
+            onLoopToggle={handleLoopToggle}
+            onFretboardToggle={handleFretboardToggle}
+            isLooping={isLooping}
+            showFretboard={showFretboard}
+          />
+        </>
+      }
+    />
   )
 }
 
