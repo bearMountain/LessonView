@@ -82,8 +82,9 @@
   background-color: var(--color-bg-secondary, #2d2d30);
   border-top: 1px solid var(--color-border, #3e3e42);
   border-bottom: 1px solid var(--color-border, #3e3e42);
-  padding: 12px 16px;
-  min-height: 120px;
+  padding: 8px 16px;
+  min-height: 80px;
+  max-height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;

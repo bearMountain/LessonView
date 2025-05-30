@@ -5,13 +5,16 @@ interface FretboardProps {
 }
 
 const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
+  // === ADJUSTABLE VISUAL VARIABLES ===
+  const dotSize = 15; // Radius of the dots in pixels (increase = bigger dots)
+  
   // Calculate position for a dot on the fretboard based on the reference image
   const getDotPosition = (fret: number, stringIndex: number) => {
     // === ADJUSTABLE POSITIONING VARIABLES ===
-    const horizontalStartOffset = 55; // How much to shift all positions left (increase = more left)
-    const verticalStartOffset = 10; // How much to shift all positions up/down (positive = down, negative = up)
-    const stringSpacing = 20; // Vertical distance between strings (increase = more spread out)
-    const horizontalScaleFactor = 1.5; // Multiply fret spacing (increase = more spread out horizontally)
+    const horizontalStartOffset = 430; // How much to shift all positions left (increase = more left)
+    const verticalStartOffset = 15; // How much to shift all positions up/down (positive = down, negative = up)
+    const stringSpacing = 50; // Vertical distance between strings (increase = more spread out)
+    const horizontalScaleFactor = 3.1; // Multiply fret spacing (increase = more spread out horizontally)
     
     // Image dimensions (same as original fretboard)
     const imageWidth = 1172; // Original image width
@@ -62,24 +65,27 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h3>Fretboard</h3>
-      <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ position: 'relative', display: 'inline-block', width: '100%', maxWidth: '1200px' }}>
         {/* Background image */}
         <img 
           src="/fretboard.png" 
           alt="Fretboard" 
           style={{ 
-            width: '800px', 
-            height: '120px',
-            border: '1px solid #ccc'
+            width: '100%', 
+            height: 'auto',
+            maxHeight: '80px',
+            objectFit: 'contain',
+            border: '1px solid #444'
           }} 
         />
         
         {/* SVG overlay for dots only */}
         <svg 
-          width="800" 
-          height="120" 
+          width="100%" 
+          height="80" 
+          viewBox="0 0 800 120"
+          preserveAspectRatio="xMidYMid meet"
           style={{ 
             position: 'absolute', 
             top: 0, 
@@ -95,7 +101,7 @@ const Fretboard: React.FC<FretboardProps> = ({ currentlyPlaying = [] }) => {
                 key={index}
                 cx={x}
                 cy={y}
-                r="8"
+                r={dotSize}
                 fill="#ff0000"
                 stroke="#990000"
                 strokeWidth="2"

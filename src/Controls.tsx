@@ -416,7 +416,11 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
           if (tabCursor >= tabData.length) {
             console.log('🏁 Reached end of tab, stopping...');
             // Use setTimeout to avoid cleanup issues during callback
-            setTimeout(() => stopPlayback(), 10);
+            // Delay clearing visual feedback to let the last note sound and be visible
+            setTimeout(() => {
+              onNotesPlaying([]); // Clear visual feedback after delay
+              stopPlayback(false); // Don't clear visual feedback again since we just did it
+            }, 1000); // 1 second delay to let last note sound
             return;
           }
           
@@ -456,7 +460,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     }
   };
 
-  const stopPlayback = () => {
+  const stopPlayback = (clearVisualFeedback: boolean = true) => {
     console.log('🛑 Manually stopping metronome playback');
     
     try {
@@ -475,7 +479,11 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
       setCurrentTimeIndex(-1);
-      onNotesPlaying([]); // Clear any remaining visual feedback
+      
+      // Only clear visual feedback if requested
+      if (clearVisualFeedback) {
+        onNotesPlaying([]); // Clear any remaining visual feedback
+      }
       
       // Dispose reusable synths
       disposeSynths();
@@ -487,7 +495,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
       setCurrentTimeIndex(-1);
-      onNotesPlaying([]);
+      if (clearVisualFeedback) {
+        onNotesPlaying([]);
+      }
       
       // Try to force clean the transport
       try {
@@ -508,6 +518,10 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     };
   }, []);
 
+  const handleStopClick = () => {
+    stopPlayback(); // Use default clearVisualFeedback = true
+  };
+
   return (
     <div className="controls">
       <h3>Playback Controls</h3>
@@ -527,7 +541,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       </div>
       
       <div>
-        <button onClick={isPlaying ? stopPlayback : playTab} disabled={tabData.length === 0}>
+        <button onClick={isPlaying ? handleStopClick : playTab} disabled={tabData.length === 0}>
           {isPlaying ? 'Stop' : `Play from position ${cursorPosition.timeIndex + 1}`}
         </button>
       </div>
