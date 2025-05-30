@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
-import type { Note, NoteDuration, CursorPosition, TabData, TimePosition } from './types';
+import type { Note, NoteDuration, CursorPosition, TabData, TimePosition, NoteType } from './types';
 import { DURATION_VISUALS, DURATION_VALUES, calculateTimePosition, getMeasureBoundaries } from './types';
 
 interface TabViewerProps {
@@ -12,6 +12,7 @@ interface TabViewerProps {
   onCursorClick: (timeIndex: number, stringIndex: number) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   selectedDuration: NoteDuration;
+  selectedNoteType: NoteType;
   onPlayFromCursor?: () => void;
   onResetCursor?: () => void;
 }
@@ -29,44 +30,31 @@ const TabViewer: React.FC<TabViewerProps> = ({
   onCursorClick,
   onPlayPreviewNote,
   selectedDuration,
+  selectedNoteType,
   onPlayFromCursor,
   onResetCursor
 }) => {
-  const [selectedNoteType, setSelectedNoteType] = useState<'note' | 'rest'>('note');
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
+  const [zoom, setZoom] = useState<number>(1); // Zoom level, 1 = 100%
   const svgRef = useRef<SVGSVGElement>(null);
   
-  // Calculate dimensions
-  const baseBeatWidth = 80; // Base width for a quarter note
-  const stringSpacing = 40;
-  const leftMargin = 80; // More space for cursor
-  const topMargin = 100; // Space for controls
-  const rightMargin = 100;
-  const minWidth = 800; // Minimum width for empty tab
-  
-  // Calculate total width based on time position durations
-  const calculateTotalWidth = () => {
-    let totalWidth = leftMargin + rightMargin;
-    
-    if (tabData.length === 0) {
-      // Empty tab: allocate space for many beat positions to maintain full width
-      totalWidth += 16 * baseBeatWidth; // Space for 16 quarter note positions
-    } else {
-      // Calculate width based on existing notes
-      tabData.forEach(timePos => {
-        totalWidth += DURATION_VALUES[timePos.duration] * baseBeatWidth;
-      });
-      
-      // Always ensure we have space for at least 8 more beat positions beyond existing content
-      const minExtraBeats = 8;
-      totalWidth += minExtraBeats * baseBeatWidth;
-    }
-    
-    return Math.max(minWidth, totalWidth);
-  };
-  
-  const totalWidth = calculateTotalWidth();
-  const totalHeight = topMargin + (stringLabels.length * stringSpacing) + 100;
+  // Layout constants with zoom
+  const stringSpacing = 60 * zoom;
+  const leftMargin = 80 * zoom;
+  const rightMargin = 80 * zoom;
+  const topMargin = 40 * zoom;
+  const bottomMargin = 40 * zoom;
+  const baseBeatWidth = 80 * zoom; // Base width for quarter note beat
+
+  // Calculate total width needed based on note durations
+  let totalWidth = leftMargin + rightMargin;
+  for (const timePos of tabData) {
+    totalWidth += DURATION_VALUES[timePos.duration] * baseBeatWidth;
+  }
+  // Ensure minimum width
+  totalWidth = Math.max(totalWidth, 800 * zoom);
+
+  const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing)) * zoom;
 
   // Calculate X position for a time position
   const getTimeX = (timeIndex: number) => {
@@ -253,6 +241,64 @@ const TabViewer: React.FC<TabViewerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedDuration, selectedNoteType, currentFretInput, onAddNote, onMoveCursor, onRemoveNote]);
 
+  // Zoom event handlers
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setZoom(prev => Math.max(0.3, Math.min(3, prev + delta)));
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.sqrt(
+          Math.pow(touch2.clientX - touch1.clientX, 2) + 
+          Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        svgRef.current?.setAttribute('data-initial-distance', distance.toString());
+        svgRef.current?.setAttribute('data-initial-zoom', zoom.toString());
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.sqrt(
+          Math.pow(touch2.clientX - touch1.clientX, 2) + 
+          Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        const initialDistance = parseFloat(svgRef.current?.getAttribute('data-initial-distance') || '0');
+        const initialZoom = parseFloat(svgRef.current?.getAttribute('data-initial-zoom') || '1');
+        
+        if (initialDistance > 0) {
+          const scale = distance / initialDistance;
+          const newZoom = Math.max(0.3, Math.min(3, initialZoom * scale));
+          setZoom(newZoom);
+        }
+      }
+    };
+
+    const svg = svgRef.current;
+    if (svg) {
+      svg.addEventListener('wheel', handleWheel, { passive: false });
+      svg.addEventListener('touchstart', handleTouchStart, { passive: false });
+      svg.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+      return () => {
+        svg.removeEventListener('wheel', handleWheel);
+        svg.removeEventListener('touchstart', handleTouchStart);
+        svg.removeEventListener('touchmove', handleTouchMove);
+      };
+    }
+  }, [zoom]);
+
   // Handle SVG click
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return;
@@ -353,196 +399,171 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
   return (
     <div className="tab-viewer">
-      {/* Controls */}
-      <div className="tab-controls">
-        <div className="duration-selector">
-          <label>Duration: </label>
-          {(['whole', 'half', 'quarter', 'eighth', 'sixteenth'] as NoteDuration[]).map((duration) => (
-            <label key={duration} style={{ marginLeft: '10px' }}>
-              <input
-                type="radio"
-                name="duration"
-                value={duration}
-                checked={selectedDuration === duration}
-                onChange={() => {}} // Read-only, controlled by toolbar
-                disabled={true}
-              />
-              {duration}
-            </label>
-          ))}
-          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-            Duration controlled by toolbar above
-          </div>
+      <div className="tab-scroll-container" style={{ overflow: 'auto', width: '100%', height: '100%', position: 'relative' }}>
+        {/* Floating zoom controls */}
+        <div className="floating-zoom-controls">
+          <button 
+            onClick={() => setZoom(prev => Math.max(0.3, prev - 0.1))}
+            title="Zoom Out (Ctrl + Mouse Wheel)"
+          >
+            🔍-
+          </button>
+          <span className="zoom-display">{Math.round(zoom * 100)}%</span>
+          <button 
+            onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
+            title="Zoom In (Ctrl + Mouse Wheel)"
+          >
+            🔍+
+          </button>
+          <button 
+            onClick={() => setZoom(1)}
+            title="Reset Zoom"
+          >
+            Reset
+          </button>
         </div>
         
-        <div className="note-type-selector">
-          <label>Type: </label>
-          <label style={{ marginLeft: '10px' }}>
-            <input
-              type="radio"
-              name="noteType"
-              value="note"
-              checked={selectedNoteType === 'note'}
-              onChange={() => setSelectedNoteType('note')}
-            />
-            Note
-          </label>
-          <label style={{ marginLeft: '10px' }}>
-            <input
-              type="radio"
-              name="noteType"
-              value="rest"
-              checked={selectedNoteType === 'rest'}
-              onChange={() => setSelectedNoteType('rest')}
-            />
-            Rest
-          </label>
-        </div>
-        
-        <div className="instructions">
-          <p>Click to place cursor • Arrow keys to navigate • Type digits to create/edit fret numbers • Enter to move down • Tab to move right • Backspace to edit • 'R' for rest • <strong>Space to play from cursor • Cmd+Enter to reset to start</strong></p>
-        </div>
-      </div>
+        <svg 
+          ref={svgRef}
+          width={totalWidth} 
+          height={totalHeight} 
+          className="tab-svg"
+          onClick={handleSvgClick}
+          tabIndex={0}
+          style={{ minWidth: '100%', minHeight: '300px' }}
+        >
+          {/* String labels */}
+          {stringLabels.map((label, displayIndex) => {
+            const stringIndex = stringIndices[displayIndex];
+            return (
+              <text
+                key={`label-${stringIndex}`}
+                x={leftMargin - 30}
+                y={getStringY(stringIndex) + 5}
+                textAnchor="middle"
+                className="string-label-svg"
+              >
+                {label}
+              </text>
+            );
+          })}
 
-      <svg 
-        ref={svgRef}
-        width={totalWidth} 
-        height={totalHeight} 
-        className="tab-svg"
-        onClick={handleSvgClick}
-        tabIndex={0}
-      >
-        {/* String labels */}
-        {stringLabels.map((label, displayIndex) => {
-          const stringIndex = stringIndices[displayIndex];
-          return (
-            <text
-              key={`label-${stringIndex}`}
-              x={leftMargin - 30}
-              y={getStringY(stringIndex) + 5}
-              textAnchor="middle"
-              className="string-label-svg"
-            >
-              {label}
-            </text>
-          );
-        })}
-
-        {/* Horizontal string lines */}
-        {stringIndices.map((stringIndex) => {
-          const y = getStringY(stringIndex);
-          const endX = totalWidth - rightMargin; // Always extend to full width
-          
-          return (
-            <line
-              key={`string-${stringIndex}`}
-              x1={leftMargin}
-              y1={y}
-              x2={endX}
-              y2={y}
-              stroke="#333"
-              strokeWidth="2"
-            />
-          );
-        })}
-
-        {/* Measure separators (only when we have enough beats) */}
-        {measureBoundaries.map((beatPosition) => {
-          const x = leftMargin + (beatPosition * baseBeatWidth);
-          const topY = getStringY(2) - 10; // Hi D
-          const bottomY = getStringY(0) + 10; // Low D
-          
-          return (
-            <line
-              key={`measure-${beatPosition}`}
-              x1={x}
-              y1={topY}
-              x2={x}
-              y2={bottomY}
-              stroke="#666"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-            />
-          );
-        })}
-
-        {/* Notes and rests at each time position */}
-        {tabData.map((timePosition, timeIndex) => {
-          const centerX = getTimeX(timeIndex) + DURATION_VALUES[timePosition.duration] * baseBeatWidth / 2;
-          
-          return timePosition.notes.map((note, noteIndex) => {
-            const x = centerX;
-            const y = getStringY(note.stringIndex);
-            const visual = DURATION_VISUALS[note.duration];
+          {/* Horizontal string lines */}
+          {stringIndices.map((stringIndex) => {
+            const y = getStringY(stringIndex);
+            const endX = totalWidth - rightMargin; // Always extend to full width
             
-            if (note.type === 'rest') {
-              // Render rest symbol
-              return (
-                <g key={`rest-${timeIndex}-${noteIndex}`}>
-                  <text
-                    x={x}
-                    y={y + 5}
-                    textAnchor="middle"
-                    fontSize="16"
-                    fill="#666"
-                  >
-                    𝄽
-                  </text>
-                </g>
-              );
-            } else {
-              // Render note
-              return (
-                <g key={`note-${timeIndex}-${noteIndex}`}>
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r="12"
-                    fill={visual.isOpen ? "white" : "#000"}
-                    stroke="#000"
-                    strokeWidth="2"
-                  />
-                  
-                  {renderNoteStem(note, x, y)}
-                  
-                  {note.fret !== null && (
+            return (
+              <line
+                key={`string-${stringIndex}`}
+                x1={leftMargin}
+                y1={y}
+                x2={endX}
+                y2={y}
+                stroke="#333"
+                strokeWidth="2"
+              />
+            );
+          })}
+
+          {/* Measure separators (only when we have enough beats) */}
+          {measureBoundaries.map((beatPosition) => {
+            const x = leftMargin + (beatPosition * baseBeatWidth);
+            const topY = getStringY(2) - 10; // Hi D
+            const bottomY = getStringY(0) + 10; // Low D
+            
+            return (
+              <line
+                key={`measure-${beatPosition}`}
+                x1={x}
+                y1={topY}
+                x2={x}
+                y2={bottomY}
+                stroke="#666"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+              />
+            );
+          })}
+
+          {/* Notes and rests at each time position */}
+          {tabData.map((timePosition, timeIndex) => {
+            const centerX = getTimeX(timeIndex) + DURATION_VALUES[timePosition.duration] * baseBeatWidth / 2;
+            
+            return timePosition.notes.map((note, noteIndex) => {
+              const x = centerX;
+              const y = getStringY(note.stringIndex);
+              const visual = DURATION_VISUALS[note.duration];
+              
+              if (note.type === 'rest') {
+                // Render rest symbol
+                return (
+                  <g key={`rest-${timeIndex}-${noteIndex}`}>
                     <text
                       x={x}
-                      y={y + 4}
+                      y={y + 5}
                       textAnchor="middle"
-                      fontSize="12"
-                      fontWeight="bold"
-                      fill={visual.isOpen ? "#000" : "#fff"}
+                      fontSize="16"
+                      fill="#666"
                     >
-                      {note.fret}
+                      𝄽
                     </text>
-                  )}
-                </g>
-              );
-            }
-          });
-        })}
+                  </g>
+                );
+              } else {
+                // Render note
+                return (
+                  <g key={`note-${timeIndex}-${noteIndex}`}>
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r="12"
+                      fill={visual.isOpen ? "white" : "#000"}
+                      stroke="#000"
+                      strokeWidth="2"
+                    />
+                    
+                    {renderNoteStem(note, x, y)}
+                    
+                    {note.fret !== null && (
+                      <text
+                        x={x}
+                        y={y + 4}
+                        textAnchor="middle"
+                        fontSize="12"
+                        fontWeight="bold"
+                        fill={visual.isOpen ? "#000" : "#fff"}
+                      >
+                        {note.fret}
+                      </text>
+                    )}
+                  </g>
+                );
+              }
+            });
+          })}
 
-        {/* Cursor */}
-        <g className="cursor">
-          <line
-            x1={getCursorX()}
-            y1={getCursorY() - 20}
-            x2={getCursorX()}
-            y2={getCursorY() + 20}
-            stroke="#ff0000"
-            strokeWidth="3"
-          />
-          <circle
-            cx={getCursorX()}
-            cy={getCursorY()}
-            r="8"
-            fill="none"
-            stroke="#ff0000"
-            strokeWidth="2"
-          />
-        </g>
-      </svg>
+          {/* Cursor */}
+          <g className="cursor">
+            <line
+              x1={getCursorX()}
+              y1={getCursorY() - 20}
+              x2={getCursorX()}
+              y2={getCursorY() + 20}
+              stroke="#ff0000"
+              strokeWidth="3"
+            />
+            <circle
+              cx={getCursorX()}
+              cy={getCursorY()}
+              r="8"
+              fill="none"
+              stroke="#ff0000"
+              strokeWidth="2"
+            />
+          </g>
+        </svg>
+      </div>
     </div>
   );
 };

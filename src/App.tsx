@@ -7,7 +7,7 @@ import MainLayout from './components/layout/MainLayout'
 import PlaybackBar from './components/transport/PlaybackBar'
 import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import type { ControlsRef } from './Controls'
-import type { Note, NoteDuration, CursorPosition, TabData, TimePosition } from './types'
+import type { Note, NoteDuration, NoteType, CursorPosition, TabData, TimePosition } from './types'
 import { getLongestDuration } from './types'
 
 // Start with empty tab data
@@ -22,6 +22,7 @@ function App() {
   const [isLooping, setIsLooping] = useState<boolean>(false);
   const [showFretboard, setShowFretboard] = useState<boolean>(true);
   const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter'); // Default note duration
+  const [selectedNoteType, setSelectedNoteType] = useState<NoteType>('note'); // Default to note
   const [timeSignature, setTimeSignature] = useState<string>('4/4'); // Default time signature
   const controlsRef = useRef<ControlsRef>(null);
 
@@ -170,6 +171,8 @@ function App() {
           onTempoChange={setTempo}
           timeSignature={timeSignature}
           onTimeSignatureChange={setTimeSignature}
+          selectedNoteType={selectedNoteType}
+          onNoteTypeChange={setSelectedNoteType}
         />
       }
       leftSidebar={
@@ -195,6 +198,7 @@ function App() {
             selectedDuration={selectedDuration}
             onPlayFromCursor={handlePlayFromCursor}
             onResetCursor={handleResetCursor}
+            selectedNoteType={selectedNoteType}
           />
         </div>
       }

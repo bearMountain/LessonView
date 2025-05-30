@@ -5,34 +5,12 @@ interface TempoControlsProps {
   onTempoChange: (tempo: number) => void;
 }
 
-interface TempoMarking {
-  name: string;
-  bpm: number;
-  range: [number, number];
-}
-
 const TempoControls: React.FC<TempoControlsProps> = ({
   tempo,
   onTempoChange,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tempo.toString());
-
-  const tempoMarkings: TempoMarking[] = [
-    { name: 'Largo', bpm: 50, range: [40, 60] },
-    { name: 'Adagio', bpm: 70, range: [66, 76] },
-    { name: 'Andante', bpm: 90, range: [76, 108] },
-    { name: 'Moderato', bpm: 115, range: [108, 120] },
-    { name: 'Allegro', bpm: 140, range: [120, 168] },
-    { name: 'Presto', bpm: 180, range: [168, 200] },
-  ];
-
-  const getCurrentTempoMarking = (): string => {
-    const marking = tempoMarkings.find(
-      (marking) => tempo >= marking.range[0] && tempo <= marking.range[1]
-    );
-    return marking?.name || 'Custom';
-  };
 
   const handleTempoIncrement = (delta: number) => {
     const newTempo = Math.max(30, Math.min(400, tempo + delta));
@@ -103,27 +81,6 @@ const TempoControls: React.FC<TempoControlsProps> = ({
         >
           <span className="tempo-button__icon">+</span>
         </button>
-      </div>
-      
-      <div className="tempo-marking">
-        <span className="tempo-marking__text">{getCurrentTempoMarking()}</span>
-      </div>
-      
-      <div className="tempo-presets">
-        {tempoMarkings.map((marking) => (
-          <button
-            key={marking.name}
-            className={`tempo-preset ${
-              tempo >= marking.range[0] && tempo <= marking.range[1]
-                ? 'tempo-preset--active'
-                : ''
-            }`}
-            onClick={() => onTempoChange(marking.bpm)}
-            title={`${marking.name} (${marking.bpm} BPM)`}
-          >
-            {marking.name}
-          </button>
-        ))}
       </div>
     </div>
   );

@@ -98,59 +98,88 @@
 /* Note Value Palette Styles */
 .note-value-palette {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 12px;
 }
 
 .note-value-palette__label {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 .note-value-palette__buttons {
   display: flex;
-  gap: var(--spacing-xs);
+  gap: 8px;
+  align-items: center;
+}
+
+.note-value-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
 }
 
 .note-value-button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: var(--spacing-xs);
-  background-color: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  min-width: 42px;
-  min-height: 42px;
   justify-content: center;
+  min-width: 50px;
+  height: 40px;
+  padding: 4px 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 11px;
+  
+  &:hover {
+    background: var(--color-hover);
+    border-color: var(--color-primary);
+  }
+  
+  &:active {
+    transform: translateY(1px);
+  }
 }
 
-.note-value-button:hover {
-  background-color: var(--color-bg-hover);
-  border-color: var(--primary-blue);
+.note-value-button--rest {
+  height: 32px;
+  min-width: 50px;
+  opacity: 0.8;
+  
+  &:hover {
+    opacity: 1;
+  }
 }
 
 .note-value-button--active {
-  background-color: var(--primary-blue);
-  border-color: var(--primary-blue);
-  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  
+  &:hover {
+    background: var(--color-primary-hover);
+  }
 }
 
 .note-value-button__symbol {
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
-  font-family: 'Times New Roman', serif;
+  margin-bottom: 2px;
 }
 
 .note-value-button__text {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 500;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
   line-height: 1;
 }
 

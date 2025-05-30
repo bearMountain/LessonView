@@ -35,7 +35,7 @@ Transform the current strumstick tab viewer into a professional, full-screen mus
 - **Professional Toolbar**: Complete implementation with 5 sections (File, Edit, Notes, Time, Layout)
 - **Note Value Palette**: Visual music note buttons with proper symbols (♩♪♫)
 - **Time Signature Selector**: Dropdown with common signatures (4/4, 3/4, 6/8, etc.)
-- **Tempo Controls**: BPM adjustment with +/- buttons, click-to-edit, tempo markings (Largo, Allegro, etc.)
+- **Tempo Controls**: BPM adjustment with +/- buttons and click-to-edit functionality
 - **Professional Styling**: Comprehensive CSS with hover states, keyboard shortcuts tooltips
 - **Integration**: Toolbar controls TabViewer note duration selection
 - **Responsive Design**: Mobile-optimized with collapsing sections
@@ -105,8 +105,7 @@ interface ToolbarSection {
 <!-- - **ClefSelector**: Treble, bass, alto clefs -->
 <!-- - **KeySignature**: Sharp/flat key selection -->
 - **TimeSignature**: 4/4, 3/4, 6/8 etc.
-<!-- - **TempoMarking**: Andante, Allegro, BPM controls -->
-- **TempoMarking**: BPM controls
+- **TempoControls**: Simple BPM controls with +/- buttons
 
 #### 2.3 Professional Tool Styling
 - Icon-based tools with tooltips

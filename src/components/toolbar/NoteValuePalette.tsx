@@ -1,52 +1,56 @@
 import React from 'react';
-import type { NoteDuration } from '../../types';
+import type { NoteDuration, NoteType } from '../../types';
 
 interface NoteValuePaletteProps {
   selectedDuration: NoteDuration;
   onDurationChange: (duration: NoteDuration) => void;
+  selectedNoteType?: NoteType;
+  onNoteTypeChange?: (type: NoteType) => void;
 }
 
 interface NoteValue {
   duration: NoteDuration;
-  symbol: string;
+  noteSymbol: string;
+  restSymbol: string;
   name: string;
-  unicodeSymbol?: string;
 }
 
 const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
   selectedDuration,
   onDurationChange,
+  selectedNoteType = 'note',
+  onNoteTypeChange,
 }) => {
   const noteValues: NoteValue[] = [
     {
       duration: 'whole',
-      symbol: '𝅝',
-      unicodeSymbol: '♩', // Fallback
-      name: 'Whole Note',
+      noteSymbol: '𝅝',
+      restSymbol: '𝄻', // Whole rest
+      name: 'Whole',
     },
     {
       duration: 'half',
-      symbol: '𝅗𝅥',
-      unicodeSymbol: '♩',
-      name: 'Half Note',
+      noteSymbol: '𝅗𝅥',
+      restSymbol: '𝄼', // Half rest
+      name: 'Half',
     },
     {
       duration: 'quarter',
-      symbol: '♩',
-      unicodeSymbol: '♩',
-      name: 'Quarter Note',
+      noteSymbol: '♩',
+      restSymbol: '𝄽', // Quarter rest
+      name: 'Quarter',
     },
     {
       duration: 'eighth',
-      symbol: '♪',
-      unicodeSymbol: '♪',
-      name: 'Eighth Note',
+      noteSymbol: '♪',
+      restSymbol: '𝄾', // Eighth rest
+      name: 'Eighth',
     },
     {
       duration: 'sixteenth',
-      symbol: '𝅘𝅥𝅯',
-      unicodeSymbol: '♬',
-      name: 'Sixteenth Note',
+      noteSymbol: '𝅘𝅥𝅯',
+      restSymbol: '𝄿', // Sixteenth rest
+      name: 'Sixteenth',
     },
   ];
 
@@ -55,22 +59,49 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
       <span className="note-value-palette__label">Duration:</span>
       <div className="note-value-palette__buttons">
         {noteValues.map((noteValue) => (
-          <button
-            key={noteValue.duration}
-            className={`note-value-button ${
-              selectedDuration === noteValue.duration ? 'note-value-button--active' : ''
-            }`}
-            onClick={() => onDurationChange(noteValue.duration)}
-            title={noteValue.name}
-            aria-label={noteValue.name}
-          >
-            <span className="note-value-button__symbol">
-              {noteValue.symbol}
-            </span>
-            <span className="note-value-button__text">
-              {noteValue.duration}
-            </span>
-          </button>
+          <div key={noteValue.duration} className="note-value-pair">
+            {/* Note button */}
+            <button
+              className={`note-value-button ${
+                selectedDuration === noteValue.duration && selectedNoteType === 'note' 
+                  ? 'note-value-button--active' : ''
+              }`}
+              onClick={() => {
+                onDurationChange(noteValue.duration);
+                if (onNoteTypeChange) onNoteTypeChange('note');
+              }}
+              title={`${noteValue.name} Note`}
+              aria-label={`${noteValue.name} Note`}
+            >
+              <span className="note-value-button__symbol">
+                {noteValue.noteSymbol}
+              </span>
+              <span className="note-value-button__text">
+                {noteValue.duration}
+              </span>
+            </button>
+            
+            {/* Rest button */}
+            <button
+              className={`note-value-button note-value-button--rest ${
+                selectedDuration === noteValue.duration && selectedNoteType === 'rest' 
+                  ? 'note-value-button--active' : ''
+              }`}
+              onClick={() => {
+                onDurationChange(noteValue.duration);
+                if (onNoteTypeChange) onNoteTypeChange('rest');
+              }}
+              title={`${noteValue.name} Rest`}
+              aria-label={`${noteValue.name} Rest`}
+            >
+              <span className="note-value-button__symbol">
+                {noteValue.restSymbol}
+              </span>
+              <span className="note-value-button__text">
+                rest
+              </span>
+            </button>
+          </div>
         ))}
       </div>
     </div>

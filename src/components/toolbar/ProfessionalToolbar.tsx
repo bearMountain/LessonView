@@ -3,11 +3,13 @@ import './ProfessionalToolbar.css';
 import NoteValuePalette from './NoteValuePalette';
 import TimeSignatureSelector from './TimeSignatureSelector';
 import TempoControls from './TempoControls';
-import type { NoteDuration } from '../../types';
+import type { NoteDuration, NoteType } from '../../types';
 
 interface ProfessionalToolbarProps {
   selectedDuration: NoteDuration;
   onDurationChange: (duration: NoteDuration) => void;
+  selectedNoteType: NoteType;
+  onNoteTypeChange: (type: NoteType) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
   timeSignature: string;
@@ -23,6 +25,8 @@ interface ToolbarSection {
 const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   selectedDuration,
   onDurationChange,
+  selectedNoteType,
+  onNoteTypeChange,
   tempo,
   onTempoChange,
   timeSignature,
@@ -86,6 +90,8 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
           <NoteValuePalette
             selectedDuration={selectedDuration}
             onDurationChange={onDurationChange}
+            selectedNoteType={selectedNoteType}
+            onNoteTypeChange={onNoteTypeChange}
           />
         </div>
       ),

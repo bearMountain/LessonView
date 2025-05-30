@@ -6,48 +6,57 @@
   color: var(--color-text-primary);
 }
 
-.tab-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background-color: var(--color-bg-secondary);
+.tab-scroll-container {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--spacing-lg);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  position: relative;
 }
 
-.duration-selector, .note-type-selector {
+.floating-zoom-controls {
+  position: absolute;
+  top: -12px;
+  right: 8px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+  z-index: 10;
 }
 
-.duration-selector label, .note-type-selector label {
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
+.floating-zoom-controls button {
+  padding: 3px 6px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
   cursor: pointer;
   color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  white-space: nowrap;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  min-width: 24px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.duration-selector input[type="radio"], .note-type-selector input[type="radio"] {
-  margin: 0;
-  accent-color: var(--primary-blue);
+.floating-zoom-controls button:hover {
+  background: var(--color-hover);
+  border-color: var(--color-primary);
 }
 
-.instructions {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  font-style: italic;
-}
-
-.instructions p {
-  margin: 0;
+.floating-zoom-controls .zoom-display {
+  min-width: 35px;
+  text-align: center;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: 11px;
 }
 
 .tab-svg {
@@ -77,16 +86,4 @@
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0.3; }
-}
-
-.controls {
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  margin: 20px 0;
-}
-
-.controls h3 {
-  margin-top: 0;
-  color: #333;
 } 
