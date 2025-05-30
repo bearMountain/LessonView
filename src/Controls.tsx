@@ -236,32 +236,47 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       // Get synth references
       const synths = synthsRef.current;
       
-      // Play pick noise
-      if (synths.strings[stringIndex].noise) {
-        synths.strings[stringIndex].noise.start(when);
-        const stopTime = typeof when === 'number' ? when + 0.005 : "+0.005";
-        synths.strings[stringIndex].noise.stop(stopTime);
-      }
-      
-      // Play main note
-      if (synths.strings[stringIndex].main) {
-        synths.strings[stringIndex].main.triggerAttackRelease(note, mainDuration, when);
-      }
-      
-      // Play harmonic layer
-      if (synths.strings[stringIndex].harmonic) {
-        const harmonicTime = typeof when === 'number' ? when + 0.002 : "+0.002";
-        synths.strings[stringIndex].harmonic.triggerAttackRelease(harmonicNote, harmonicDuration, harmonicTime, 0.2);
-      }
-      
-      // Play sub layer
-      if (synths.strings[stringIndex].sub) {
-        const subTime = typeof when === 'number' ? when + 0.008 : "+0.008";
-        synths.strings[stringIndex].sub.triggerAttackRelease(subNote, subDuration, subTime, 0.15);
-      }
+      // Return a promise that resolves when the main synth finishes (for end-of-song detection)
+      return new Promise<void>((resolve) => {
+        // Set up onsilence callback for the main synth (longest lasting one)
+        const originalOnSilence = synths.strings[stringIndex].main?.onsilence;
+        
+        synths.strings[stringIndex].main!.onsilence = () => {
+          // Restore original callback
+          if (synths.strings[stringIndex].main) {
+            synths.strings[stringIndex].main.onsilence = originalOnSilence || (() => {});
+          }
+          resolve();
+        };
+        
+        // Play pick noise
+        if (synths.strings[stringIndex].noise) {
+          synths.strings[stringIndex].noise.start(when);
+          const stopTime = typeof when === 'number' ? when + 0.005 : "+0.005";
+          synths.strings[stringIndex].noise.stop(stopTime);
+        }
+        
+        // Play main note
+        if (synths.strings[stringIndex].main) {
+          synths.strings[stringIndex].main.triggerAttackRelease(note, mainDuration, when);
+        }
+        
+        // Play harmonic layer
+        if (synths.strings[stringIndex].harmonic) {
+          const harmonicTime = typeof when === 'number' ? when + 0.002 : "+0.002";
+          synths.strings[stringIndex].harmonic.triggerAttackRelease(harmonicNote, harmonicDuration, harmonicTime, 0.2);
+        }
+        
+        // Play sub layer
+        if (synths.strings[stringIndex].sub) {
+          const subTime = typeof when === 'number' ? when + 0.008 : "+0.008";
+          synths.strings[stringIndex].sub.triggerAttackRelease(subNote, subDuration, subTime, 0.15);
+        }
+      });
       
     } catch (error) {
       console.error(`Error in playNote for string ${stringIndex}:`, error);
+      return Promise.resolve(); // Return resolved promise on error
     }
   };
 
@@ -347,6 +362,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       let currentSixteenthNote = startingSixteenthNote;
       let tabCursor = cursorPosition.timeIndex; // Start from cursor position
       let positionStartBeat = startingSixteenthNote; // When current position started
+      let lastPositionNotePromises: Promise<void>[] = []; // Track the last position's note completion
       
       // Calculate total duration in sixteenth notes for completion detection
       const totalSixteenthNotes = tabData.reduce((total, timePos) => {
@@ -388,20 +404,26 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
               }));
               onNotesPlaying(playingNotes);
               
-              // Play all notes at this position using the exact scheduled time
-              notesToPlay.forEach(note => {
+              // Play all notes at this position and collect promises
+              const notePromises = notesToPlay.map(note => {
                 console.log(`    Note: fret ${note.fret} on string ${note.stringIndex} (duration: ${note.duration})`);
                 try {
-                  playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
+                  return playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
                 } catch (noteError) {
                   console.error(`Error playing note ${note.fret} on string ${note.stringIndex}:`, noteError);
+                  return Promise.resolve(); // Return resolved promise on error
                 }
               });
+              
+              // Store promises from this position - they become the "last position" for end detection
+              lastPositionNotePromises = notePromises;
               
             } else {
               console.log(`  ⏸️ Rest at position ${tabCursor + 1}`);
               // Clear visual feedback for rests
               onNotesPlaying([]);
+              // No notes to track for this position
+              lastPositionNotePromises = [];
             }
             
             // Move to next position
@@ -415,12 +437,27 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
           // Check if we've reached the end
           if (tabCursor >= tabData.length) {
             console.log('🏁 Reached end of tab, stopping...');
-            // Use setTimeout to avoid cleanup issues during callback
-            // Delay clearing visual feedback to let the last note sound and be visible
-            setTimeout(() => {
-              onNotesPlaying([]); // Clear visual feedback after delay
-              stopPlayback(false); // Don't clear visual feedback again since we just did it
-            }, 1000); // 1 second delay to let last note sound
+            
+            // Wait for all notes from the last position to finish before cleaning up
+            if (lastPositionNotePromises.length > 0) {
+              console.log(`  ⏰ Waiting for ${lastPositionNotePromises.length} notes to finish...`);
+              
+              Promise.all(lastPositionNotePromises).then(() => {
+                console.log('🧹 All last notes finished, cleaning up...');
+                onNotesPlaying([]); // Clear visual feedback
+                stopPlayback(false); // Don't clear visual feedback again since we just did it
+              }).catch((error) => {
+                console.error('Error waiting for notes to finish:', error);
+                // Clean up anyway
+                onNotesPlaying([]);
+                stopPlayback(false);
+              });
+            } else {
+              // No notes to wait for (last position was a rest), stop immediately
+              console.log('  ⏰ No notes to wait for, stopping immediately');
+              onNotesPlaying([]);
+              stopPlayback(false);
+            }
             return;
           }
           
@@ -518,9 +555,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     };
   }, []);
 
-  const handleStopClick = () => {
-    stopPlayback(); // Use default clearVisualFeedback = true
-  };
+  const handleStopClick = () => stopPlayback();
 
   return (
     <div className="controls">

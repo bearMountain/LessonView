@@ -20,7 +20,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   centerWorkspace,
 }) => {
   return (
-    <div className="main-layout">
+    <div className={`main-layout ${fretboard ? 'main-layout--with-fretboard' : 'main-layout--no-fretboard'}`}>
       <header className="main-layout__toolbar">
         {toolbar}
       </header>
@@ -37,9 +37,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         {rightSidebar}
       </aside>
       
-      <section className="main-layout__fretboard">
-        {fretboard}
-      </section>
+      {fretboard && (
+        <section className="main-layout__fretboard">
+          {fretboard}
+        </section>
+      )}
       
       <footer className="main-layout__bottom-panel">
         {bottomPanel}

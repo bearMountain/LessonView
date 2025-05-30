@@ -1,12 +1,6 @@
 .main-layout {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  grid-template-rows: auto 1fr auto auto;
-  grid-template-areas:
-    "toolbar      toolbar      toolbar"
-    "left-sidebar center       right-sidebar"
-    "fretboard    fretboard    fretboard"
-    "bottom-panel bottom-panel bottom-panel";
   
   /* Ensure full viewport coverage with no offset */
   position: fixed;
@@ -24,6 +18,25 @@
   
   /* Typography */
   font-family: var(--font-ui, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+}
+
+/* Layout with fretboard */
+.main-layout--with-fretboard {
+  grid-template-rows: auto 1fr auto auto;
+  grid-template-areas:
+    "toolbar      toolbar      toolbar"
+    "left-sidebar center       right-sidebar"
+    "fretboard    fretboard    fretboard"
+    "bottom-panel bottom-panel bottom-panel";
+}
+
+/* Layout without fretboard */
+.main-layout--no-fretboard {
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "toolbar      toolbar      toolbar"
+    "left-sidebar center       right-sidebar"
+    "bottom-panel bottom-panel bottom-panel";
 }
 
 .main-layout__toolbar {
