@@ -1,16 +1,20 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as Tone from 'tone';
-import type { TabData } from './types';
-import { DURATION_VALUES } from './types';
+import type { TabData, Note } from './types';
+import { DURATION_VALUES, DURATION_SLOTS, getNotesAtSlot, getTotalNoteDuration } from './types';
 
 interface ControlsProps {
   tabData: TabData;
-  cursorPosition: { timeIndex: number; stringIndex: number };
+  cursorPosition: { timeSlot: number; stringIndex: number };
   onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   onPlaybackStateChange?: (isPlaying: boolean) => void;
+  onCurrentTimeSlotChange?: (timeSlot: number) => void;
+  onCountInStateChange?: (isCountingIn: boolean, beat?: number, totalBeats?: number) => void;
+  countInEnabled?: boolean;
+  timeSignature?: string;
 }
 
 export interface ControlsRef {
@@ -19,9 +23,9 @@ export interface ControlsRef {
   stopPlayback: () => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlayPreviewNote, onPlaybackStateChange }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlayPreviewNote, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature }, ref) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTimeIndex, setCurrentTimeIndex] = useState<number>(-1);
+  const [currentTimeSlot, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<Tone.Part | null>(null);
   const synthsRef = useRef<{
     strings: Array<{
@@ -236,18 +240,16 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       // Get synth references
       const synths = synthsRef.current;
       
-      // Return a promise that resolves when the main synth finishes (for end-of-song detection)
+      // Return a promise that resolves after the note duration (simpler than onsilence)
       return new Promise<void>((resolve) => {
-        // Set up onsilence callback for the main synth (longest lasting one)
-        const originalOnSilence = synths.strings[stringIndex].main?.onsilence;
+        // Calculate when the note will finish (in milliseconds)
+        const noteFinishTime = (typeof when === 'number' ? when : Tone.now()) + mainDuration + 0.1; // Add small buffer
+        const timeoutMs = Math.max(100, (noteFinishTime - Tone.now()) * 1000);
         
-        synths.strings[stringIndex].main!.onsilence = () => {
-          // Restore original callback
-          if (synths.strings[stringIndex].main) {
-            synths.strings[stringIndex].main.onsilence = originalOnSilence || (() => {});
-          }
+        // Resolve after the note should be finished
+        setTimeout(() => {
           resolve();
-        };
+        }, timeoutMs);
         
         // Play pick noise
         if (synths.strings[stringIndex].noise) {
@@ -287,6 +289,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       await Tone.start();
       initializeSynths();
     }
+
+    // Show finger circle for preview note
+    onNotesPlaying([{ fret, stringIndex }]);
     
     // Quick preview with shorter duration for immediate feedback
     try {
@@ -329,8 +334,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   const playTab = async () => {
     if (tabData.length === 0) return;
     
-    console.log('=== STARTING METRONOME PLAYBACK ===');
-    console.log(`Starting from cursor position: timeIndex=${cursorPosition.timeIndex}`);
+    console.log('=== STARTING GRID-BASED PLAYBACK ===');
+    console.log(`Starting from cursor position: timeSlot=${cursorPosition.timeSlot}`);
+    console.log(`Count-in enabled: ${countInEnabled}`);
     
     try {
       await Tone.start();
@@ -350,23 +356,105 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       
       setIsPlaying(true);
       onPlaybackStateChange?.(true);
-      setCurrentTimeIndex(cursorPosition.timeIndex);
       
-      // Calculate starting position in sixteenth notes
-      let startingSixteenthNote = 0;
-      for (let i = 0; i < Math.min(cursorPosition.timeIndex, tabData.length); i++) {
-        startingSixteenthNote += DURATION_VALUES[tabData[i].duration] * 4; // Convert to sixteenth notes
+      // Parse time signature to get beats per measure
+      const [numerator] = (timeSignature || '4/4').split('/').map(Number);
+      const beatsPerMeasure = numerator || 4;
+      
+      // Count-in phase
+      if (countInEnabled) {
+        console.log(`🎼 Starting count-in: ${beatsPerMeasure} beats`);
+        
+        // Notify that count-in is starting
+        onCountInStateChange?.(true, 0, beatsPerMeasure);
+        
+        // Create a simple click sound for count-in
+        const clickSynth = new Tone.MembraneSynth({
+          pitchDecay: 0.008,
+          octaves: 2,
+          envelope: {
+            attack: 0.001,
+            decay: 0.3,
+            sustain: 0.01,
+            release: 0.3
+          }
+        }).toDestination();
+        
+        // Set cursor blink speed to match tempo for basic visual feedback
+        const blinkDuration = (60 / tempo) * 1000; // milliseconds per beat
+        document.body.style.setProperty('cursor', 'none');
+        
+        // Create a simple blinking visual indicator
+        const indicator = document.createElement('div');
+        indicator.style.cssText = `
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: var(--primary-blue);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 4px;
+          font-weight: bold;
+          z-index: 10000;
+          animation: count-in-blink ${blinkDuration}ms infinite;
+        `;
+        indicator.textContent = 'Count-in...';
+        document.body.appendChild(indicator);
+        
+        let countInBeat = 0;
+        
+        const countInPromise = new Promise<void>((resolve) => {
+          const countInCallback = Tone.Transport.scheduleRepeat((time) => {
+            countInBeat++;
+            console.log(`🎵 Count-in beat ${countInBeat}/${beatsPerMeasure}`);
+            
+            // Update count-in state
+            onCountInStateChange?.(true, countInBeat, beatsPerMeasure);
+            
+            // Update indicator text
+            indicator.textContent = `Count-in: ${countInBeat}/${beatsPerMeasure}`;
+            
+            // Play click sound (higher pitch for beat 1)
+            const pitch = countInBeat === 1 ? 'C5' : 'C4';
+            clickSynth.triggerAttackRelease(pitch, '8n', time);
+            
+            // End count-in after completing all beats in the measure
+            if (countInBeat >= beatsPerMeasure) {
+              // Schedule cleanup after this beat finishes playing
+              setTimeout(() => {
+                Tone.Transport.clear(countInCallback);
+                clickSynth.dispose();
+                // Reset cursor and remove indicator
+                document.body.style.removeProperty('cursor');
+                document.body.removeChild(indicator);
+                // Notify that count-in is complete
+                onCountInStateChange?.(false);
+                resolve();
+              }, 100); // Small delay to let the final beat sound
+            }
+          }, "4n"); // Quarter note intervals for count-in
+          
+          // Start transport for count-in
+          Tone.Transport.start();
+        });
+        
+        // Wait for count-in to complete
+        await countInPromise;
+        
+        console.log('🎼 Count-in complete, starting main playback');
+        
+        // Reset transport for main playback
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        Tone.Transport.position = 0;
       }
       
-      // Metronome state - starting from cursor position
-      let currentSixteenthNote = startingSixteenthNote;
-      let tabCursor = cursorPosition.timeIndex; // Start from cursor position
-      let positionStartBeat = startingSixteenthNote; // When current position started
-      let lastPositionNotePromises: Promise<void>[] = []; // Track the last position's note completion
+      // Main playback phase
+      setCurrentTimeSlot(cursorPosition.timeSlot);
+      onCurrentTimeSlotChange?.(cursorPosition.timeSlot);
       
-      // Calculate total duration in sixteenth notes for completion detection
-      const totalSixteenthNotes = tabData.reduce((total, timePos) => {
-        return total + (DURATION_VALUES[timePos.duration] * 4); // Convert quarter notes to sixteenth notes
+      // otes
       }, 0);
       
       console.log(`Tab has ${tabData.length} positions, ${totalSixteenthNotes} total sixteenth notes`);
@@ -404,26 +492,20 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
               }));
               onNotesPlaying(playingNotes);
               
-              // Play all notes at this position and collect promises
-              const notePromises = notesToPlay.map(note => {
+              // Play all notes at this position using the exact scheduled time
+              notesToPlay.forEach(note => {
                 console.log(`    Note: fret ${note.fret} on string ${note.stringIndex} (duration: ${note.duration})`);
                 try {
-                  return playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
+                  playNote(note.fret!, note.stringIndex, DURATION_VALUES[note.duration], time);
                 } catch (noteError) {
                   console.error(`Error playing note ${note.fret} on string ${note.stringIndex}:`, noteError);
-                  return Promise.resolve(); // Return resolved promise on error
                 }
               });
-              
-              // Store promises from this position - they become the "last position" for end detection
-              lastPositionNotePromises = notePromises;
               
             } else {
               console.log(`  ⏸️ Rest at position ${tabCursor + 1}`);
               // Clear visual feedback for rests
               onNotesPlaying([]);
-              // No notes to track for this position
-              lastPositionNotePromises = [];
             }
             
             // Move to next position
@@ -438,23 +520,37 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
           if (tabCursor >= tabData.length) {
             console.log('🏁 Reached end of tab, stopping...');
             
-            // Wait for all notes from the last position to finish before cleaning up
-            if (lastPositionNotePromises.length > 0) {
-              console.log(`  ⏰ Waiting for ${lastPositionNotePromises.length} notes to finish...`);
+            // Calculate when the last note(s) will finish playing
+            // We need to look at the previous position to get the note durations
+            if (tabCursor > 0) {
+              const lastTimePos = tabData[tabCursor - 1];
+              const notesInLastPosition = lastTimePos.notes.filter(note => note.type === 'note' && note.fret !== null);
               
-              Promise.all(lastPositionNotePromises).then(() => {
-                console.log('🧹 All last notes finished, cleaning up...');
-                onNotesPlaying([]); // Clear visual feedback
-                stopPlayback(false); // Don't clear visual feedback again since we just did it
-              }).catch((error) => {
-                console.error('Error waiting for notes to finish:', error);
-                // Clean up anyway
+              if (notesInLastPosition.length > 0) {
+                // Find the longest note duration in the last position
+                const longestNoteDuration = Math.max(...notesInLastPosition.map(note => DURATION_VALUES[note.duration]));
+                
+                // Schedule cleanup when the longest note finishes
+                // Convert quarter note duration to Tone time format
+                const cleanupTime = `+${longestNoteDuration}n`; // e.g., "+1n" for quarter note, "+2n" for half note
+                
+                console.log(`  ⏰ Scheduling cleanup in ${cleanupTime} (${longestNoteDuration} quarter notes)`);
+                
+                Tone.Transport.schedule((time) => {
+                  console.log('🧹 Scheduled cleanup executing...');
+                  onNotesPlaying([]); // Clear visual feedback
+                  // Schedule the actual stop slightly after to ensure visual clear happens first
+                  Tone.Transport.schedule(() => {
+                    stopPlayback(false); // Don't clear visual feedback again since we just did it
+                  }, `+${1/32}n`); // Very small delay to ensure order
+                }, cleanupTime);
+              } else {
+                // No notes in last position (was a rest), stop immediately
                 onNotesPlaying([]);
                 stopPlayback(false);
-              });
+              }
             } else {
-              // No notes to wait for (last position was a rest), stop immediately
-              console.log('  ⏰ No notes to wait for, stopping immediately');
+              // Edge case: no previous position, stop immediately  
               onNotesPlaying([]);
               stopPlayback(false);
             }

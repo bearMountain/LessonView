@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
@@ -7,15 +7,15 @@ import MainLayout from './components/layout/MainLayout'
 import PlaybackBar from './components/transport/PlaybackBar'
 import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import type { ControlsRef } from './Controls'
-import type { Note, NoteDuration, NoteType, CursorPosition, TabData, TimePosition } from './types'
-import { getLongestDuration } from './types'
+import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
+import { DURATION_SLOTS, addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, findNextAvailableSlot, createTie, getAllTies, removeTie } from './types'
 
 // Start with empty tab data
 const initialTabData: TabData = [];
 
 function App() {
   const [tabData, setTabData] = useState<TabData>(initialTabData);
-  const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ timeIndex: 0, stringIndex: 2 }); // Start on Hi D string
+  const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ timeSlot: 0, stringIndex: 2 }); // Start on Hi D string
   const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
   const [tempo, setTempo] = useState<number>(120); // Default 120 BPM
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -24,46 +24,45 @@ function App() {
   const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter'); // Default note duration
   const [selectedNoteType, setSelectedNoteType] = useState<NoteType>('note'); // Default to note
   const [timeSignature, setTimeSignature] = useState<string>('4/4'); // Default time signature
+  const [zoom, setZoom] = useState<number>(1.0);
+  const [currentPlaybackTimeSlot, setCurrentPlaybackTimeSlot] = useState<number>(-1);
+  const [countInEnabled, setCountInEnabled] = useState<boolean>(false);
+  const [tieMode, setTieMode] = useState<boolean>(false);
+  const [selectedNotes, setSelectedNotes] = useState<Array<{ timeSlot: number; stringIndex: number }>>([]);
   const controlsRef = useRef<ControlsRef>(null);
 
-  const addNote = (fret: number | null, duration?: NoteDuration, type: 'note' | 'rest' = 'note') => {
-    const noteDuration = duration || selectedDuration; // Use provided duration or selected from toolbar
-    
-    setTabData(prevData => {
-      const newData = [...prevData];
+  const handleAddNote = (fret: number | null, duration: NoteDuration = selectedDuration, type: NoteType = selectedNoteType) => {
+    setTabData(prevTabData => {
+      // Place note directly at cursor position (user controls placement)
+      const startSlot = cursorPosition.timeSlot;
       
-      // Ensure we have a time position at the cursor location
-      while (newData.length <= cursorPosition.timeIndex) {
-        newData.push({
-          notes: [],
-          duration: 'quarter' // Default duration, will be updated
-        });
-      }
-      
-      const timePosition = newData[cursorPosition.timeIndex];
+      // Create new note
       const newNote: Note = {
         type,
-        fret: type === 'rest' ? null : fret,
-        duration: noteDuration,
-        stringIndex: cursorPosition.stringIndex
+        fret,
+        duration,
+        stringIndex: cursorPosition.stringIndex,
+        startSlot: startSlot
       };
-      
-      // Remove any existing note on this string at this time position
-      const filteredNotes = timePosition.notes.filter(note => note.stringIndex !== cursorPosition.stringIndex);
-      
-      // Add the new note
-      const updatedNotes = [...filteredNotes, newNote];
-      
-      // Update the time position with the new note and longest duration
-      newData[cursorPosition.timeIndex] = {
-        notes: updatedNotes,
-        duration: getLongestDuration(updatedNotes)
-      };
-      
-      return newData;
+
+      // Add note to grid (this will replace any existing note at this position)
+      return addNoteToGrid(prevTabData, newNote);
     });
-    
-    // Don't automatically move cursor - let TabViewer control cursor movement explicitly
+  };
+
+  const handleRemoveNote = () => {
+    setTabData(prevTabData => {
+      // Find note at current cursor position
+      const notesAtCursor = getNotesAtSlot(prevTabData, cursorPosition.timeSlot, cursorPosition.stringIndex);
+      
+      if (notesAtCursor.length > 0) {
+        // Remove the first note found at this position
+        const noteToRemove = notesAtCursor[0];
+        return removeNoteFromGrid(prevTabData, noteToRemove);
+      }
+      
+      return prevTabData; // No note to remove
+    });
   };
 
   const moveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
@@ -72,10 +71,10 @@ function App() {
       
       switch (direction) {
         case 'left':
-          newPosition.timeIndex = Math.max(0, prev.timeIndex - 1);
+          newPosition.timeSlot = Math.max(0, prev.timeSlot - 1);
           break;
         case 'right':
-          newPosition.timeIndex = Math.min(tabData.length, prev.timeIndex + 1);
+          newPosition.timeSlot = prev.timeSlot + 1; // No upper limit - grid can grow
           break;
         case 'up':
           newPosition.stringIndex = Math.min(2, prev.stringIndex + 1); // Hi D is index 2
@@ -97,28 +96,8 @@ function App() {
     setTempo(newTempo);
   };
 
-  const removeNote = () => {
-    setTabData(prevData => {
-      const newData = [...prevData];
-      
-      // If there's no time position at cursor, nothing to remove
-      if (cursorPosition.timeIndex >= newData.length) {
-        return prevData;
-      }
-      
-      const timePosition = newData[cursorPosition.timeIndex];
-      
-      // Remove any existing note on this string at this time position
-      const filteredNotes = timePosition.notes.filter(note => note.stringIndex !== cursorPosition.stringIndex);
-      
-      // Update the time position with filtered notes
-      newData[cursorPosition.timeIndex] = {
-        notes: filteredNotes,
-        duration: getLongestDuration(filteredNotes)
-      };
-      
-      return newData;
-    });
+  const handleTimeSignatureChange = (signature: string) => {
+    setTimeSignature(signature);
   };
 
   const handlePlayPause = () => {
@@ -139,6 +118,88 @@ function App() {
     setShowFretboard(!showFretboard);
   };
 
+  const handleCountInToggle = () => {
+    setCountInEnabled(!countInEnabled);
+  };
+
+  const handleTieModeChange = (enabled: boolean) => {
+    setTieMode(enabled);
+    if (!enabled) {
+      setSelectedNotes([]); // Clear selection when disabling tie mode
+    } else if (selectedNotes.length === 2) {
+      // If tie mode is being enabled and we have 2 notes selected, create the tie
+      handleCreateTie();
+    }
+  };
+
+  const handleNoteSelection = (timeSlot: number, stringIndex: number) => {
+    // Always allow note selection when shift is held or when we already have selections
+    const hasExistingSelections = selectedNotes.length > 0;
+    
+    const noteKey = { timeSlot, stringIndex };
+    const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
+    
+    if (existingIndex >= 0) {
+      // Deselect if already selected
+      setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
+    } else {
+      // Select note (max 2 notes for tie)
+      setSelectedNotes(prev => {
+        if (prev.length >= 2) {
+          return [prev[1], noteKey]; // Replace first with second, add new
+        }
+        return [...prev, noteKey];
+      });
+    }
+  };
+
+  const handleCreateTie = () => {
+    if (selectedNotes.length === 2) {
+      const [note1, note2] = selectedNotes;
+      
+      // Ensure same string and same fret
+      if (note1.stringIndex !== note2.stringIndex) {
+        console.log('Cannot tie notes on different strings');
+        return;
+      }
+      
+      const notes1 = getNotesAtSlot(tabData, note1.timeSlot, note1.stringIndex);
+      const notes2 = getNotesAtSlot(tabData, note2.timeSlot, note2.stringIndex);
+      
+      if (notes1.length === 0 || notes2.length === 0) {
+        console.log('Cannot tie: one or both notes do not exist');
+        return;
+      }
+      
+      if (notes1[0].fret !== notes2[0].fret) {
+        console.log('Cannot tie notes with different frets');
+        return;
+      }
+      
+      // Create the tie (from earlier to later note)
+      const fromSlot = Math.min(note1.timeSlot, note2.timeSlot);
+      const toSlot = Math.max(note1.timeSlot, note2.timeSlot);
+      
+      // Check if tie already exists
+      const existingTies = getAllTies(tabData);
+      const existingTie = existingTies.find(tie => 
+        tie.fromSlot === fromSlot && tie.toSlot === toSlot && tie.stringIndex === note1.stringIndex
+      );
+      
+      setTabData(prevTabData => {
+        if (existingTie) {
+          // Remove existing tie
+          return removeTie(prevTabData, fromSlot, toSlot, note1.stringIndex);
+        } else {
+          // Create new tie
+          return createTie(prevTabData, fromSlot, toSlot, note1.stringIndex);
+        }
+      });
+      
+      setSelectedNotes([]); // Clear selection after creating/removing tie
+    }
+  };
+
   // Listen for playback state changes from Controls component
   const handlePlaybackStateChange = (playing: boolean) => {
     setIsPlaying(playing);
@@ -154,12 +215,12 @@ function App() {
 
   // Handle reset cursor to start (cmd+enter shortcut) 
   const handleResetCursor = () => {
-    setCursorPosition({ timeIndex: 0, stringIndex: 2 }); // Reset to start, Hi D string
+    setCursorPosition({ timeSlot: 0, stringIndex: 2 }); // Reset to start, Hi D string
   };
 
   // Calculate current time display (simplified for now)
   const currentTime = "0:00";
-  const totalTime = tabData.length > 0 ? `0:${Math.floor(tabData.length / 4).toString().padStart(2, '0')}` : "0:00";
+  const totalTime = tabData.length > 0 ? `0:${Math.floor(tabData.length / 16).toString().padStart(2, '0')}` : "0:00"; // 16 slots per measure
 
   return (
     <MainLayout
@@ -173,6 +234,8 @@ function App() {
           onTimeSignatureChange={setTimeSignature}
           selectedNoteType={selectedNoteType}
           onNoteTypeChange={setSelectedNoteType}
+          tieMode={tieMode}
+          onTieModeChange={handleTieModeChange}
         />
       }
       leftSidebar={
@@ -186,19 +249,59 @@ function App() {
         </div>
       }
       centerWorkspace={
-        <div>
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          {/* Floating zoom controls */}
+          <div className="floating-zoom-controls">
+            <button 
+              onClick={() => setZoom(prev => Math.max(0.6, prev - 0.1))}
+              title="Zoom Out (Ctrl + Mouse Wheel)"
+            >
+              🔍-
+            </button>
+            <span className="zoom-display">{Math.round(zoom * 100)}%</span>
+            <button 
+              onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
+              title="Zoom In (Ctrl + Mouse Wheel)"
+            >
+              🔍+
+            </button>
+            <button 
+              onClick={() => setZoom(1)}
+              title="Reset Zoom"
+            >
+              Reset
+            </button>
+          </div>
+          
           <TabViewer 
             tabData={tabData} 
             cursorPosition={cursorPosition}
-            onAddNote={addNote}
-            onRemoveNote={removeNote}
+            onAddNote={handleAddNote}
+            onRemoveNote={handleRemoveNote}
             onMoveCursor={moveCursor}
-            onCursorClick={(timeIndex: number, stringIndex: number) => setCursorPosition({ timeIndex, stringIndex })}
+            onCursorClick={(timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
+              setCursorPosition({ timeSlot, stringIndex });
+              // Only handle note selection logic when shift is held
+              if (shiftHeld) {
+                handleNoteSelection(timeSlot, stringIndex);
+              } else {
+                // Clear selection on normal clicks
+                setSelectedNotes([]);
+              }
+            }}
             onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
             selectedDuration={selectedDuration}
             onPlayFromCursor={handlePlayFromCursor}
+            onTogglePlayback={handlePlayPause}
             onResetCursor={handleResetCursor}
             selectedNoteType={selectedNoteType}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            isPlaying={isPlaying}
+            currentPlaybackTimeSlot={currentPlaybackTimeSlot}
+            tieMode={tieMode}
+            selectedNotes={selectedNotes}
+            onCreateTie={handleCreateTie}
           />
         </div>
       }
@@ -230,8 +333,10 @@ function App() {
             onTempoChange={handleTempoChange}
             onLoopToggle={handleLoopToggle}
             onFretboardToggle={handleFretboardToggle}
+            onCountInToggle={handleCountInToggle}
             isLooping={isLooping}
             showFretboard={showFretboard}
+            countInEnabled={countInEnabled}
           />
           
           {/* Hidden Controls component for audio functionality */}
@@ -244,6 +349,9 @@ function App() {
               tempo={tempo}
               onTempoChange={handleTempoChange}
               onPlaybackStateChange={handlePlaybackStateChange}
+              onCurrentTimeSlotChange={setCurrentPlaybackTimeSlot}
+              countInEnabled={countInEnabled}
+              timeSignature={timeSignature}
             />
           </div>
         </>

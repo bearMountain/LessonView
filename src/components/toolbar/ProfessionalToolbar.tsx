@@ -14,6 +14,8 @@ interface ProfessionalToolbarProps {
   onTempoChange: (tempo: number) => void;
   timeSignature: string;
   onTimeSignatureChange: (signature: string) => void;
+  tieMode: boolean;
+  onTieModeChange: (enabled: boolean) => void;
 }
 
 interface ToolbarSection {
@@ -31,6 +33,8 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   onTempoChange,
   timeSignature,
   onTimeSignatureChange,
+  tieMode,
+  onTieModeChange,
 }) => {
   const sections: ToolbarSection[] = [
     {
@@ -93,6 +97,22 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
             selectedNoteType={selectedNoteType}
             onNoteTypeChange={onNoteTypeChange}
           />
+          <div className="toolbar-separator" />
+          <button 
+            className={`toolbar-button ${tieMode ? 'active' : ''}`}
+            title="Tie Mode (T) - Select two notes and press T to tie them"
+            onClick={() => onTieModeChange(!tieMode)}
+          >
+            <span className="toolbar-button__icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {/* Tie arc symbol */}
+                <path d="M4 12 Q12 6 20 12" strokeLinecap="round"/>
+                <circle cx="4" cy="12" r="2" fill="currentColor"/>
+                <circle cx="20" cy="12" r="2" fill="currentColor"/>
+              </svg>
+            </span>
+            <span className="toolbar-button__text">Tie</span>
+          </button>
         </div>
       ),
     },

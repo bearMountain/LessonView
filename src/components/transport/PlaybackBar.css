@@ -182,4 +182,38 @@
     min-width: 60px;
     font-size: var(--font-size-sm);
   }
+}
+
+.playback-bar__count-in-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.playback-bar__count-in-button:hover {
+  background-color: var(--color-hover-bg);
+  border-color: var(--color-border-light);
+}
+
+.playback-bar__count-in-button:active {
+  background-color: var(--color-active-bg);
+}
+
+.playback-bar__count-in-button.active {
+  background-color: var(--primary-blue);
+  border-color: var(--primary-blue);
+  color: white;
+}
+
+.playback-bar__count-in-button.active:hover {
+  background-color: var(--primary-blue-light);
+  border-color: var(--primary-blue-light);
 } 

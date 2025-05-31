@@ -11,6 +11,15 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  /* Count-in visual indicator */
+  --count-in-blink-duration: 1s;
+}
+
+/* Count-in blink animation for visual feedback */
+@keyframes count-in-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
 }
 
 a {

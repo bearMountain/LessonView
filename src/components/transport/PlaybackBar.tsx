@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './PlaybackBar.css';
 
 interface PlaybackBarProps {
@@ -11,8 +11,10 @@ interface PlaybackBarProps {
   onTempoChange: (newTempo: number) => void;
   onLoopToggle: () => void;
   onFretboardToggle: () => void;
+  onCountInToggle: () => void;
   isLooping?: boolean;
   showFretboard?: boolean;
+  countInEnabled?: boolean;
 }
 
 const PlaybackBar: React.FC<PlaybackBarProps> = ({
@@ -25,9 +27,14 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
   onTempoChange,
   onLoopToggle,
   onFretboardToggle,
+  onCountInToggle,
   isLooping = false,
   showFretboard = true,
+  countInEnabled = false,
 }) => {
+  const [isChangingTempo, setIsChangingTempo] = useState(false);
+  const tempoIntervalRef = useRef<number | null>(null);
+
   const handleTempoDecrease = () => {
     const newTempo = Math.max(60, tempo - 5);
     onTempoChange(newTempo);
@@ -37,6 +44,62 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
     const newTempo = Math.min(200, tempo + 5);
     onTempoChange(newTempo);
   };
+
+  const startTempoChange = (direction: 'increase' | 'decrease') => {
+    setIsChangingTempo(true);
+    
+    // Immediate change
+    if (direction === 'increase') {
+      handleTempoIncrease();
+    } else {
+      handleTempoDecrease();
+    }
+    
+    // Start continuous change after a short delay
+    const timeout = setTimeout(() => {
+      tempoIntervalRef.current = setInterval(() => {
+        if (direction === 'increase') {
+          const newTempo = Math.min(200, tempo + 1); // Smaller increments for continuous change
+          onTempoChange(newTempo);
+        } else {
+          const newTempo = Math.max(60, tempo - 1);
+          onTempoChange(newTempo);
+        }
+      }, 100); // Change every 100ms
+    }, 300); // Wait 300ms before starting continuous change
+    
+    // Store timeout reference for cleanup
+    tempoIntervalRef.current = timeout as any;
+  };
+
+  const stopTempoChange = () => {
+    setIsChangingTempo(false);
+    if (tempoIntervalRef.current) {
+      clearInterval(tempoIntervalRef.current);
+      clearTimeout(tempoIntervalRef.current);
+      tempoIntervalRef.current = null;
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (tempoIntervalRef.current) {
+        clearInterval(tempoIntervalRef.current);
+        clearTimeout(tempoIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Handle mouse/touch events for continuous tempo changes
+  const handleTempoButtonEvents = (direction: 'increase' | 'decrease') => ({
+    onMouseDown: () => startTempoChange(direction),
+    onMouseUp: stopTempoChange,
+    onMouseLeave: stopTempoChange,
+    onTouchStart: () => startTempoChange(direction),
+    onTouchEnd: stopTempoChange,
+    onClick: direction === 'increase' ? handleTempoIncrease : handleTempoDecrease, // Fallback for quick clicks
+  });
 
   return (
     <div className="playback-bar">
@@ -59,6 +122,20 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
           )}
         </button>
         
+        <button 
+          className={`playback-bar__count-in-button ${countInEnabled ? 'active' : ''}`}
+          onClick={onCountInToggle}
+          aria-label="Toggle count-in"
+          title="Count-in: Play one measure of metronome before playback"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            {/* Metronome icon */}
+            <path d="M12 2L10.5 8.5L9 9L10.5 15.5L12 22L13.5 15.5L15 9L13.5 8.5L12 2Z"/>
+            <circle cx="12" cy="6" r="1.5"/>
+            <path d="M8 20H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
+        
         <div className="playback-bar__track-info">
           <div className="playback-bar__track-title">{trackTitle}</div>
           <div className="playback-bar__time-display">
@@ -71,7 +148,7 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
       <div className="playback-bar__center">
         <button 
           className="playback-bar__tempo-button"
-          onClick={handleTempoDecrease}
+          {...handleTempoButtonEvents('decrease')}
           aria-label="Decrease tempo"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -85,7 +162,7 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
         
         <button 
           className="playback-bar__tempo-button"
-          onClick={handleTempoIncrease}
+          {...handleTempoButtonEvents('increase')}
           aria-label="Increase tempo"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

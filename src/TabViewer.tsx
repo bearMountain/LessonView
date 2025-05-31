@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
-import type { Note, NoteDuration, CursorPosition, TabData, TimePosition, NoteType } from './types';
-import { DURATION_VISUALS, DURATION_VALUES, calculateTimePosition, getMeasureBoundaries } from './types';
+import type { Note, NoteDuration, CursorPosition, TabData, NoteType } from './types';
+import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies } from './types';
 
 interface TabViewerProps {
   tabData: TabData;
@@ -9,12 +9,20 @@ interface TabViewerProps {
   onAddNote: (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => void;
   onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
-  onCursorClick: (timeIndex: number, stringIndex: number) => void;
+  onCursorClick: (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   selectedDuration: NoteDuration;
   selectedNoteType: NoteType;
   onPlayFromCursor?: () => void;
+  onTogglePlayback?: () => void;
   onResetCursor?: () => void;
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  isPlaying?: boolean;
+  currentPlaybackTimeSlot?: number;
+  tieMode?: boolean;
+  selectedNotes?: Array<{ timeSlot: number; stringIndex: number }>;
+  onCreateTie?: () => void;
 }
 
 // String labels (reversed order - Hi D on top)
@@ -32,10 +40,17 @@ const TabViewer: React.FC<TabViewerProps> = ({
   selectedDuration,
   selectedNoteType,
   onPlayFromCursor,
-  onResetCursor
+  onTogglePlayback,
+  onResetCursor,
+  zoom,
+  onZoomChange,
+  isPlaying,
+  currentPlaybackTimeSlot,
+  tieMode,
+  selectedNotes,
+  onCreateTie
 }) => {
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
-  const [zoom, setZoom] = useState<number>(1); // Zoom level, 1 = 100%
   const svgRef = useRef<SVGSVGElement>(null);
   
   // Layout constants with zoom
@@ -44,25 +59,12 @@ const TabViewer: React.FC<TabViewerProps> = ({
   const rightMargin = 80 * zoom;
   const topMargin = 40 * zoom;
   const bottomMargin = 40 * zoom;
-  const baseBeatWidth = 80 * zoom; // Base width for quarter note beat
+  const slotWidth = 20 * zoom; // Width of each sixteenth note slot
 
-  // Calculate total width needed based on note durations
-  let totalWidth = leftMargin + rightMargin;
-  for (const timePos of tabData) {
-    totalWidth += DURATION_VALUES[timePos.duration] * baseBeatWidth;
-  }
-  // Ensure minimum width
-  totalWidth = Math.max(totalWidth, 800 * zoom);
-
+  // Calculate total width needed
+  const minSlots = Math.max(tabData.length, cursorPosition.timeSlot + 8); // Show at least 8 slots ahead of cursor
+  const totalWidth = leftMargin + (minSlots * slotWidth) + rightMargin;
   const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing)) * zoom;
-
-  // Calculate X position for a time position
-  const getTimeX = (timeIndex: number) => {
-    if (timeIndex === 0) return leftMargin;
-    
-    const position = calculateTimePosition(tabData, timeIndex);
-    return leftMargin + (position * baseBeatWidth);
-  };
 
   // Calculate Y position for a string
   const getStringY = (stringIndex: number) => {
@@ -73,15 +75,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
   // Get cursor position in pixels
   const getCursorX = () => {
-    // Match note positioning: position cursor at center of time position
-    if (cursorPosition.timeIndex < tabData.length) {
-      // If we're at an existing time position, center the cursor within that duration
-      const timePosition = tabData[cursorPosition.timeIndex];
-      return getTimeX(cursorPosition.timeIndex) + DURATION_VALUES[timePosition.duration] * baseBeatWidth / 2;
-    } else {
-      // If we're at a new position, center within a default quarter note duration
-      return getTimeX(cursorPosition.timeIndex) + DURATION_VALUES['quarter'] * baseBeatWidth / 2;
-    }
+    return getSlotX(cursorPosition.timeSlot, leftMargin, slotWidth);
   };
 
   const getCursorY = () => {
@@ -91,13 +85,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
   // Load existing note into currentFretInput when cursor moves to it
   const loadExistingNote = () => {
     // Check if there's a note at the current cursor position
-    if (cursorPosition.timeIndex < tabData.length) {
-      const timePosition = tabData[cursorPosition.timeIndex];
-      const existingNote = timePosition.notes.find(
-        note => note.stringIndex === cursorPosition.stringIndex && note.type === 'note' && note.fret !== null
-      );
-      
-      if (existingNote && existingNote.fret !== null) {
+    const notesAtCursor = getNotesAtSlot(tabData, cursorPosition.timeSlot, cursorPosition.stringIndex);
+    
+    if (notesAtCursor.length > 0) {
+      const existingNote = notesAtCursor[0];
+      if (existingNote.type === 'note' && existingNote.fret !== null) {
         // Load the existing fret value into input for editing
         setCurrentFretInput(existingNote.fret.toString());
         // Play preview sound for the existing note
@@ -105,11 +97,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
           onPlayPreviewNote(existingNote.fret, cursorPosition.stringIndex);
         }
       } else {
-        // No note at this position, clear input
+        // Rest or null fret, clear input
         setCurrentFretInput('');
       }
     } else {
-      // Position beyond existing data, clear input
+      // No note at this position, clear input
       setCurrentFretInput('');
     }
   };
@@ -173,13 +165,17 @@ const TabViewer: React.FC<TabViewerProps> = ({
           if (selectedNoteType === 'rest') {
             onAddNote(null, selectedDuration, 'rest');
           }
-          onMoveCursor('right'); // Move right
+          // Move cursor by the duration of the current note type
+          const slotsToMove = DURATION_SLOTS[selectedDuration];
+          for (let i = 0; i < slotsToMove; i++) {
+            onMoveCursor('right');
+          }
           break;
         case ' ':
           e.preventDefault();
-          // Space bar: Play from current cursor position
-          if (onPlayFromCursor) {
-            onPlayFromCursor();
+          // Space bar: Toggle playback (play/pause)
+          if (onTogglePlayback) {
+            onTogglePlayback();
           }
           break;
         case '0': case '1': case '2': case '3': case '4': case '5':
@@ -234,6 +230,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
           onAddNote(null, selectedDuration, 'rest');
           setCurrentFretInput('');
           break;
+        case 't':
+        case 'T':
+          e.preventDefault();
+          if (onCreateTie) {
+            onCreateTie();
+          }
+          break;
       }
     };
 
@@ -247,7 +250,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setZoom(prev => Math.max(0.3, Math.min(3, prev + delta)));
+        onZoomChange(Math.max(0.6, Math.min(3, zoom + delta)));
       }
     };
 
@@ -279,8 +282,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
         
         if (initialDistance > 0) {
           const scale = distance / initialDistance;
-          const newZoom = Math.max(0.3, Math.min(3, initialZoom * scale));
-          setZoom(newZoom);
+          const newZoom = Math.max(0.6, Math.min(3, initialZoom * scale));
+          onZoomChange(newZoom);
         }
       }
     };
@@ -297,7 +300,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
         svg.removeEventListener('touchmove', handleTouchMove);
       };
     }
-  }, [zoom]);
+  }, [zoom, onZoomChange]);
 
   // Handle SVG click
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -320,41 +323,101 @@ const TabViewer: React.FC<TabViewerProps> = ({
       }
     });
     
-    // Determine time position by finding the closest note center
-    let timeIndex = 0;
-    let timeMinDistance = Infinity;
+    // Determine time slot by converting X position
+    const relativeX = x - leftMargin - slotWidth; // Account for the padding in getSlotX
+    const clickedTimeSlot = Math.max(0, Math.round(relativeX / slotWidth));
     
-    // Check distance to each existing time position
-    for (let i = 0; i < tabData.length; i++) {
-      const centerX = getTimeX(i) + DURATION_VALUES[tabData[i].duration] * baseBeatWidth / 2;
-      const distance = Math.abs(x - centerX);
-      
-      if (distance < timeMinDistance) {
-        timeMinDistance = distance;
-        timeIndex = i;
+    // First, check if we clicked directly on an existing note (within a reasonable radius)
+    let clickedOnExistingNote = false;
+    let noteTimeSlot = clickedTimeSlot;
+    
+    for (let slot = Math.max(0, clickedTimeSlot - 1); slot <= clickedTimeSlot + 1; slot++) {
+      const notesAtSlot = getNotesAtSlot(tabData, slot, closestStringIndex);
+      if (notesAtSlot.length > 0) {
+        const noteAtSlot = notesAtSlot[0];
+        if (noteAtSlot.startSlot === slot) {
+          // Check if click is close to the note position
+          const noteX = getSlotX(slot, leftMargin, slotWidth);
+          const distance = Math.abs(x - noteX);
+          if (distance < slotWidth * 0.8) { // Within 80% of slot width
+            noteTimeSlot = slot;
+            clickedOnExistingNote = true;
+            break;
+          }
+        }
       }
     }
     
-    // Also check distance to the next potential position (after all existing notes)
-    if (tabData.length > 0) {
-      const nextPositionX = getTimeX(tabData.length);
-      const nextCenterX = nextPositionX + DURATION_VALUES['quarter'] * baseBeatWidth / 2; // Assume quarter note for new position
-      const distanceToNext = Math.abs(x - nextCenterX);
+    // Handle tie selection with shift-click
+    if (e.shiftKey && clickedOnExistingNote) {
+      // Shift-click on existing note: handle tie selection
+      const noteKey = { timeSlot: noteTimeSlot, stringIndex: closestStringIndex };
+      const existingIndex = selectedNotes?.findIndex(n => n.timeSlot === noteTimeSlot && n.stringIndex === closestStringIndex) ?? -1;
       
-      if (distanceToNext < timeMinDistance) {
-        timeIndex = tabData.length;
+      if (existingIndex >= 0) {
+        // Deselect if already selected
+        if (selectedNotes) {
+          const newSelection = selectedNotes.filter((_, i) => i !== existingIndex);
+          onCursorClick(noteTimeSlot, closestStringIndex, true); // This will trigger handleNoteSelection with updated array
+        }
+      } else {
+        // Select note (max 2 notes for tie)
+        if (selectedNotes) {
+          if (selectedNotes.length >= 2) {
+            // Replace first with second, add new
+            onCursorClick(noteTimeSlot, closestStringIndex, true); // This will update selection
+          } else {
+            onCursorClick(noteTimeSlot, closestStringIndex, true); // This will add to selection
+          }
+        } else {
+          onCursorClick(noteTimeSlot, closestStringIndex, true); // First selection
+        }
       }
+      
+      // Don't clear input when shift-clicking for tie selection
+      // Focus the SVG element so keyboard input works after mouse click
+      svgRef.current.focus();
+      return;
+    }
+    
+    // Normal click behavior (move cursor)
+    if (clickedOnExistingNote) {
+      onCursorClick(noteTimeSlot, closestStringIndex, false);
     } else {
-      // No existing data, check if click is close to the first potential position
-      const firstPositionX = getTimeX(0);
-      const firstCenterX = firstPositionX + DURATION_VALUES['quarter'] * baseBeatWidth / 2;
-      timeIndex = 0; // Default to first position when no data exists
+      // If we didn't click on an existing note, use smart positioning
+      let finalTimeSlot = clickedTimeSlot;
+      
+      // Look backwards from the clicked position to find the most recent note on this string
+      let mostRecentNote: Note | null = null;
+      let mostRecentNoteSlot = -1;
+      
+      for (let slot = clickedTimeSlot; slot >= 0; slot--) {
+        const notesAtSlot = getNotesAtSlot(tabData, slot, closestStringIndex);
+        if (notesAtSlot.length > 0) {
+          const noteAtSlot = notesAtSlot[0];
+          // Only consider notes that actually start at this slot
+          if (noteAtSlot.startSlot === slot) {
+            mostRecentNote = noteAtSlot;
+            mostRecentNoteSlot = slot;
+            break;
+          }
+        }
+      }
+      
+      // If we found a recent note and clicked to the right of it, 
+      // position cursor where the next note should go
+      if (mostRecentNote && clickedTimeSlot > mostRecentNoteSlot) {
+        const noteDurationSlots = DURATION_SLOTS[mostRecentNote.duration];
+        finalTimeSlot = mostRecentNoteSlot + noteDurationSlots;
+      }
+      
+      onCursorClick(finalTimeSlot, closestStringIndex, false);
     }
     
-    onCursorClick(timeIndex, closestStringIndex);
-    
-    // Clear input when clicking to new position
-    setCurrentFretInput('');
+    // Clear input when clicking to new position (unless shift-clicking for ties)
+    if (!e.shiftKey) {
+      setCurrentFretInput('');
+    }
     
     // Focus the SVG element so keyboard input works after mouse click
     svgRef.current.focus();
@@ -400,29 +463,6 @@ const TabViewer: React.FC<TabViewerProps> = ({
   return (
     <div className="tab-viewer">
       <div className="tab-scroll-container" style={{ overflow: 'auto', width: '100%', height: '100%', position: 'relative' }}>
-        {/* Floating zoom controls */}
-        <div className="floating-zoom-controls">
-          <button 
-            onClick={() => setZoom(prev => Math.max(0.3, prev - 0.1))}
-            title="Zoom Out (Ctrl + Mouse Wheel)"
-          >
-            🔍-
-          </button>
-          <span className="zoom-display">{Math.round(zoom * 100)}%</span>
-          <button 
-            onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
-            title="Zoom In (Ctrl + Mouse Wheel)"
-          >
-            🔍+
-          </button>
-          <button 
-            onClick={() => setZoom(1)}
-            title="Reset Zoom"
-          >
-            Reset
-          </button>
-        </div>
-        
         <svg 
           ref={svgRef}
           width={totalWidth} 
@@ -451,7 +491,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
           {/* Horizontal string lines */}
           {stringIndices.map((stringIndex) => {
             const y = getStringY(stringIndex);
-            const endX = totalWidth - rightMargin; // Always extend to full width
+            const endX = totalWidth - rightMargin;
             
             return (
               <line
@@ -466,15 +506,15 @@ const TabViewer: React.FC<TabViewerProps> = ({
             );
           })}
 
-          {/* Measure separators (only when we have enough beats) */}
-          {measureBoundaries.map((beatPosition) => {
-            const x = leftMargin + (beatPosition * baseBeatWidth);
+          {/* Measure separators */}
+          {measureBoundaries.map((slotPosition) => {
+            const x = getMeasureLineX(slotPosition, leftMargin, slotWidth);
             const topY = getStringY(2) - 10; // Hi D
             const bottomY = getStringY(0) + 10; // Low D
             
             return (
               <line
-                key={`measure-${beatPosition}`}
+                key={`measure-${slotPosition}`}
                 x1={x}
                 y1={topY}
                 x2={x}
@@ -486,19 +526,17 @@ const TabViewer: React.FC<TabViewerProps> = ({
             );
           })}
 
-          {/* Notes and rests at each time position */}
-          {tabData.map((timePosition, timeIndex) => {
-            const centerX = getTimeX(timeIndex) + DURATION_VALUES[timePosition.duration] * baseBeatWidth / 2;
-            
-            return timePosition.notes.map((note, noteIndex) => {
-              const x = centerX;
+          {/* Notes and rests - iterate through all slots */}
+          {tabData.map((cell, slotIndex) => {
+            return cell.notes.map((note, noteIndex) => {
+              const x = getSlotX(slotIndex, leftMargin, slotWidth);
               const y = getStringY(note.stringIndex);
               const visual = DURATION_VISUALS[note.duration];
               
               if (note.type === 'rest') {
                 // Render rest symbol
                 return (
-                  <g key={`rest-${timeIndex}-${noteIndex}`}>
+                  <g key={`rest-${slotIndex}-${noteIndex}`}>
                     <text
                       x={x}
                       y={y + 5}
@@ -513,7 +551,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
               } else {
                 // Render note
                 return (
-                  <g key={`note-${timeIndex}-${noteIndex}`}>
+                  <g key={`note-${slotIndex}-${noteIndex}`}>
                     <circle
                       cx={x}
                       cy={y}
@@ -543,6 +581,49 @@ const TabViewer: React.FC<TabViewerProps> = ({
             });
           })}
 
+          {/* Ties - render curved lines between tied notes */}
+          {getAllTies(tabData).map((tie, index) => {
+            const fromX = getSlotX(tie.fromSlot, leftMargin, slotWidth);
+            const toX = getSlotX(tie.toSlot, leftMargin, slotWidth);
+            const y = getStringY(tie.stringIndex);
+            
+            // Create a curved path for the tie
+            const midX = (fromX + toX) / 2;
+            const curveHeight = 20; // Height of the tie curve
+            const path = `M ${fromX} ${y} Q ${midX} ${y - curveHeight} ${toX} ${y}`;
+            
+            return (
+              <path
+                key={`tie-${index}`}
+                d={path}
+                stroke="#000"
+                strokeWidth="2"
+                fill="none"
+                opacity="0.7"
+              />
+            );
+          })}
+
+          {/* Selected notes highlighting (for tie mode) */}
+          {tieMode && selectedNotes && selectedNotes.map((selectedNote, index) => {
+            const x = getSlotX(selectedNote.timeSlot, leftMargin, slotWidth);
+            const y = getStringY(selectedNote.stringIndex);
+            
+            return (
+              <circle
+                key={`selected-${index}`}
+                cx={x}
+                cy={y}
+                r="18"
+                fill="none"
+                stroke="#007acc"
+                strokeWidth="3"
+                strokeDasharray="4,2"
+                opacity="0.8"
+              />
+            );
+          })}
+
           {/* Cursor */}
           <g className="cursor">
             <line
@@ -562,6 +643,29 @@ const TabViewer: React.FC<TabViewerProps> = ({
               strokeWidth="2"
             />
           </g>
+
+          {/* Playback indicator - shows current playing position */}
+          {isPlaying && currentPlaybackTimeSlot !== undefined && currentPlaybackTimeSlot >= 0 && (
+            <g className="playback-indicator">
+              <line
+                x1={getSlotX(currentPlaybackTimeSlot, leftMargin, slotWidth)}
+                y1={getStringY(2) - 30} // Above the Hi D string
+                x2={getSlotX(currentPlaybackTimeSlot, leftMargin, slotWidth)}
+                y2={getStringY(0) + 30} // Below the Low D string
+                stroke="rgba(128, 128, 128, 0.7)"
+                strokeWidth="2"
+                opacity="0.8"
+                strokeDasharray="none"
+              />
+              <circle
+                cx={getSlotX(currentPlaybackTimeSlot, leftMargin, slotWidth)}
+                cy={getStringY(1)} // Center on A string
+                r="3"
+                fill="rgba(128, 128, 128, 0.7)"
+                opacity="0.8"
+              />
+            </g>
+          )}
         </svg>
       </div>
     </div>

@@ -10,7 +10,7 @@ interface NoteValuePaletteProps {
 
 interface NoteValue {
   duration: NoteDuration;
-  noteSymbol: string;
+  noteSvgPath: string;
   restSymbol: string;
   name: string;
 }
@@ -24,31 +24,31 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
   const noteValues: NoteValue[] = [
     {
       duration: 'whole',
-      noteSymbol: '𝅝',
+      noteSvgPath: '/Note SVGS/Whole Note.svg',
       restSymbol: '𝄻', // Whole rest
       name: 'Whole',
     },
     {
       duration: 'half',
-      noteSymbol: '𝅗𝅥',
+      noteSvgPath: '/Note SVGS/Half Note.svg',
       restSymbol: '𝄼', // Half rest
       name: 'Half',
     },
     {
       duration: 'quarter',
-      noteSymbol: '♩',
+      noteSvgPath: '/Note SVGS/Quarter Note.svg',
       restSymbol: '𝄽', // Quarter rest
       name: 'Quarter',
     },
     {
       duration: 'eighth',
-      noteSymbol: '♪',
+      noteSvgPath: '/Note SVGS/Eigth Note.svg',
       restSymbol: '𝄾', // Eighth rest
       name: 'Eighth',
     },
     {
       duration: 'sixteenth',
-      noteSymbol: '𝅘𝅥𝅯',
+      noteSvgPath: '/Note SVGS/Sixteenth Note.svg',
       restSymbol: '𝄿', // Sixteenth rest
       name: 'Sixteenth',
     },
@@ -73,12 +73,11 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
               title={`${noteValue.name} Note`}
               aria-label={`${noteValue.name} Note`}
             >
-              <span className="note-value-button__symbol">
-                {noteValue.noteSymbol}
-              </span>
-              <span className="note-value-button__text">
-                {noteValue.duration}
-              </span>
+              <img 
+                src={noteValue.noteSvgPath} 
+                alt={`${noteValue.name} note`}
+                className="note-value-button__svg"
+              />
             </button>
             
             {/* Rest button */}
@@ -96,9 +95,6 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
             >
               <span className="note-value-button__symbol">
                 {noteValue.restSymbol}
-              </span>
-              <span className="note-value-button__text">
-                rest
               </span>
             </button>
           </div>
