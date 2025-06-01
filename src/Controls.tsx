@@ -355,15 +355,10 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       const [numerator] = (timeSignature || '4/4').split('/').map(Number);
       const beatsPerMeasure = numerator || 4;
       
-      // Count-in phase
+      // Create metronome synth for count-in clicks
+      let clickSynth: Tone.MembraneSynth | null = null;
       if (countInEnabled) {
-        console.log(`🎼 Starting count-in: ${beatsPerMeasure} beats`);
-        
-        // Notify that count-in is starting
-        onCountInStateChange?.(true, 0, beatsPerMeasure);
-        
-        // Create a simple click sound for count-in
-        const clickSynth = new Tone.MembraneSynth({
+        clickSynth = new Tone.MembraneSynth({
           pitchDecay: 0.008,
           octaves: 2,
           envelope: {
@@ -373,80 +368,62 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
             release: 0.3
           }
         }).toDestination();
-        
-        let countInBeat = 0;
-        
-        const countInPromise = new Promise<void>((resolve) => {
-          const countInCallback = Tone.Transport.scheduleRepeat((time) => {
-            countInBeat++;
-            console.log(`🎵 Count-in beat ${countInBeat}/${beatsPerMeasure}`);
-            
-            // Update count-in state
-            onCountInStateChange?.(true, countInBeat, beatsPerMeasure);
-            
-            // Play click sound (higher pitch for beat 1)
-            const pitch = countInBeat === 1 ? 'C5' : 'C4';
-            clickSynth.triggerAttackRelease(pitch, '8n', time);
-            
-            // End count-in after completing all beats in the measure
-            if (countInBeat >= beatsPerMeasure) {
-              // Clear the repeat callback immediately
-              Tone.Transport.clear(countInCallback);
-              
-              // Calculate time for one beat at current tempo (in milliseconds)
-              const beatDurationMs = (60 / tempo) * 1000;
-              
-              // Schedule the resolution after the final beat has time to ring out
-              // Just add enough time for the click sound to be heard (100ms)
-              setTimeout(() => {
-                clickSynth.dispose();
-                onCountInStateChange?.(false);
-                resolve();
-              }, 100); // Just enough for the click to be heard
-            }
-          }, "4n"); // Quarter note intervals for count-in
-          
-          // Start transport for count-in
-          Tone.Transport.start();
-        });
-        
-        // Wait for count-in to complete
-        await countInPromise;
-        
-        console.log('🎼 Count-in complete, transitioning to main playback');
-        
-        // Clear any scheduled events from count-in
-        Tone.Transport.cancel();
-        
-        // Don't pause - just reset position immediately for smooth transition
-        // The Transport keeps running which prevents audio glitches
       }
       
-      // Main playback phase
-      setCurrentTimeSlot(cursorPosition.timeSlot);
-      onCurrentTimeSlotChange?.(cursorPosition.timeSlot);
+      // Calculate where to start in the data
+      let dataStartIndex = 0;
+      let transportStartPosition = "0:0:0";
+      
+      // If count-in is enabled, we'll schedule count-in beats before the tab data
+      let countInSlots = 0;
+      if (countInEnabled) {
+        // Each beat is 4 sixteenth notes
+        countInSlots = beatsPerMeasure * 4;
+        console.log(`📍 Count-in will use ${countInSlots} slots (${beatsPerMeasure} beats)`);
+      }
       
       // Track current position
-      let tabCursor = cursorPosition.timeSlot;
-      
-      // After count-in, the transport is already at the end of the count-in measure
-      // We want to continue immediately, not wait for another measure
-      if (countInEnabled) {
-        // Just continue from where we are, adding the cursor offset
-        const transportPosition = `0:0:${cursorPosition.timeSlot}`;
-        Tone.Transport.position = transportPosition;
-        console.log(`📍 After count-in, continuing from position ${transportPosition}`);
-      } else {
-        // No count-in, start from cursor position directly
-        const transportPosition = `0:0:${cursorPosition.timeSlot}`;
-        Tone.Transport.position = transportPosition;
-        console.log(`📍 Set transport position to ${transportPosition}`);
-      }
+      let absoluteSlot = 0; // Absolute position including count-in
+      let tabCursor = cursorPosition.timeSlot; // Position in the actual tab data
+      let countInBeat = 0;
       
       // The metronome: fires every sixteenth note
       const metronomeId = Tone.Transport.scheduleRepeat((time) => {
         try {
-          // Check if we've reached the end
+          // Handle count-in phase
+          if (countInEnabled && absoluteSlot < countInSlots) {
+            // We're in count-in phase
+            // Play click on every 4th slot (quarter notes)
+            if (absoluteSlot % 4 === 0) {
+              countInBeat++;
+              console.log(`🎵 Count-in beat ${countInBeat}/${beatsPerMeasure}`);
+              
+              // Update count-in state
+              onCountInStateChange?.(true, countInBeat, beatsPerMeasure);
+              
+              // Play click sound (higher pitch for beat 1)
+              const pitch = countInBeat === 1 ? 'C5' : 'C4';
+              clickSynth!.triggerAttackRelease(pitch, '8n', time);
+              
+              // On the last count-in beat, notify completion
+              if (countInBeat === beatsPerMeasure) {
+                // Schedule the count-in state change for after this beat
+                Tone.Transport.schedule((time) => {
+                  onCountInStateChange?.(false);
+                  // Dispose of the click synth after use
+                  if (clickSynth) {
+                    clickSynth.dispose();
+                    clickSynth = null;
+                  }
+                }, `+4n`); // After this beat completes
+              }
+            }
+            
+            absoluteSlot++;
+            return; // Don't process tab data yet
+          }
+          
+          // Main playback phase - check if we've reached the end
           if (tabCursor >= tabData.length) {
             console.log('🏁 Reached end of tab, stopping...');
             
@@ -479,8 +456,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
               notesToPlay.forEach(note => {
                 console.log(`  Note: fret ${note.fret} on string ${note.stringIndex}`);
                 
-                // Calculate note duration in seconds based on how many slots it spans
-                // Each slot is a 16th note, so the duration in quarter notes is slots * 0.25
+                // Calculate note duration in seconds
                 const durationInQuarterNotes = DURATION_VALUES[note.duration];
                 const durationInSeconds = (durationInQuarterNotes * 60) / tempo;
                 
@@ -490,29 +466,38 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
             } else {
               console.log(`⏸️ Rest at position ${tabCursor + 1}`);
               // Don't clear visual feedback on rests - let the circles persist
-              // The next note will update the display
             }
           }
           
           // Move to next position
           tabCursor++;
+          absoluteSlot++;
           
         } catch (error) {
           console.error('Error in metronome callback:', error);
           // Stop playback on error to prevent further issues
           stopPlayback();
         }
-      }, "16n", 0); // Always start immediately - the position setting handles the offset
+      }, "16n", 0); // Fire every sixteenth note, starting immediately
       
       // Store the metronome ID for cleanup
       partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) } as any;
       
-      // Start the transport if not already running (it will be running if count-in was used)
-      if (Tone.Transport.state !== "started") {
-        Tone.Transport.start();
+      // If starting from a cursor position with count-in, we need to account for that
+      if (countInEnabled) {
+        // Start from the beginning to include count-in
+        Tone.Transport.position = "0:0:0";
+      } else {
+        // Jump directly to cursor position
+        const transportPosition = `0:0:${cursorPosition.timeSlot}`;
+        Tone.Transport.position = transportPosition;
+        console.log(`📍 Set transport position to ${transportPosition}`);
       }
       
-      console.log(`✅ Transport running at ${tempo} BPM`);
+      // Start the transport
+      Tone.Transport.start();
+      
+      console.log(`✅ Transport started at ${tempo} BPM`);
       console.log('=== PLAYBACK RUNNING ===');
     } catch (error) {
       console.error('Error in playTab:', error);
