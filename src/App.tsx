@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import { useState, useRef } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
@@ -8,7 +8,7 @@ import PlaybackBar from './components/transport/PlaybackBar'
 import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
-import { DURATION_SLOTS, addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, findNextAvailableSlot, createTie, getAllTies, removeTie } from './types'
+import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie } from './types'
 
 // Start with empty tab data
 const initialTabData: TabData = [];
@@ -96,10 +96,6 @@ function App() {
     setTempo(newTempo);
   };
 
-  const handleTimeSignatureChange = (signature: string) => {
-    setTimeSignature(signature);
-  };
-
   const handlePlayPause = () => {
     if (isPlaying) {
       controlsRef.current?.stopPlayback();
@@ -122,29 +118,8 @@ function App() {
     setCountInEnabled(!countInEnabled);
   };
 
-  const handleTieModeChange = (enabled: boolean) => {
-    // Check if we have exactly 2 notes selected
-    if (selectedNotes.length === 2) {
-      // Check if these notes currently have a tie
-      const [note1, note2] = selectedNotes;
-      const fromSlot = Math.min(note1.timeSlot, note2.timeSlot);
-      const toSlot = Math.max(note1.timeSlot, note2.timeSlot);
-      
-      const existingTies = getAllTies(tabData);
-      const existingTie = existingTies.find(tie => 
-        tie.fromSlot === fromSlot && tie.toSlot === toSlot && tie.stringIndex === note1.stringIndex
-      );
-      
-      if (existingTie) {
-        // Remove the existing tie
-        setTabData(prevTabData => removeTie(prevTabData, fromSlot, toSlot, note1.stringIndex));
-      } else {
-        // Create a new tie
-        handleCreateTie();
-      }
-    }
-    
-    // Don't change tieMode state - it's now purely visual based on selection
+  const handleTieModeChange = () => {
+    // Removed unused parameter - function not currently used
   };
 
   const handleCreateTie = () => {
@@ -197,14 +172,6 @@ function App() {
   // Listen for playback state changes from Controls component
   const handlePlaybackStateChange = (playing: boolean) => {
     setIsPlaying(playing);
-  };
-
-  // Handle play from cursor (space bar shortcut)
-  const handlePlayFromCursor = () => {
-    if (!isPlaying) {
-      controlsRef.current?.playTab();
-      setIsPlaying(true);
-    }
   };
 
   // Handle reset cursor to start (cmd+enter shortcut) 
@@ -338,7 +305,6 @@ function App() {
             }}
             onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
             selectedDuration={selectedDuration}
-            onPlayFromCursor={handlePlayFromCursor}
             onTogglePlayback={handlePlayPause}
             onResetCursor={handleResetCursor}
             selectedNoteType={selectedNoteType}
@@ -346,7 +312,6 @@ function App() {
             onZoomChange={setZoom}
             isPlaying={isPlaying}
             currentPlaybackTimeSlot={currentPlaybackTimeSlot}
-            tieMode={getCurrentTieState()}
             selectedNotes={selectedNotes}
             onCreateTie={handleCreateTie}
           />

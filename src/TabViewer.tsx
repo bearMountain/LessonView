@@ -13,14 +13,12 @@ interface TabViewerProps {
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   selectedDuration: NoteDuration;
   selectedNoteType: NoteType;
-  onPlayFromCursor?: () => void;
   onTogglePlayback?: () => void;
   onResetCursor?: () => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   isPlaying?: boolean;
   currentPlaybackTimeSlot?: number;
-  tieMode?: boolean;
   selectedNotes?: Array<{ timeSlot: number; stringIndex: number }>;
   onCreateTie?: () => void;
 }
@@ -38,15 +36,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
   onCursorClick,
   onPlayPreviewNote,
   selectedDuration,
-  selectedNoteType,
-  onPlayFromCursor,
   onTogglePlayback,
   onResetCursor,
+  selectedNoteType,
   zoom,
   onZoomChange,
   isPlaying,
   currentPlaybackTimeSlot,
-  tieMode,
   selectedNotes,
   onCreateTie
 }) => {
@@ -106,11 +102,10 @@ const TabViewer: React.FC<TabViewerProps> = ({
     }
   };
 
-  // Load existing note when cursor position changes and input is clear
+  // Load existing note at cursor position when component mounts or cursor moves
   useEffect(() => {
-    if (currentFretInput === '') {
-      loadExistingNote();
-    }
+    loadExistingNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursorPosition]);
 
   // Handle keyboard input
@@ -159,7 +154,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
             onMoveCursor('down'); // Move down after placing note
           }
           break;
-        case 'Tab':
+        case 'Tab': {
           e.preventDefault();
           setCurrentFretInput(''); // Always clear input when moving with Tab
           if (selectedNoteType === 'rest') {
@@ -171,6 +166,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
             onMoveCursor('right');
           }
           break;
+        }
         case ' ':
           e.preventDefault();
           // Space bar: Toggle playback (play/pause)
@@ -179,7 +175,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
           }
           break;
         case '0': case '1': case '2': case '3': case '4': case '5':
-        case '6': case '7': case '8': case '9':
+        case '6': case '7': case '8': case '9': {
           e.preventDefault();
           
           const newInput = currentFretInput + e.key;
@@ -206,7 +202,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
             }
           }
           break;
-        case 'Backspace':
+        }
+        case 'Backspace': {
           e.preventDefault();
           if (currentFretInput.length > 0) {
             const newInput = currentFretInput.slice(0, -1);
@@ -221,6 +218,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
             }
           }
           break;
+        }
         case 'Escape':
           e.preventDefault();
           setCurrentFretInput('');
@@ -242,6 +240,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDuration, selectedNoteType, currentFretInput, onAddNote, onMoveCursor, onRemoveNote]);
 
   // Zoom event handlers
@@ -351,13 +350,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
     // Handle tie selection with shift-click
     if (e.shiftKey && clickedOnExistingNote) {
       // Shift-click on existing note: handle tie selection
-      const noteKey = { timeSlot: noteTimeSlot, stringIndex: closestStringIndex };
       const existingIndex = selectedNotes?.findIndex(n => n.timeSlot === noteTimeSlot && n.stringIndex === closestStringIndex) ?? -1;
       
       if (existingIndex >= 0) {
         // Deselect if already selected
         if (selectedNotes) {
-          const newSelection = selectedNotes.filter((_, i) => i !== existingIndex);
           onCursorClick(noteTimeSlot, closestStringIndex, true); // This will trigger handleNoteSelection with updated array
         }
       } else {

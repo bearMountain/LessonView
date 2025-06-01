@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as Tone from 'tone';
 import type { TabData } from './types';
-import { DURATION_VALUES, getNotesAtSlot, getTotalNoteDuration } from './types';
+import { getTotalNoteDuration } from './types';
 
 interface ControlsProps {
   tabData: TabData;
@@ -9,7 +9,6 @@ interface ControlsProps {
   onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
-  onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   onPlaybackStateChange?: (isPlaying: boolean) => void;
   onCurrentTimeSlotChange?: (timeSlot: number) => void;
   onCountInStateChange?: (isCountingIn: boolean, beat?: number, totalBeats?: number) => void;
@@ -23,10 +22,10 @@ export interface ControlsRef {
   stopPlayback: () => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlayPreviewNote, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature }, ref) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeSlot, setCurrentTimeSlot] = useState<number>(-1);
-  const partRef = useRef<Tone.Part | null>(null);
+  const partRef = useRef<{ dispose: () => void } | null>(null);
   const synthsRef = useRef<{
     strings: Array<{
       main: Tone.Synth | null;
@@ -58,9 +57,6 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   const currentlyPlayingNotesRef = useRef<Set<string>>(new Set());
   const finalNoteTimeoutRef = useRef<number | null>(null);
 
-  // String tuning (in Hz) - Strumstick is tuned to D-A-D
-  const stringFrequencies = [146.83, 220.00, 293.66]; // Low D, A, Hi D
-  
   // Map fret numbers to semitones (0-D, 1-E, 2-F#, 3-G, 4-A, 5-B, 6-C, 7-C#, 8-D, etc.)
   const getSemitones = (fret: number): number => {
     // First octave mapping
@@ -197,46 +193,6 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     }
   };
 
-  // Cleanup synth instances
-  const disposeSynths = () => {
-    try {
-      const synths = synthsRef.current;
-      
-      // Dispose synths for each string
-      for (let stringIndex = 0; stringIndex < 3; stringIndex++) {
-        const stringSynths = synths.strings[stringIndex];
-        if (stringSynths.main) stringSynths.main.dispose();
-        if (stringSynths.harmonic) stringSynths.harmonic.dispose();
-        if (stringSynths.sub) stringSynths.sub.dispose();
-        if (stringSynths.noise) stringSynths.noise.dispose();
-        
-        // Reset this string's references
-        synths.strings[stringIndex] = { main: null, harmonic: null, sub: null, noise: null };
-      }
-      
-      // Dispose shared effects
-      const effects = synths.effects;
-      if (effects.reverb) effects.reverb.dispose();
-      if (effects.distortion) effects.distortion.dispose();
-      if (effects.filter) effects.filter.dispose();
-      if (effects.chorus) effects.chorus.dispose();
-      if (effects.vibrato) effects.vibrato.dispose();
-      
-      // Reset effects references
-      synths.effects = {
-        reverb: null,
-        distortion: null,
-        filter: null,
-        chorus: null,
-        vibrato: null,
-      };
-      
-      console.log('✅ Synths disposed for all strings');
-    } catch (error) {
-      console.error('Error disposing synths:', error);
-    }
-  };
-
   const playNote = async (fret: number, stringIndex: number, duration: number, scheduleTime?: number, onNoteEnd?: () => void) => {
     // Ensure synths are initialized
     if (!synthsRef.current.strings[stringIndex].main) {
@@ -299,7 +255,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       if (onNoteEnd) {
         // Schedule callback to fire after the note duration
         // Using relative time from now (when this scheduling happens)
-        Tone.Transport.scheduleOnce((time) => {
+        Tone.Transport.scheduleOnce(() => {
           onNoteEnd();
         }, `+${duration}`);
       }
@@ -417,10 +373,6 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
         }).toDestination();
       }
       
-      // Calculate where to start in the data
-      let dataStartIndex = 0;
-      let transportStartPosition = "0:0:0";
-      
       // If count-in is enabled, we'll schedule count-in beats before the tab data
       let countInSlots = 0;
       if (countInEnabled) {
@@ -455,7 +407,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
               // On the last count-in beat, notify completion
               if (countInBeat === beatsPerMeasure) {
                 // Schedule the count-in state change for after this beat
-                Tone.Transport.schedule((time) => {
+                Tone.Transport.schedule(() => {
                   onCountInStateChange?.(false);
                   // Dispose of the click synth after use
                   if (clickSynth) {
@@ -526,7 +478,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                   if (isLastPosition && currentlyPlayingNotesRef.current.size === 0) {
                     console.log('🏁 Last note finished, stopping playback...');
                     // Schedule stop in next tick to ensure clean shutdown
-                    Tone.Transport.schedule((time) => {
+                    Tone.Transport.schedule(() => {
                       stopPlayback();
                     }, "+0.1");
                   }
@@ -551,7 +503,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       }, "16n", 0); // Fire every sixteenth note, starting immediately
       
       // Store the metronome ID for cleanup
-      partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) } as any;
+      partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) };
       
       // If starting from a cursor position with count-in, we need to account for that
       if (countInEnabled) {
@@ -625,9 +577,6 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
         clearAllPlayingNotes();
       }
       
-      // Dispose reusable synths (commented out to reuse synths between plays)
-      // disposeSynths();
-      
       console.log('✅ Transport stopped and cleaned up');
     } catch (error) {
       console.error('Error during Transport cleanup:', error);
@@ -656,6 +605,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     return () => {
       stopPlayback();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStopClick = () => stopPlayback();

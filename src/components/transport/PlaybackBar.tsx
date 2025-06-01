@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import './PlaybackBar.css';
 
 interface PlaybackBarProps {
@@ -32,7 +32,6 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
   showFretboard = true,
   countInEnabled = false,
 }) => {
-  const [isChangingTempo, setIsChangingTempo] = useState(false);
   const tempoIntervalRef = useRef<number | null>(null);
 
   const handleTempoDecrease = () => {
@@ -46,8 +45,6 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
   };
 
   const startTempoChange = (direction: 'increase' | 'decrease') => {
-    setIsChangingTempo(true);
-    
     // Immediate change
     if (direction === 'increase') {
       handleTempoIncrease();
@@ -69,11 +66,10 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
     }, 300); // Wait 300ms before starting continuous change
     
     // Store timeout reference for cleanup
-    tempoIntervalRef.current = timeout as any;
+    tempoIntervalRef.current = timeout;
   };
 
   const stopTempoChange = () => {
-    setIsChangingTempo(false);
     if (tempoIntervalRef.current) {
       clearInterval(tempoIntervalRef.current);
       clearTimeout(tempoIntervalRef.current);
