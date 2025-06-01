@@ -297,10 +297,11 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       
       // Schedule the completion callback using Tone's precise timing
       if (onNoteEnd) {
-        const noteEndTime = typeof when === 'number' ? when + duration : `+${duration}`;
-        Tone.Transport.schedule((time) => {
+        // Schedule callback to fire after the note duration
+        // Using relative time from now (when this scheduling happens)
+        Tone.Transport.scheduleOnce((time) => {
           onNoteEnd();
-        }, noteEndTime);
+        }, `+${duration}`);
       }
       
     } catch (error) {
@@ -474,9 +475,8 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
           
           // Main playback phase - check if we've reached the end
           if (tabCursor >= tabData.length) {
-            // Just increment and continue - the last note's completion will handle stopping
-            tabCursor++;
-            absoluteSlot++;
+            // Don't process any more notes, but keep the transport running
+            // The note completion callbacks will handle stopping when the last note finishes
             return;
           }
           
@@ -563,6 +563,14 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
         Tone.Transport.position = transportPosition;
         console.log(`📍 Set transport position to ${transportPosition}`);
       }
+      
+      // Set a maximum playback time to prevent infinite loops
+      const maxPlaybackTime = (tabData.length / 4) * (60 / tempo) + 30; // Tab duration + 30 seconds buffer
+      
+      Tone.Transport.scheduleOnce(() => {
+        console.log('⏰ Maximum playback time reached, stopping...');
+        stopPlayback();
+      }, `+${maxPlaybackTime}`);
       
       // Start the transport
       Tone.Transport.start();
