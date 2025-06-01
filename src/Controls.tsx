@@ -76,8 +76,8 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   };
 
   // Helper functions to manage currently playing notes for precise visual feedback
-  const addPlayingNote = (fret: number, stringIndex: number) => {
-    const noteKey = `${fret}-${stringIndex}`;
+  const addPlayingNote = (fret: number, stringIndex: number, timeSlot: number) => {
+    const noteKey = `${fret}-${stringIndex}-${timeSlot}`;
     currentlyPlayingNotesRef.current.add(noteKey);
     updateVisualFeedback();
     return noteKey;
@@ -515,7 +515,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                   ));
                 
                 // Add note to tracking system
-                const noteKey = addPlayingNote(note.fret!, note.stringIndex);
+                const noteKey = addPlayingNote(note.fret!, note.stringIndex, tabCursor);
                 
                 // Play the note with completion callback
                 playNote(note.fret!, note.stringIndex, durationInSeconds, time, () => {
