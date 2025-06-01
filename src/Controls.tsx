@@ -55,6 +55,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       vibrato: null,
     }
   });
+  const currentlyPlayingNotesRef = useRef<Map<string, { fret: number; stringIndex: number; endTime: number }>>(new Map());
 
   // String tuning (in Hz) - Strumstick is tuned to D-A-D
   const stringFrequencies = [146.83, 220.00, 293.66]; // Low D, A, Hi D
@@ -71,6 +72,33 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     const semitones = firstOctaveMap[position];
     // Add 12 semitones for each octave
     return semitones + (octave * 12);
+  };
+
+  // Helper functions to manage currently playing notes for precise visual feedback
+  const addPlayingNote = (fret: number, stringIndex: number, startTime: number, duration: number) => {
+    const noteKey = `${fret}-${stringIndex}-${startTime}`;
+    const endTime = startTime + duration;
+    currentlyPlayingNotesRef.current.set(noteKey, { fret, stringIndex, endTime });
+    updateVisualFeedback();
+    return noteKey;
+  };
+
+  const removePlayingNote = (noteKey: string) => {
+    currentlyPlayingNotesRef.current.delete(noteKey);
+    updateVisualFeedback();
+  };
+
+  const updateVisualFeedback = () => {
+    const playingNotes = Array.from(currentlyPlayingNotesRef.current.values()).map(note => ({
+      fret: note.fret,
+      stringIndex: note.stringIndex
+    }));
+    onNotesPlaying(playingNotes);
+  };
+
+  const clearAllPlayingNotes = () => {
+    currentlyPlayingNotesRef.current.clear();
+    onNotesPlaying([]);
   };
 
   // Initialize reusable synth instances
@@ -206,7 +234,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     }
   };
 
-  const playNote = async (fret: number, stringIndex: number, duration: number, scheduleTime?: number) => {
+  const playNote = async (fret: number, stringIndex: number, duration: number, scheduleTime?: number, onNoteEnd?: () => void) => {
     // Ensure synths are initialized
     if (!synthsRef.current.strings[stringIndex].main) {
       console.error(`Synths for string ${stringIndex} not initialized`);
@@ -262,6 +290,14 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       if (synths.strings[stringIndex].sub) {
         const subTime = typeof when === 'number' ? when + 0.008 : "+0.008";
         synths.strings[stringIndex].sub.triggerAttackRelease(subNote, subDuration, subTime, 0.15);
+      }
+      
+      // Schedule the completion callback using Tone's precise timing
+      if (onNoteEnd) {
+        const noteEndTime = typeof when === 'number' ? when + duration : `+${duration}`;
+        Tone.Transport.schedule((time) => {
+          onNoteEnd();
+        }, noteEndTime);
       }
       
     } catch (error) {
@@ -435,7 +471,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
             console.log('🏁 Reached end of tab, stopping...');
             
             // Clear visual feedback then stop
-            onNotesPlaying([]);
+            clearAllPlayingNotes();
             stopPlayback();
             return;
           }
@@ -451,13 +487,6 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
             
             if (notesToPlay.length > 0) {
               console.log(`🎸 Playing ${notesToPlay.length} notes at position ${tabCursor + 1}`);
-              
-              // Update visual feedback with new notes
-              const playingNotes = notesToPlay.map(note => ({
-                fret: note.fret!,
-                stringIndex: note.stringIndex
-              }));
-              onNotesPlaying(playingNotes);
               
               // Play all notes at this position using the exact scheduled time
               notesToPlay.forEach(note => {
@@ -475,7 +504,14 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                 
                 console.log(`  Duration: ${totalDurationInQuarterNotes} quarter notes = ${durationInSeconds.toFixed(2)}s (including ties)`);
                 
-                playNote(note.fret!, note.stringIndex, durationInSeconds, time);
+                // Add note to tracking system
+                const noteKey = addPlayingNote(note.fret!, note.stringIndex, time, durationInSeconds);
+                
+                // Play the note with completion callback
+                playNote(note.fret!, note.stringIndex, durationInSeconds, time, () => {
+                  // This callback is called when the note ends - remove from visual feedback
+                  removePlayingNote(noteKey);
+                });
               });
               
             } else {
@@ -553,7 +589,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       
       // Only clear visual feedback if requested
       if (clearVisualFeedback) {
-        onNotesPlaying([]); // Clear any remaining visual feedback
+        clearAllPlayingNotes();
       }
       
       // Dispose reusable synths (commented out to reuse synths between plays)
