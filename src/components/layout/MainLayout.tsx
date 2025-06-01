@@ -19,23 +19,35 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   bottomPanel,
   centerWorkspace,
 }) => {
+  // Determine layout class based on which components are provided
+  const layoutClass = [
+    'main-layout',
+    fretboard ? 'main-layout--with-fretboard' : 'main-layout--no-fretboard',
+    leftSidebar ? '' : 'main-layout--no-left-sidebar',
+    rightSidebar ? '' : 'main-layout--no-right-sidebar',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`main-layout ${fretboard ? 'main-layout--with-fretboard' : 'main-layout--no-fretboard'}`}>
+    <div className={layoutClass}>
       <header className="main-layout__toolbar">
         {toolbar}
       </header>
       
-      <aside className="main-layout__left-sidebar">
-        {leftSidebar}
-      </aside>
+      {leftSidebar && (
+        <aside className="main-layout__left-sidebar">
+          {leftSidebar}
+        </aside>
+      )}
       
       <main className="main-layout__center-workspace">
         {centerWorkspace}
       </main>
       
-      <aside className="main-layout__right-sidebar">
-        {rightSidebar}
-      </aside>
+      {rightSidebar && (
+        <aside className="main-layout__right-sidebar">
+          {rightSidebar}
+        </aside>
+      )}
       
       {fretboard && (
         <section className="main-layout__fretboard">

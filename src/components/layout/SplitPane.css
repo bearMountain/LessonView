@@ -1,0 +1,94 @@
+.split-pane {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.split-pane--horizontal {
+  flex-direction: row;
+}
+
+.split-pane--vertical {
+  flex-direction: column;
+}
+
+.split-pane__pane {
+  overflow: hidden;
+  position: relative;
+}
+
+.split-pane__pane--first {
+  flex-shrink: 0;
+}
+
+.split-pane__pane--second {
+  flex: 1;
+}
+
+.split-pane__divider {
+  position: relative;
+  flex-shrink: 0;
+  background-color: var(--color-border, #3e3e42);
+  transition: background-color 0.2s ease;
+  z-index: 10;
+}
+
+.split-pane--horizontal .split-pane__divider {
+  width: 8px;
+  cursor: col-resize;
+}
+
+.split-pane--vertical .split-pane__divider {
+  height: 8px;
+  cursor: row-resize;
+}
+
+.split-pane__divider:hover {
+  background-color: var(--color-border-hover, #5a5a5e);
+}
+
+.split-pane__divider-handle {
+  position: absolute;
+  background-color: var(--color-text-tertiary, #999999);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.split-pane--horizontal .split-pane__divider-handle {
+  width: 4px;
+  height: 40px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.split-pane--vertical .split-pane__divider-handle {
+  width: 40px;
+  height: 4px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.split-pane__divider:hover .split-pane__divider-handle,
+.split-pane--dragging .split-pane__divider-handle {
+  opacity: 0.5;
+}
+
+.split-pane--dragging .split-pane__divider {
+  background-color: var(--primary-blue, #2563eb);
+}
+
+/* Prevent text selection while dragging */
+.split-pane--dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.split-pane--dragging * {
+  pointer-events: none;
+} 

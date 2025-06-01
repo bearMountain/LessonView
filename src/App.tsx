@@ -6,6 +6,9 @@ import Controls from './Controls'
 import MainLayout from './components/layout/MainLayout'
 import PlaybackBar from './components/transport/PlaybackBar'
 import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
+import VideoPlayer from './components/video/VideoPlayer'
+import SplitPane from './components/layout/SplitPane'
+import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
 import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie } from './types'
@@ -13,12 +16,12 @@ import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTie
 // Start with empty tab data
 const initialTabData: TabData = [];
 
-function App() {
+// Main App Content Component (needs to be inside SyncEngineProvider)
+function AppContent() {
   const [tabData, setTabData] = useState<TabData>(initialTabData);
   const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ timeSlot: 0, stringIndex: 2 }); // Start on Hi D string
   const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
   const [tempo, setTempo] = useState<number>(120); // Default 120 BPM
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isLooping, setIsLooping] = useState<boolean>(false);
   const [showFretboard, setShowFretboard] = useState<boolean>(true);
   const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter'); // Default note duration
@@ -29,7 +32,20 @@ function App() {
   const [countInEnabled, setCountInEnabled] = useState<boolean>(false);
   const [selectedNotes, setSelectedNotes] = useState<Array<{ timeSlot: number; stringIndex: number }>>([]);
   const [firstSelectedNote, setFirstSelectedNote] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
+  
+  // Video sync state
+  const [videoSource, setVideoSource] = useState<string>('/videos/test-vid-1.MP4');
+  const [splitRatio, setSplitRatio] = useState<number>(0.4); // 40% video, 60% tab viewer
+  
   const controlsRef = useRef<ControlsRef>(null);
+  
+  // Use sync engine
+  const syncEngine = useSyncEngine();
+  
+  // Sync engine derived values
+  const isPlaying = syncEngine.state.masterTimeline.isPlaying;
+  const videoTime = syncEngine.state.masterTimeline.currentTime;
+  const videoDuration = syncEngine.state.masterTimeline.totalDuration;
 
   const handleAddNote = (fret: number | null, duration: NoteDuration = selectedDuration, type: NoteType = selectedNoteType) => {
     setTabData(prevTabData => {
@@ -94,16 +110,13 @@ function App() {
 
   const handleTempoChange = (newTempo: number) => {
     setTempo(newTempo);
+    // Update sync engine playback rate based on tempo change
+    const bpmRatio = newTempo / 120; // Assuming 120 BPM as baseline
+    syncEngine.setPlaybackRate(bpmRatio);
   };
 
   const handlePlayPause = () => {
-    if (isPlaying) {
-      controlsRef.current?.stopPlayback();
-      setIsPlaying(false);
-    } else {
-      controlsRef.current?.playTab();
-      setIsPlaying(true);
-    }
+    syncEngine.togglePlayback();
   };
 
   const handleLoopToggle = () => {
@@ -169,9 +182,33 @@ function App() {
     }
   };
 
-  // Listen for playback state changes from Controls component
+  // Video event handlers
+  const handleVideoTimeUpdate = (time: number) => {
+    // Only update if not playing (to avoid feedback loops)
+    if (!isPlaying) {
+      syncEngine.updateTime(time);
+    }
+  };
+
+  const handleVideoDurationChange = (duration: number) => {
+    syncEngine.setDuration(duration);
+  };
+
+  const handleVideoPlayStateChange = (playing: boolean) => {
+    // Video player reports state changes
+    // This could be used for error handling
+  };
+
+  // Sync play/pause with existing Controls component
   const handlePlaybackStateChange = (playing: boolean) => {
-    setIsPlaying(playing);
+    // Called by Controls component - sync with master timeline
+    if (playing !== isPlaying) {
+      if (playing) {
+        syncEngine.play();
+      } else {
+        syncEngine.pause();
+      }
+    }
   };
 
   // Handle reset cursor to start (cmd+enter shortcut) 
@@ -220,112 +257,108 @@ function App() {
           onTieModeChange={handleTieModeChange}
         />
       }
-      leftSidebar={
-        <div>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', color: 'var(--color-text-secondary)' }}>
-            Tools
-          </h3>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
-            Note palettes and editing tools will go here
-          </p>
-        </div>
-      }
       centerWorkspace={
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-          {/* Floating zoom controls */}
-          <div className="floating-zoom-controls">
-            <button 
-              onClick={() => setZoom(prev => Math.max(0.6, prev - 0.1))}
-              title="Zoom Out (Ctrl + Mouse Wheel)"
-            >
-              🔍-
-            </button>
-            <span className="zoom-display">{Math.round(zoom * 100)}%</span>
-            <button 
-              onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
-              title="Zoom In (Ctrl + Mouse Wheel)"
-            >
-              🔍+
-            </button>
-            <button 
-              onClick={() => setZoom(1)}
-              title="Reset Zoom"
-            >
-              Reset
-            </button>
-          </div>
-          
-          <TabViewer 
-            tabData={tabData} 
-            cursorPosition={cursorPosition}
-            onAddNote={handleAddNote}
-            onRemoveNote={handleRemoveNote}
-            onMoveCursor={moveCursor}
-            onCursorClick={(timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
-              setCursorPosition({ timeSlot, stringIndex });
-              
-              if (shiftHeld) {
-                // Shift+click: handle pair selection for ties
-                const noteKey = { timeSlot, stringIndex };
-                const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
+        <SplitPane
+          defaultSplitRatio={splitRatio}
+          minPaneSize={200}
+          orientation="horizontal"
+          onSplitChange={setSplitRatio}
+        >
+          <VideoPlayer
+            source={videoSource}
+            currentTime={videoTime}
+            isPlaying={isPlaying}
+            playbackRate={1.0}
+            onTimeUpdate={handleVideoTimeUpdate}
+            onDurationChange={handleVideoDurationChange}
+            onPlayStateChange={handleVideoPlayStateChange}
+          />
+          <div style={{ position: 'relative', width: '100%', height: '100%', padding: '24px' }}>
+            {/* Floating zoom controls */}
+            <div className="floating-zoom-controls">
+              <button 
+                onClick={() => setZoom(prev => Math.max(0.6, prev - 0.1))}
+                title="Zoom Out (Ctrl + Mouse Wheel)"
+              >
+                🔍-
+              </button>
+              <span className="zoom-display">{Math.round(zoom * 100)}%</span>
+              <button 
+                onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
+                title="Zoom In (Ctrl + Mouse Wheel)"
+              >
+                🔍+
+              </button>
+              <button 
+                onClick={() => setZoom(1)}
+                title="Reset Zoom"
+              >
+                Reset
+              </button>
+            </div>
+            
+            <TabViewer 
+              tabData={tabData} 
+              cursorPosition={cursorPosition}
+              onAddNote={handleAddNote}
+              onRemoveNote={handleRemoveNote}
+              onMoveCursor={moveCursor}
+              onCursorClick={(timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
+                setCursorPosition({ timeSlot, stringIndex });
                 
-                if (existingIndex >= 0) {
-                  // Deselect if already selected
-                  setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
-                  setFirstSelectedNote(null);
-                } else {
-                  // Add to selection
-                  if (firstSelectedNote) {
-                    // We have a first note, create the pair
-                    setSelectedNotes([firstSelectedNote, noteKey]);
-                    setFirstSelectedNote(null); // Clear first selection since we now have a pair
-                  } else if (selectedNotes.length === 2) {
-                    // We already have a pair, replace with new pair starting from this note
-                    setFirstSelectedNote(noteKey);
-                    setSelectedNotes([]);
+                if (shiftHeld) {
+                  // Shift+click: handle pair selection for ties
+                  const noteKey = { timeSlot, stringIndex };
+                  const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
+                  
+                  if (existingIndex >= 0) {
+                    // Deselect if already selected
+                    setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
+                    setFirstSelectedNote(null);
                   } else {
-                    // Start new selection with this note
-                    setFirstSelectedNote(noteKey);
+                    // Add to selection
+                    if (firstSelectedNote) {
+                      // We have a first note, create the pair
+                      setSelectedNotes([firstSelectedNote, noteKey]);
+                      setFirstSelectedNote(null); // Clear first selection since we now have a pair
+                    } else if (selectedNotes.length === 2) {
+                      // We already have a pair, replace with new pair starting from this note
+                      setFirstSelectedNote(noteKey);
+                      setSelectedNotes([]);
+                    } else {
+                      // Start new selection with this note
+                      setFirstSelectedNote(noteKey);
+                      setSelectedNotes([]);
+                    }
+                  }
+                } else {
+                  // Normal click: track as first selection (no highlights yet)
+                  const notes = getNotesAtSlot(tabData, timeSlot, stringIndex);
+                  if (notes.length > 0) {
+                    // Clicked on an existing note, track it as first selection
+                    setFirstSelectedNote({ timeSlot, stringIndex });
+                    setSelectedNotes([]); // Clear any existing pair selection
+                  } else {
+                    // Clicked on empty space, clear selections
+                    setFirstSelectedNote(null);
                     setSelectedNotes([]);
                   }
                 }
-              } else {
-                // Normal click: track as first selection (no highlights yet)
-                const notes = getNotesAtSlot(tabData, timeSlot, stringIndex);
-                if (notes.length > 0) {
-                  // Clicked on an existing note, track it as first selection
-                  setFirstSelectedNote({ timeSlot, stringIndex });
-                  setSelectedNotes([]); // Clear any existing pair selection
-                } else {
-                  // Clicked on empty space, clear selections
-                  setFirstSelectedNote(null);
-                  setSelectedNotes([]);
-                }
-              }
-            }}
-            onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
-            selectedDuration={selectedDuration}
-            onTogglePlayback={handlePlayPause}
-            onResetCursor={handleResetCursor}
-            selectedNoteType={selectedNoteType}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            isPlaying={isPlaying}
-            currentPlaybackTimeSlot={currentPlaybackTimeSlot}
-            selectedNotes={selectedNotes}
-            onCreateTie={handleCreateTie}
-          />
-        </div>
-      }
-      rightSidebar={
-        <div>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: 'var(--font-size-md)', color: 'var(--color-text-secondary)' }}>
-            Properties
-          </h3>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
-            Note and measure properties will go here
-          </p>
-        </div>
+              }}
+              onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
+              selectedDuration={selectedDuration}
+              onTogglePlayback={handlePlayPause}
+              onResetCursor={handleResetCursor}
+              selectedNoteType={selectedNoteType}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              isPlaying={isPlaying}
+              currentPlaybackTimeSlot={currentPlaybackTimeSlot}
+              selectedNotes={selectedNotes}
+              onCreateTie={handleCreateTie}
+            />
+          </div>
+        </SplitPane>
       }
       fretboard={showFretboard ? (
         <div style={{ width: '100%' }}>
@@ -370,6 +403,15 @@ function App() {
       }
     />
   )
+}
+
+// Main App component with SyncEngineProvider
+function App() {
+  return (
+    <SyncEngineProvider>
+      <AppContent />
+    </SyncEngineProvider>
+  );
 }
 
 export default App

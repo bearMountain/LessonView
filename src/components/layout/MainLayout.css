@@ -39,6 +39,26 @@
     "bottom-panel bottom-panel bottom-panel";
 }
 
+/* Layout without sidebars */
+.main-layout--no-left-sidebar.main-layout--no-right-sidebar {
+  grid-template-columns: 1fr;
+}
+
+.main-layout--no-left-sidebar.main-layout--no-right-sidebar.main-layout--with-fretboard {
+  grid-template-areas:
+    "toolbar"
+    "center"
+    "fretboard"
+    "bottom-panel";
+}
+
+.main-layout--no-left-sidebar.main-layout--no-right-sidebar.main-layout--no-fretboard {
+  grid-template-areas:
+    "toolbar"
+    "center"
+    "bottom-panel";
+}
+
 .main-layout__toolbar {
   grid-area: toolbar;
   background-color: var(--color-bg-secondary, #2d2d30);
@@ -69,8 +89,8 @@
 .main-layout__center-workspace {
   grid-area: center;
   background-color: var(--color-bg-workspace, #1e1e1e);
-  padding: 24px;
-  overflow: auto;
+  padding: 0;
+  overflow: hidden;
   position: relative;
   
   /* Focus outline */
