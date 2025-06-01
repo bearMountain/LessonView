@@ -351,6 +351,10 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       setIsPlaying(true);
       onPlaybackStateChange?.(true);
       
+      // Set initial playback indicator position to cursor location
+      setCurrentTimeSlot(cursorPosition.timeSlot);
+      onCurrentTimeSlotChange?.(cursorPosition.timeSlot);
+      
       // Parse time signature to get beats per measure
       const [numerator] = (timeSignature || '4/4').split('/').map(Number);
       const beatsPerMeasure = numerator || 4;
@@ -418,6 +422,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                 }, `+4n`); // After this beat completes
               }
             }
+            
+            // Keep the indicator at cursor position during count-in
+            // Don't change currentTimeSlot during count-in
             
             absoluteSlot++;
             return; // Don't process tab data yet

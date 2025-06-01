@@ -1,0 +1,7 @@
+<svg class="svg-icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs>
+        <symbol viewBox="0 0 24 24" id="shape-metronome"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.557 6.189l-1.138-3.413A1.501 1.501 0 0013 1.75H9.075a1.5 1.5 0 00-1.4.968l-6.825 18a1.5 1.5 0 001.4 2.032H19a1.5 1.5 0 001.423-1.974l-2.831-8.493M2.352 16.75h16.725M21 1.75a2.25 2.25 0 110 4.5 2.25 2.25 0 010-4.5zm-1.584 3.848L10.5 16.75"></path></symbol>
+    </defs>
+    <title>Metronome and count-in</title>
+    <use xlink:href="#shape-metronome"></use>
+</svg>

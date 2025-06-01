@@ -122,26 +122,26 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
           )}
         </button>
         
-        <button 
-          className={`playback-bar__count-in-button ${countInEnabled ? 'active' : ''}`}
-          onClick={onCountInToggle}
-          aria-label="Toggle count-in"
-          title="Count-in: Play one measure of metronome before playback"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            {/* Metronome icon */}
-            <path d="M12 2L10.5 8.5L9 9L10.5 15.5L12 22L13.5 15.5L15 9L13.5 8.5L12 2Z"/>
-            <circle cx="12" cy="6" r="1.5"/>
-            <path d="M8 20H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </button>
-        
         <div className="playback-bar__track-info">
           <div className="playback-bar__track-title">{trackTitle}</div>
           <div className="playback-bar__time-display">
             {currentTime} / {totalTime}
           </div>
         </div>
+
+        <button 
+          className={`playback-bar__count-in-button ${countInEnabled ? 'active' : ''}`}
+          onClick={onCountInToggle}
+          aria-label="Toggle count-in"
+          title="Count-in: Play one measure of metronome before playback"
+        >
+          <img 
+            src="/icons/metranome.svg" 
+            alt="Metronome"
+            width="16" 
+            height="16"
+          />
+        </button>
       </div>
 
       {/* Center Section - Tempo Controls */}
