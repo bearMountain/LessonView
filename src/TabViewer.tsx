@@ -48,6 +48,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
 }) => {
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
+  const isResettingRef = useRef<boolean>(false); // Track when we're resetting via Cmd+Enter
   
   // Layout constants with zoom
   const stringSpacing = 60 * zoom;
@@ -88,8 +89,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (existingNote.type === 'note' && existingNote.fret !== null) {
         // Load the existing fret value into input for editing
         setCurrentFretInput(existingNote.fret.toString());
-        // Play preview sound for the existing note
-        if (onPlayPreviewNote) {
+        // Play preview sound for the existing note (unless we're resetting via Cmd+Enter)
+        if (onPlayPreviewNote && !isResettingRef.current) {
           onPlayPreviewNote(existingNote.fret, cursorPosition.stringIndex);
         }
       } else {
@@ -100,6 +101,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
       // No note at this position, clear input
       setCurrentFretInput('');
     }
+    
+    // Reset the flag after use
+    isResettingRef.current = false;
   };
 
   // Load existing note at cursor position when component mounts or cursor moves
@@ -135,8 +139,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
         case 'Enter':
           e.preventDefault();
           if (e.metaKey || e.ctrlKey) {
-            // Cmd+Enter / Ctrl+Enter: Reset cursor to start (no loadExistingNote call)
+            // Cmd+Enter / Ctrl+Enter: Reset cursor to start (no sound)
             if (onResetCursor) {
+              isResettingRef.current = true; // Set flag to skip sound
               onResetCursor();
             }
           } else if (selectedNoteType === 'rest') {
