@@ -27,8 +27,8 @@ function App() {
   const [zoom, setZoom] = useState<number>(1.0);
   const [currentPlaybackTimeSlot, setCurrentPlaybackTimeSlot] = useState<number>(-1);
   const [countInEnabled, setCountInEnabled] = useState<boolean>(false);
-  const [tieMode, setTieMode] = useState<boolean>(false);
   const [selectedNotes, setSelectedNotes] = useState<Array<{ timeSlot: number; stringIndex: number }>>([]);
+  const [firstSelectedNote, setFirstSelectedNote] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
   const controlsRef = useRef<ControlsRef>(null);
 
   const handleAddNote = (fret: number | null, duration: NoteDuration = selectedDuration, type: NoteType = selectedNoteType) => {
@@ -123,34 +123,28 @@ function App() {
   };
 
   const handleTieModeChange = (enabled: boolean) => {
-    setTieMode(enabled);
-    if (!enabled) {
-      setSelectedNotes([]); // Clear selection when disabling tie mode
-    } else if (selectedNotes.length === 2) {
-      // If tie mode is being enabled and we have 2 notes selected, create the tie
-      handleCreateTie();
+    // Check if we have exactly 2 notes selected
+    if (selectedNotes.length === 2) {
+      // Check if these notes currently have a tie
+      const [note1, note2] = selectedNotes;
+      const fromSlot = Math.min(note1.timeSlot, note2.timeSlot);
+      const toSlot = Math.max(note1.timeSlot, note2.timeSlot);
+      
+      const existingTies = getAllTies(tabData);
+      const existingTie = existingTies.find(tie => 
+        tie.fromSlot === fromSlot && tie.toSlot === toSlot && tie.stringIndex === note1.stringIndex
+      );
+      
+      if (existingTie) {
+        // Remove the existing tie
+        setTabData(prevTabData => removeTie(prevTabData, fromSlot, toSlot, note1.stringIndex));
+      } else {
+        // Create a new tie
+        handleCreateTie();
+      }
     }
-  };
-
-  const handleNoteSelection = (timeSlot: number, stringIndex: number) => {
-    // Always allow note selection when shift is held or when we already have selections
-    const hasExistingSelections = selectedNotes.length > 0;
     
-    const noteKey = { timeSlot, stringIndex };
-    const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
-    
-    if (existingIndex >= 0) {
-      // Deselect if already selected
-      setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
-    } else {
-      // Select note (max 2 notes for tie)
-      setSelectedNotes(prev => {
-        if (prev.length >= 2) {
-          return [prev[1], noteKey]; // Replace first with second, add new
-        }
-        return [...prev, noteKey];
-      });
-    }
+    // Don't change tieMode state - it's now purely visual based on selection
   };
 
   const handleCreateTie = () => {
@@ -196,7 +190,7 @@ function App() {
         }
       });
       
-      setSelectedNotes([]); // Clear selection after creating/removing tie
+      // Don't clear selection after creating/removing tie - keep notes selected
     }
   };
 
@@ -222,6 +216,27 @@ function App() {
   const currentTime = "0:00";
   const totalTime = tabData.length > 0 ? `0:${Math.floor(tabData.length / 16).toString().padStart(2, '0')}` : "0:00"; // 16 slots per measure
 
+  // Calculate the current tie state based on selected notes
+  const getCurrentTieState = (): boolean => {
+    if (selectedNotes.length !== 2) return false;
+    
+    const [note1, note2] = selectedNotes;
+    
+    // Ensure same string
+    if (note1.stringIndex !== note2.stringIndex) return false;
+    
+    // Check for existing tie
+    const fromSlot = Math.min(note1.timeSlot, note2.timeSlot);
+    const toSlot = Math.max(note1.timeSlot, note2.timeSlot);
+    
+    const existingTies = getAllTies(tabData);
+    const existingTie = existingTies.find(tie => 
+      tie.fromSlot === fromSlot && tie.toSlot === toSlot && tie.stringIndex === note1.stringIndex
+    );
+    
+    return !!existingTie;
+  };
+
   return (
     <MainLayout
       toolbar={
@@ -234,7 +249,7 @@ function App() {
           onTimeSignatureChange={setTimeSignature}
           selectedNoteType={selectedNoteType}
           onNoteTypeChange={setSelectedNoteType}
-          tieMode={tieMode}
+          tieMode={getCurrentTieState()}
           onTieModeChange={handleTieModeChange}
         />
       }
@@ -281,12 +296,44 @@ function App() {
             onMoveCursor={moveCursor}
             onCursorClick={(timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
               setCursorPosition({ timeSlot, stringIndex });
-              // Only handle note selection logic when shift is held
+              
               if (shiftHeld) {
-                handleNoteSelection(timeSlot, stringIndex);
+                // Shift+click: handle pair selection for ties
+                const noteKey = { timeSlot, stringIndex };
+                const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
+                
+                if (existingIndex >= 0) {
+                  // Deselect if already selected
+                  setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
+                  setFirstSelectedNote(null);
+                } else {
+                  // Add to selection
+                  if (firstSelectedNote) {
+                    // We have a first note, create the pair
+                    setSelectedNotes([firstSelectedNote, noteKey]);
+                    setFirstSelectedNote(null); // Clear first selection since we now have a pair
+                  } else if (selectedNotes.length === 2) {
+                    // We already have a pair, replace with new pair starting from this note
+                    setFirstSelectedNote(noteKey);
+                    setSelectedNotes([]);
+                  } else {
+                    // Start new selection with this note
+                    setFirstSelectedNote(noteKey);
+                    setSelectedNotes([]);
+                  }
+                }
               } else {
-                // Clear selection on normal clicks
-                setSelectedNotes([]);
+                // Normal click: track as first selection (no highlights yet)
+                const notes = getNotesAtSlot(tabData, timeSlot, stringIndex);
+                if (notes.length > 0) {
+                  // Clicked on an existing note, track it as first selection
+                  setFirstSelectedNote({ timeSlot, stringIndex });
+                  setSelectedNotes([]); // Clear any existing pair selection
+                } else {
+                  // Clicked on empty space, clear selections
+                  setFirstSelectedNote(null);
+                  setSelectedNotes([]);
+                }
               }
             }}
             onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
@@ -299,7 +346,7 @@ function App() {
             onZoomChange={setZoom}
             isPlaying={isPlaying}
             currentPlaybackTimeSlot={currentPlaybackTimeSlot}
-            tieMode={tieMode}
+            tieMode={getCurrentTieState()}
             selectedNotes={selectedNotes}
             onCreateTie={handleCreateTie}
           />

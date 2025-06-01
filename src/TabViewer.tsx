@@ -380,8 +380,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
       return;
     }
     
-    // Normal click behavior (move cursor)
+    // Normal click behavior (move cursor only, no highlighting)
     if (clickedOnExistingNote) {
+      // Move cursor to the clicked note
       onCursorClick(noteTimeSlot, closestStringIndex, false);
     } else {
       // If we didn't click on an existing note, use smart positioning
@@ -605,7 +606,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
           })}
 
           {/* Selected notes highlighting (for tie mode) */}
-          {tieMode && selectedNotes && selectedNotes.map((selectedNote, index) => {
+          {selectedNotes && selectedNotes.map((selectedNote, index) => {
             const x = getSlotX(selectedNote.timeSlot, leftMargin, slotWidth);
             const y = getStringY(selectedNote.stringIndex);
             

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as Tone from 'tone';
 import type { TabData } from './types';
-import { DURATION_VALUES } from './types';
+import { DURATION_VALUES, getNotesAtSlot, getTotalNoteDuration } from './types';
 
 interface ControlsProps {
   tabData: TabData;
@@ -461,11 +461,19 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
               
               // Play all notes at this position using the exact scheduled time
               notesToPlay.forEach(note => {
+                // Skip if this note is tied from a previous note (already playing)
+                if (note.isTiedFrom !== undefined) {
+                  console.log(`  Skipping tied note: fret ${note.fret} on string ${note.stringIndex} (tied from slot ${note.isTiedFrom})`);
+                  return;
+                }
+                
                 console.log(`  Note: fret ${note.fret} on string ${note.stringIndex}`);
                 
-                // Calculate note duration in seconds
-                const durationInQuarterNotes = DURATION_VALUES[note.duration];
-                const durationInSeconds = (durationInQuarterNotes * 60) / tempo;
+                // Calculate note duration including tied notes
+                const totalDurationInQuarterNotes = getTotalNoteDuration(tabData, tabCursor, note.stringIndex);
+                const durationInSeconds = (totalDurationInQuarterNotes * 60) / tempo;
+                
+                console.log(`  Duration: ${totalDurationInQuarterNotes} quarter notes = ${durationInSeconds.toFixed(2)}s (including ties)`);
                 
                 playNote(note.fret!, note.stringIndex, durationInSeconds, time);
               });
