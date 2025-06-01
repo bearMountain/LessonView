@@ -55,7 +55,8 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       vibrato: null,
     }
   });
-  const currentlyPlayingNotesRef = useRef<Map<string, { fret: number; stringIndex: number; endTime: number }>>(new Map());
+  const currentlyPlayingNotesRef = useRef<Set<string>>(new Set());
+  const finalNoteTimeoutRef = useRef<number | null>(null);
 
   // String tuning (in Hz) - Strumstick is tuned to D-A-D
   const stringFrequencies = [146.83, 220.00, 293.66]; // Low D, A, Hi D
@@ -75,10 +76,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   };
 
   // Helper functions to manage currently playing notes for precise visual feedback
-  const addPlayingNote = (fret: number, stringIndex: number, startTime: number, duration: number) => {
-    const noteKey = `${fret}-${stringIndex}-${startTime}`;
-    const endTime = startTime + duration;
-    currentlyPlayingNotesRef.current.set(noteKey, { fret, stringIndex, endTime });
+  const addPlayingNote = (fret: number, stringIndex: number) => {
+    const noteKey = `${fret}-${stringIndex}`;
+    currentlyPlayingNotesRef.current.add(noteKey);
     updateVisualFeedback();
     return noteKey;
   };
@@ -89,10 +89,13 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   };
 
   const updateVisualFeedback = () => {
-    const playingNotes = Array.from(currentlyPlayingNotesRef.current.values()).map(note => ({
-      fret: note.fret,
-      stringIndex: note.stringIndex
-    }));
+    const playingNotes = Array.from(currentlyPlayingNotesRef.current).map(noteKey => {
+      const [fretStr, stringIndexStr] = noteKey.split('-');
+      return {
+        fret: parseInt(fretStr),
+        stringIndex: parseInt(stringIndexStr)
+      };
+    });
     onNotesPlaying(playingNotes);
   };
 
@@ -380,6 +383,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       Tone.Transport.cancel();
       Tone.Transport.position = 0;
       
+      // Clear any lingering visual feedback from previous playback
+      clearAllPlayingNotes();
+      
       // Set tempo - Transport will handle BPM changes automatically
       console.log(`Setting tempo to ${tempo} BPM`);
       Tone.Transport.bpm.value = tempo;
@@ -468,11 +474,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
           
           // Main playback phase - check if we've reached the end
           if (tabCursor >= tabData.length) {
-            console.log('🏁 Reached end of tab, stopping...');
-            
-            // Clear visual feedback then stop
-            clearAllPlayingNotes();
-            stopPlayback();
+            // Just increment and continue - the last note's completion will handle stopping
+            tabCursor++;
+            absoluteSlot++;
             return;
           }
           
@@ -504,13 +508,28 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                 
                 console.log(`  Duration: ${totalDurationInQuarterNotes} quarter notes = ${durationInSeconds.toFixed(2)}s (including ties)`);
                 
+                // Check if this is one of the last notes in the tab
+                const isLastPosition = tabCursor === tabData.length - 1 || 
+                  (tabCursor < tabData.length - 1 && tabData.slice(tabCursor + 1).every(pos => 
+                    pos.notes.length === 0 || pos.notes.every(n => n.type === 'rest')
+                  ));
+                
                 // Add note to tracking system
-                const noteKey = addPlayingNote(note.fret!, note.stringIndex, time, durationInSeconds);
+                const noteKey = addPlayingNote(note.fret!, note.stringIndex);
                 
                 // Play the note with completion callback
                 playNote(note.fret!, note.stringIndex, durationInSeconds, time, () => {
                   // This callback is called when the note ends - remove from visual feedback
                   removePlayingNote(noteKey);
+                  
+                  // If this was the last note, check if we should stop
+                  if (isLastPosition && currentlyPlayingNotesRef.current.size === 0) {
+                    console.log('🏁 Last note finished, stopping playback...');
+                    // Schedule stop in next tick to ensure clean shutdown
+                    Tone.Transport.schedule((time) => {
+                      stopPlayback();
+                    }, "+0.1");
+                  }
                 });
               });
               
@@ -555,7 +574,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
       setCurrentTimeSlot(-1);
-      onNotesPlaying([]);
+      clearAllPlayingNotes();
       
       // Try to force clean the transport
       try {
@@ -571,6 +590,12 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     console.log('🛑 Stopping Transport playback');
     
     try {
+      // Clear any pending timeout
+      if (finalNoteTimeoutRef.current) {
+        clearTimeout(finalNoteTimeoutRef.current);
+        finalNoteTimeoutRef.current = null;
+      }
+      
       // Stop and clear the transport
       Tone.Transport.stop();
       Tone.Transport.cancel();
@@ -603,7 +628,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       onPlaybackStateChange?.(false);
       setCurrentTimeSlot(-1);
       if (clearVisualFeedback) {
-        onNotesPlaying([]);
+        clearAllPlayingNotes();
       }
       
       // Try to force clean the transport
