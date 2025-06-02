@@ -40,6 +40,10 @@ function AppContent() {
   // Add state to track pause position
   const [pausedAtTimeSlot, setPausedAtTimeSlot] = useState<number>(-1);
   
+  // Audio mute controls
+  const [isVideoMuted, setIsVideoMuted] = useState<boolean>(false);
+  const [isSynthMuted, setIsSynthMuted] = useState<boolean>(false);
+  
   const controlsRef = useRef<ControlsRef>(null);
   
   // Use sync engine
@@ -355,6 +359,15 @@ function AppContent() {
     syncEngine.seekToSlot(0); // Reset sync engine time as well
   };
 
+  // Audio mute handlers
+  const handleVideoMuteToggle = () => {
+    setIsVideoMuted(!isVideoMuted);
+  };
+
+  const handleSynthMuteToggle = () => {
+    setIsSynthMuted(!isSynthMuted);
+  };
+
   // Calculate current time display (simplified for now)
   const currentTime = "0:00";
   const totalTime = tabData.length > 0 ? `0:${Math.floor(tabData.length / 16).toString().padStart(2, '0')}` : "0:00"; // 16 slots per measure
@@ -408,9 +421,11 @@ function AppContent() {
             currentTime={currentVideoTime}
             isPlaying={isPlaying}
             playbackRate={videoPlaybackRate}
+            isMuted={isVideoMuted}
             onTimeUpdate={handleVideoTimeUpdate}
             onDurationChange={handleVideoDurationChange}
             onPlayStateChange={handleVideoPlayStateChange}
+            onMuteToggle={handleVideoMuteToggle}
           />
           <div style={{ position: 'relative', width: '100%', height: '100%', padding: '24px' }}>
             {/* Floating zoom controls */}
@@ -433,6 +448,17 @@ function AppContent() {
                 title="Reset Zoom"
               >
                 Reset
+              </button>
+            </div>
+            
+            {/* Synth Mute Button - Bottom Left */}
+            <div className="floating-synth-controls">
+              <button 
+                onClick={handleSynthMuteToggle}
+                title={isSynthMuted ? 'Unmute Synth' : 'Mute Synth'}
+                className="synth-mute-button"
+              >
+                {isSynthMuted ? '🔇' : '🎵'}
               </button>
             </div>
             
@@ -495,6 +521,7 @@ function AppContent() {
               onCurrentTimeSlotChange={setCurrentPlaybackTimeSlot}
               countInEnabled={countInEnabled}
               timeSignature={timeSignature}
+              isMuted={isSynthMuted}
             />
           </div>
         </>

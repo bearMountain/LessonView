@@ -14,6 +14,7 @@ interface ControlsProps {
   onCountInStateChange?: (isCountingIn: boolean, beat?: number, totalBeats?: number) => void;
   countInEnabled?: boolean;
   timeSignature?: string;
+  isMuted?: boolean;
 }
 
 export interface ControlsRef {
@@ -22,7 +23,7 @@ export interface ControlsRef {
   stopPlayback: (clearVisualFeedback?: boolean) => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature, isMuted }, ref) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeSlot, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<{ dispose: () => void } | null>(null);
@@ -200,6 +201,17 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       return;
     }
     
+    // Skip audio if muted, but still handle visual feedback and timing
+    if (isMuted) {
+      // Schedule the completion callback using Tone's precise timing even when muted
+      if (onNoteEnd) {
+        Tone.Transport.scheduleOnce(() => {
+          onNoteEnd();
+        }, `+${duration}`);
+      }
+      return;
+    }
+    
     try {
       // Calculate sustain multiplier
       const baseSustainMultiplier = 0.8;
@@ -275,6 +287,15 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
 
     // Show finger circle for preview note
     onNotesPlaying([{ fret, stringIndex }]);
+    
+    // Skip audio if muted, but still show visual feedback
+    if (isMuted) {
+      // Clear the visual feedback after a short delay
+      setTimeout(() => {
+        onNotesPlaying([]);
+      }, 800); // Same duration as unmuted preview
+      return;
+    }
     
     // Quick preview with shorter duration for immediate feedback
     try {

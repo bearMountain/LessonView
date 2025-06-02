@@ -6,9 +6,11 @@ interface VideoPlayerProps {
   currentTime?: number;
   isPlaying?: boolean;
   playbackRate?: number;
+  isMuted?: boolean;
   onTimeUpdate?: (time: number) => void;
   onDurationChange?: (duration: number) => void;
   onPlayStateChange?: (isPlaying: boolean) => void;
+  onMuteToggle?: () => void;
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -16,9 +18,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   currentTime = 0,
   isPlaying = false,
   playbackRate = 1.0,
+  isMuted = false,
   onTimeUpdate,
   onDurationChange,
   onPlayStateChange,
+  onMuteToggle,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState<number>(0);
@@ -75,6 +79,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [currentTime]);
 
+  // Handle mute state
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = isMuted;
+  }, [isMuted]);
+
   // Video event handlers
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
@@ -115,6 +125,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onLoadedMetadata={handleLoadedMetadata}
             controls={false} // We'll use custom controls
           />
+          
+          {/* Video Mute Button - Bottom Right */}
+          {onMuteToggle && (
+            <button
+              className="video-player__mute-button"
+              onClick={onMuteToggle}
+              title={isMuted ? 'Unmute Video' : 'Mute Video'}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+          )}
+          
           {videoError && (
             <div className="video-player__error">
               {videoError}
