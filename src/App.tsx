@@ -34,8 +34,11 @@ function AppContent() {
   const [firstSelectedNote, setFirstSelectedNote] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
   
   // Video sync state
-  const [videoSource, setVideoSource] = useState<string>('/videos/test-vid-1.MP4');
+  const [videoSource, setVideoSource] = useState<string>('/videos/test-vid-1.mp4');
   const [splitRatio, setSplitRatio] = useState<number>(0.4); // 40% video, 60% tab viewer
+  
+  // Add state to track pause position
+  const [pausedAtTimeSlot, setPausedAtTimeSlot] = useState<number>(-1);
   
   const controlsRef = useRef<ControlsRef>(null);
   
@@ -143,13 +146,37 @@ function AppContent() {
   const handlePlayPause = () => {
     if (isPlaying) {
       // Pause both tab and video at current positions
-      controlsRef.current?.stopPlayback();
+      const currentSlot = currentPlaybackTimeSlot >= 0 ? currentPlaybackTimeSlot : syncEngine.state.currentPosition.timeSlot;
+      
+      // Store where we paused
+      setPausedAtTimeSlot(currentSlot);
+      
+      // Stop audio playback but preserve visual feedback (don't clear finger circles)
+      controlsRef.current?.stopPlayback(false); // Pass false to preserve visual feedback
       syncEngine.pause();
+      
+      // Keep the playback indicator visible at the paused position
+      setCurrentPlaybackTimeSlot(currentSlot);
+      
+      console.log(`⏸️ Paused at timeSlot: ${currentSlot}`);
     } else {
-      // Resume both from current sync position
-      // Note: Controls component will handle starting from current position
-      controlsRef.current?.playTab();
+      // Resume from paused position or cursor position
+      const resumeFromSlot = pausedAtTimeSlot >= 0 ? pausedAtTimeSlot : cursorPosition.timeSlot;
+      
+      // Update cursor position to resume position
+      setCursorPosition(prev => ({ ...prev, timeSlot: resumeFromSlot }));
+      
+      // Seek sync engine to resume position
+      syncEngine.seekToSlot(resumeFromSlot);
+      
+      // Start playback
       syncEngine.play();
+      controlsRef.current?.playTab();
+      
+      // Clear paused state
+      setPausedAtTimeSlot(-1);
+      
+      console.log(`▶️ Resuming from timeSlot: ${resumeFromSlot}`);
     }
   };
 
@@ -240,6 +267,9 @@ function AppContent() {
     
     // Seek sync engine to this position (will update video)
     syncEngine.seekToSlot(timeSlot);
+    
+    // Clear any paused state since we're seeking to a new position
+    setPausedAtTimeSlot(-1);
     
     // If currently playing, restart playback from new position
     if (isPlaying) {

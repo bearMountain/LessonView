@@ -19,7 +19,7 @@ interface ControlsProps {
 export interface ControlsRef {
   playPreviewNote: (fret: number, stringIndex: number) => void;
   playTab: () => void;
-  stopPlayback: () => void;
+  stopPlayback: (clearVisualFeedback?: boolean) => void;
 }
 
 const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature }, ref) => {

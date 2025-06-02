@@ -648,23 +648,23 @@ const TabViewer: React.FC<TabViewerProps> = ({
           </g>
 
           {/* Playback indicator - shows current playing position */}
-          {isPlaying && currentPlaybackTimeSlot !== undefined && currentPlaybackTimeSlot >= 0 && (
+          {currentPlaybackTimeSlot !== undefined && currentPlaybackTimeSlot >= 0 && (
             <g className="playback-indicator">
               <line
                 x1={getSlotX(currentPlaybackTimeSlot, leftMargin, slotWidth)}
                 y1={getStringY(2) - 30} // Above the Hi D string
                 x2={getSlotX(currentPlaybackTimeSlot, leftMargin, slotWidth)}
                 y2={getStringY(0) + 30} // Below the Low D string
-                stroke="rgba(128, 128, 128, 0.7)"
+                stroke={isPlaying ? "rgba(0, 255, 0, 0.7)" : "rgba(255, 165, 0, 0.8)"} // Green when playing, orange when paused
                 strokeWidth="2"
                 opacity="0.8"
-                strokeDasharray="none"
+                strokeDasharray={isPlaying ? "none" : "5,3"} // Solid when playing, dashed when paused
               />
               <circle
                 cx={getSlotX(currentPlaybackTimeSlot, leftMargin, slotWidth)}
                 cy={getStringY(1)} // Center on A string
                 r="3"
-                fill="rgba(128, 128, 128, 0.7)"
+                fill={isPlaying ? "rgba(0, 255, 0, 0.7)" : "rgba(255, 165, 0, 0.8)"} // Green when playing, orange when paused
                 opacity="0.8"
               />
             </g>
