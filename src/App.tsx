@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
@@ -42,10 +42,37 @@ function AppContent() {
   // Use sync engine
   const syncEngine = useSyncEngine();
   
-  // Sync engine derived values
-  const isPlaying = syncEngine.state.masterTimeline.isPlaying;
-  const videoTime = syncEngine.state.masterTimeline.currentTime;
-  const videoDuration = syncEngine.state.masterTimeline.totalDuration;
+  // Sync engine integration
+  const isPlaying = syncEngine.state.isPlaying;
+  const currentVideoTime = syncEngine.state.currentPosition.seconds;
+  const videoPlaybackRate = syncEngine.getVideoPlaybackRate();
+
+  // Initialize video config
+  useEffect(() => {
+    syncEngine.setVideoConfig({
+      source: videoSource,
+      recordedBPM: 120, // TODO: Make this configurable per video
+    });
+    syncEngine.setTabBPM(tempo);
+    syncEngine.setTimeSignature(timeSignature);
+  }, [videoSource, syncEngine]);
+
+  // Sync tempo changes
+  useEffect(() => {
+    syncEngine.setTabBPM(tempo);
+  }, [tempo, syncEngine]);
+
+  // Sync time signature changes
+  useEffect(() => {
+    syncEngine.setTimeSignature(timeSignature);
+  }, [timeSignature, syncEngine]);
+
+  // Sync current playback position from Controls component
+  useEffect(() => {
+    if (currentPlaybackTimeSlot >= 0) {
+      syncEngine.updatePosition(currentPlaybackTimeSlot);
+    }
+  }, [currentPlaybackTimeSlot, syncEngine]);
 
   const handleAddNote = (fret: number | null, duration: NoteDuration = selectedDuration, type: NoteType = selectedNoteType) => {
     setTabData(prevTabData => {
@@ -110,13 +137,20 @@ function AppContent() {
 
   const handleTempoChange = (newTempo: number) => {
     setTempo(newTempo);
-    // Update sync engine playback rate based on tempo change
-    const bpmRatio = newTempo / 120; // Assuming 120 BPM as baseline
-    syncEngine.setPlaybackRate(bpmRatio);
+    // Sync engine will automatically recalculate video playback rate
   };
 
   const handlePlayPause = () => {
-    syncEngine.togglePlayback();
+    if (isPlaying) {
+      // Pause both tab and video at current positions
+      controlsRef.current?.stopPlayback();
+      syncEngine.pause();
+    } else {
+      // Resume both from current sync position
+      // Note: Controls component will handle starting from current position
+      controlsRef.current?.playTab();
+      syncEngine.play();
+    }
   };
 
   const handleLoopToggle = () => {
@@ -184,24 +218,78 @@ function AppContent() {
 
   // Video event handlers
   const handleVideoTimeUpdate = (time: number) => {
-    // Only update if not playing (to avoid feedback loops)
-    if (!isPlaying) {
-      syncEngine.updateTime(time);
-    }
+    // Video reports its time updates during playback
+    // We don't need to update sync engine as it's handling this
   };
 
   const handleVideoDurationChange = (duration: number) => {
-    syncEngine.setDuration(duration);
+    // Video duration loaded - could be used for validation
+    console.log('Video duration:', duration);
   };
 
   const handleVideoPlayStateChange = (playing: boolean) => {
-    // Video player reports state changes
-    // This could be used for error handling
+    // Video player reports state changes - for error handling
+    if (playing !== isPlaying) {
+      console.log('Video/sync state mismatch - video:', playing, 'sync:', isPlaying);
+    }
+  };
+
+  // Handle cursor clicks - this should seek both video and tab
+  const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
+    setCursorPosition({ timeSlot, stringIndex });
+    
+    // Seek sync engine to this position (will update video)
+    syncEngine.seekToSlot(timeSlot);
+    
+    // If currently playing, restart playback from new position
+    if (isPlaying) {
+      controlsRef.current?.stopPlayback();
+      controlsRef.current?.playTab();
+    }
+    
+    if (shiftHeld) {
+      // Shift+click: handle pair selection for ties
+      const noteKey = { timeSlot, stringIndex };
+      const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
+      
+      if (existingIndex >= 0) {
+        // Deselect if already selected
+        setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
+        setFirstSelectedNote(null);
+      } else {
+        // Add to selection
+        if (firstSelectedNote) {
+          // We have a first note, create the pair
+          setSelectedNotes([firstSelectedNote, noteKey]);
+          setFirstSelectedNote(null); // Clear first selection since we now have a pair
+        } else if (selectedNotes.length === 2) {
+          // We already have a pair, replace with new pair starting from this note
+          setFirstSelectedNote(noteKey);
+          setSelectedNotes([]);
+        } else {
+          // Start new selection with this note
+          setFirstSelectedNote(noteKey);
+          setSelectedNotes([]);
+        }
+      }
+    } else {
+      // Normal click: track as first selection (no highlights yet)
+      const notes = getNotesAtSlot(tabData, timeSlot, stringIndex);
+      if (notes.length > 0) {
+        // Clicked on an existing note, track it as first selection
+        setFirstSelectedNote({ timeSlot, stringIndex });
+        setSelectedNotes([]); // Clear any existing pair selection
+      } else {
+        // Clicked on empty space, clear selections
+        setFirstSelectedNote(null);
+        setSelectedNotes([]);
+      }
+    }
   };
 
   // Sync play/pause with existing Controls component
   const handlePlaybackStateChange = (playing: boolean) => {
-    // Called by Controls component - sync with master timeline
+    // Controls component reports playback state changes
     if (playing !== isPlaying) {
       if (playing) {
         syncEngine.play();
@@ -214,6 +302,7 @@ function AppContent() {
   // Handle reset cursor to start (cmd+enter shortcut) 
   const handleResetCursor = () => {
     setCursorPosition({ timeSlot: 0, stringIndex: 2 }); // Reset to start, Hi D string
+    syncEngine.seekToSlot(0); // Reset sync engine time as well
   };
 
   // Calculate current time display (simplified for now)
@@ -266,9 +355,9 @@ function AppContent() {
         >
           <VideoPlayer
             source={videoSource}
-            currentTime={videoTime}
+            currentTime={currentVideoTime}
             isPlaying={isPlaying}
-            playbackRate={1.0}
+            playbackRate={videoPlaybackRate}
             onTimeUpdate={handleVideoTimeUpdate}
             onDurationChange={handleVideoDurationChange}
             onPlayStateChange={handleVideoPlayStateChange}
@@ -303,48 +392,7 @@ function AppContent() {
               onAddNote={handleAddNote}
               onRemoveNote={handleRemoveNote}
               onMoveCursor={moveCursor}
-              onCursorClick={(timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
-                setCursorPosition({ timeSlot, stringIndex });
-                
-                if (shiftHeld) {
-                  // Shift+click: handle pair selection for ties
-                  const noteKey = { timeSlot, stringIndex };
-                  const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
-                  
-                  if (existingIndex >= 0) {
-                    // Deselect if already selected
-                    setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
-                    setFirstSelectedNote(null);
-                  } else {
-                    // Add to selection
-                    if (firstSelectedNote) {
-                      // We have a first note, create the pair
-                      setSelectedNotes([firstSelectedNote, noteKey]);
-                      setFirstSelectedNote(null); // Clear first selection since we now have a pair
-                    } else if (selectedNotes.length === 2) {
-                      // We already have a pair, replace with new pair starting from this note
-                      setFirstSelectedNote(noteKey);
-                      setSelectedNotes([]);
-                    } else {
-                      // Start new selection with this note
-                      setFirstSelectedNote(noteKey);
-                      setSelectedNotes([]);
-                    }
-                  }
-                } else {
-                  // Normal click: track as first selection (no highlights yet)
-                  const notes = getNotesAtSlot(tabData, timeSlot, stringIndex);
-                  if (notes.length > 0) {
-                    // Clicked on an existing note, track it as first selection
-                    setFirstSelectedNote({ timeSlot, stringIndex });
-                    setSelectedNotes([]); // Clear any existing pair selection
-                  } else {
-                    // Clicked on empty space, clear selections
-                    setFirstSelectedNote(null);
-                    setSelectedNotes([]);
-                  }
-                }
-              }}
+              onCursorClick={handleCursorClick}
               onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
               selectedDuration={selectedDuration}
               onTogglePlayback={handlePlayPause}

@@ -1,116 +1,110 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 // Types
-export interface MasterTimeline {
-  currentTime: number;      // Master timestamp (seconds)
-  isPlaying: boolean;       // Master play state
-  totalDuration: number;    // Total duration
-  playbackRate: number;     // Master playback speed
+export interface VideoConfig {
+  source: string | File;
+  recordedBPM: number;  // BPM the video was recorded at
 }
 
-export interface SyncPoint {
-  videoTime: number;        // Timestamp in video (seconds)
-  notationTime: number;     // Position in notation (beats)
-  confidence: number;       // How confident this sync point is
-  type: 'manual' | 'automatic' | 'keyframe';
-}
-
-export interface TimeMapper {
-  videoTimeToNotationTime(videoSeconds: number): number;
-  notationTimeToVideoTime(notationBeats: number): number;
+export interface TimePosition {
+  timeSlot: number;     // Current position in tab (16th note slots)
+  seconds: number;      // Equivalent seconds based on current BPM
 }
 
 interface SyncEngineState {
-  masterTimeline: MasterTimeline;
-  syncPoints: SyncPoint[];
-  isInitialized: boolean;
+  isPlaying: boolean;
+  currentPosition: TimePosition;
+  tabBPM: number;
+  videoConfig: VideoConfig | null;
+  timeSignature: string;
 }
 
 // Actions
 type SyncEngineAction =
   | { type: 'PLAY' }
   | { type: 'PAUSE' }
-  | { type: 'SEEK'; time: number }
-  | { type: 'SET_PLAYBACK_RATE'; rate: number }
-  | { type: 'SET_DURATION'; duration: number }
-  | { type: 'UPDATE_TIME'; time: number }
-  | { type: 'ADD_SYNC_POINT'; syncPoint: SyncPoint }
-  | { type: 'REMOVE_SYNC_POINT'; index: number }
-  | { type: 'INITIALIZE' };
+  | { type: 'SEEK_TO_SLOT'; timeSlot: number }
+  | { type: 'UPDATE_POSITION'; timeSlot: number }
+  | { type: 'SET_TAB_BPM'; bpm: number }
+  | { type: 'SET_VIDEO_CONFIG'; config: VideoConfig }
+  | { type: 'SET_TIME_SIGNATURE'; signature: string };
+
+// Utility functions
+function getSlotsPerMeasure(timeSignature: string): number {
+  const [numerator] = timeSignature.split('/').map(Number);
+  return numerator * 4; // 4 sixteenth notes per beat
+}
+
+function timeSlotToSeconds(timeSlot: number, bpm: number): number {
+  // Each timeSlot is a 16th note
+  // At 120 BPM: 1 beat = 0.5 seconds, 1 sixteenth = 0.125 seconds
+  return timeSlot * (60 / bpm / 4);
+}
+
+function getVideoPlaybackRate(tabBPM: number, videoBPM: number): number {
+  return tabBPM / videoBPM;
+}
 
 // Reducer
 function syncEngineReducer(state: SyncEngineState, action: SyncEngineAction): SyncEngineState {
   switch (action.type) {
-    case 'INITIALIZE':
-      return {
-        ...state,
-        isInitialized: true,
-      };
-
     case 'PLAY':
       return {
         ...state,
-        masterTimeline: {
-          ...state.masterTimeline,
-          isPlaying: true,
-        },
+        isPlaying: true,
       };
 
     case 'PAUSE':
       return {
         ...state,
-        masterTimeline: {
-          ...state.masterTimeline,
-          isPlaying: false,
+        isPlaying: false,
+      };
+
+    case 'SEEK_TO_SLOT': {
+      const seconds = timeSlotToSeconds(action.timeSlot, state.tabBPM);
+      return {
+        ...state,
+        currentPosition: {
+          timeSlot: action.timeSlot,
+          seconds,
         },
       };
+    }
 
-    case 'SEEK':
+    case 'UPDATE_POSITION': {
+      const seconds = timeSlotToSeconds(action.timeSlot, state.tabBPM);
       return {
         ...state,
-        masterTimeline: {
-          ...state.masterTimeline,
-          currentTime: Math.max(0, Math.min(action.time, state.masterTimeline.totalDuration)),
+        currentPosition: {
+          timeSlot: action.timeSlot,
+          seconds,
         },
       };
+    }
 
-    case 'SET_PLAYBACK_RATE':
+    case 'SET_TAB_BPM': {
+      // Recalculate current position in seconds with new BPM
+      const seconds = timeSlotToSeconds(state.currentPosition.timeSlot, action.bpm);
       return {
         ...state,
-        masterTimeline: {
-          ...state.masterTimeline,
-          playbackRate: action.rate,
+        tabBPM: action.bpm,
+        currentPosition: {
+          ...state.currentPosition,
+          seconds,
         },
       };
+    }
 
-    case 'SET_DURATION':
+    case 'SET_VIDEO_CONFIG':
       return {
         ...state,
-        masterTimeline: {
-          ...state.masterTimeline,
-          totalDuration: action.duration,
-        },
+        videoConfig: action.config,
       };
 
-    case 'UPDATE_TIME':
+    case 'SET_TIME_SIGNATURE':
       return {
         ...state,
-        masterTimeline: {
-          ...state.masterTimeline,
-          currentTime: action.time,
-        },
-      };
-
-    case 'ADD_SYNC_POINT':
-      return {
-        ...state,
-        syncPoints: [...state.syncPoints, action.syncPoint].sort((a, b) => a.videoTime - b.videoTime),
-      };
-
-    case 'REMOVE_SYNC_POINT':
-      return {
-        ...state,
-        syncPoints: state.syncPoints.filter((_, index) => index !== action.index),
+        timeSignature: action.signature,
       };
 
     default:
@@ -120,114 +114,39 @@ function syncEngineReducer(state: SyncEngineState, action: SyncEngineAction): Sy
 
 // Initial state
 const initialState: SyncEngineState = {
-  masterTimeline: {
-    currentTime: 0,
-    isPlaying: false,
-    totalDuration: 0,
-    playbackRate: 1.0,
+  isPlaying: false,
+  currentPosition: {
+    timeSlot: 0,
+    seconds: 0,
   },
-  syncPoints: [],
-  isInitialized: false,
+  tabBPM: 120,
+  videoConfig: null,
+  timeSignature: '4/4',
 };
 
 // Context
 interface SyncEngineContextType {
   state: SyncEngineState;
-  timeMapper: TimeMapper;
   
   // Core methods
   play(): void;
   pause(): void;
   togglePlayback(): void;
-  seekTo(time: number): void;
-  setPlaybackRate(rate: number): void;
-  setDuration(duration: number): void;
-  updateTime(time: number): void;
+  seekToSlot(timeSlot: number): void;
+  updatePosition(timeSlot: number): void;
   
-  // Sync point methods
-  addSyncPoint(syncPoint: SyncPoint): void;
-  removeSyncPoint(index: number): void;
+  // Configuration
+  setTabBPM(bpm: number): void;
+  setVideoConfig(config: VideoConfig): void;
+  setTimeSignature(signature: string): void;
   
-  // Conversion methods
-  videoTimeToNotationTime(videoSeconds: number): number;
-  notationTimeToVideoTime(notationBeats: number): number;
+  // Utility methods
+  getVideoPlaybackRate(): number;
+  getSlotsPerMeasure(): number;
+  timeSlotToSeconds(timeSlot: number): number;
 }
 
 const SyncEngineContext = createContext<SyncEngineContextType | null>(null);
-
-// Time mapping implementation
-function createTimeMapper(syncPoints: SyncPoint[]): TimeMapper {
-  return {
-    videoTimeToNotationTime(videoSeconds: number): number {
-      if (syncPoints.length === 0) {
-        // Default 1:1 mapping - 120 BPM, 4/4 time
-        // 1 beat = 0.5 seconds at 120 BPM
-        return videoSeconds * 2; // Convert seconds to beats
-      }
-
-      if (syncPoints.length === 1) {
-        const point = syncPoints[0];
-        const timeOffset = videoSeconds - point.videoTime;
-        return point.notationTime + (timeOffset * 2); // Assume default 120 BPM
-      }
-
-      // Find surrounding sync points for interpolation
-      let beforePoint = syncPoints[0];
-      let afterPoint = syncPoints[syncPoints.length - 1];
-
-      for (let i = 0; i < syncPoints.length - 1; i++) {
-        if (videoSeconds >= syncPoints[i].videoTime && videoSeconds <= syncPoints[i + 1].videoTime) {
-          beforePoint = syncPoints[i];
-          afterPoint = syncPoints[i + 1];
-          break;
-        }
-      }
-
-      // Linear interpolation between sync points
-      const videoTimeDiff = afterPoint.videoTime - beforePoint.videoTime;
-      const notationTimeDiff = afterPoint.notationTime - beforePoint.notationTime;
-      
-      if (videoTimeDiff === 0) return beforePoint.notationTime;
-      
-      const ratio = (videoSeconds - beforePoint.videoTime) / videoTimeDiff;
-      return beforePoint.notationTime + (ratio * notationTimeDiff);
-    },
-
-    notationTimeToVideoTime(notationBeats: number): number {
-      if (syncPoints.length === 0) {
-        // Default 1:1 mapping - 120 BPM
-        return notationBeats * 0.5; // Convert beats to seconds
-      }
-
-      if (syncPoints.length === 1) {
-        const point = syncPoints[0];
-        const beatOffset = notationBeats - point.notationTime;
-        return point.videoTime + (beatOffset * 0.5); // Assume default 120 BPM
-      }
-
-      // Find surrounding sync points for reverse interpolation
-      let beforePoint = syncPoints[0];
-      let afterPoint = syncPoints[syncPoints.length - 1];
-
-      for (let i = 0; i < syncPoints.length - 1; i++) {
-        if (notationBeats >= syncPoints[i].notationTime && notationBeats <= syncPoints[i + 1].notationTime) {
-          beforePoint = syncPoints[i];
-          afterPoint = syncPoints[i + 1];
-          break;
-        }
-      }
-
-      // Linear interpolation between sync points
-      const notationTimeDiff = afterPoint.notationTime - beforePoint.notationTime;
-      const videoTimeDiff = afterPoint.videoTime - beforePoint.videoTime;
-      
-      if (notationTimeDiff === 0) return beforePoint.videoTime;
-      
-      const ratio = (notationBeats - beforePoint.notationTime) / notationTimeDiff;
-      return beforePoint.videoTime + (ratio * videoTimeDiff);
-    },
-  };
-}
 
 // Provider component
 interface SyncEngineProviderProps {
@@ -236,51 +155,9 @@ interface SyncEngineProviderProps {
 
 export const SyncEngineProvider: React.FC<SyncEngineProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(syncEngineReducer, initialState);
-  const timeMapper = createTimeMapper(state.syncPoints);
-  const animationFrameRef = useRef<number>();
-  const lastTimeRef = useRef<number>(Date.now());
-
-  // Master timeline update loop
-  const updateLoop = useCallback(() => {
-    const now = Date.now();
-    const deltaTime = (now - lastTimeRef.current) / 1000; // Convert to seconds
-    lastTimeRef.current = now;
-    
-    dispatch({ 
-      type: 'UPDATE_TIME', 
-      time: state.masterTimeline.currentTime + deltaTime * state.masterTimeline.playbackRate 
-    });
-    
-    if (state.masterTimeline.isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(updateLoop);
-    }
-  }, [state.masterTimeline.currentTime, state.masterTimeline.playbackRate, state.masterTimeline.isPlaying]);
-
-  useEffect(() => {
-    if (state.masterTimeline.isPlaying && state.isInitialized) {
-      lastTimeRef.current = Date.now();
-      animationFrameRef.current = requestAnimationFrame(updateLoop);
-    } else {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    }
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [state.masterTimeline.isPlaying, state.isInitialized, updateLoop]);
-
-  // Initialize on mount
-  useEffect(() => {
-    dispatch({ type: 'INITIALIZE' });
-  }, []);
 
   const contextValue: SyncEngineContextType = {
     state,
-    timeMapper,
 
     play() {
       dispatch({ type: 'PLAY' });
@@ -291,43 +168,44 @@ export const SyncEngineProvider: React.FC<SyncEngineProviderProps> = ({ children
     },
 
     togglePlayback() {
-      if (state.masterTimeline.isPlaying) {
+      if (state.isPlaying) {
         dispatch({ type: 'PAUSE' });
       } else {
         dispatch({ type: 'PLAY' });
       }
     },
 
-    seekTo(time: number) {
-      dispatch({ type: 'SEEK', time });
+    seekToSlot(timeSlot: number) {
+      dispatch({ type: 'SEEK_TO_SLOT', timeSlot });
     },
 
-    setPlaybackRate(rate: number) {
-      dispatch({ type: 'SET_PLAYBACK_RATE', rate });
+    updatePosition(timeSlot: number) {
+      dispatch({ type: 'UPDATE_POSITION', timeSlot });
     },
 
-    setDuration(duration: number) {
-      dispatch({ type: 'SET_DURATION', duration });
+    setTabBPM(bpm: number) {
+      dispatch({ type: 'SET_TAB_BPM', bpm });
     },
 
-    updateTime(time: number) {
-      dispatch({ type: 'UPDATE_TIME', time });
+    setVideoConfig(config: VideoConfig) {
+      dispatch({ type: 'SET_VIDEO_CONFIG', config });
     },
 
-    addSyncPoint(syncPoint: SyncPoint) {
-      dispatch({ type: 'ADD_SYNC_POINT', syncPoint });
+    setTimeSignature(signature: string) {
+      dispatch({ type: 'SET_TIME_SIGNATURE', signature });
     },
 
-    removeSyncPoint(index: number) {
-      dispatch({ type: 'REMOVE_SYNC_POINT', index });
+    getVideoPlaybackRate(): number {
+      if (!state.videoConfig) return 1.0;
+      return getVideoPlaybackRate(state.tabBPM, state.videoConfig.recordedBPM);
     },
 
-    videoTimeToNotationTime(videoSeconds: number): number {
-      return timeMapper.videoTimeToNotationTime(videoSeconds);
+    getSlotsPerMeasure(): number {
+      return getSlotsPerMeasure(state.timeSignature);
     },
 
-    notationTimeToVideoTime(notationBeats: number): number {
-      return timeMapper.notationTimeToVideoTime(notationBeats);
+    timeSlotToSeconds(timeSlot: number): number {
+      return timeSlotToSeconds(timeSlot, state.tabBPM);
     },
   };
 
