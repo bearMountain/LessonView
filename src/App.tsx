@@ -73,9 +73,13 @@ function AppContent() {
   // Sync current playback position from Controls component
   useEffect(() => {
     if (currentPlaybackTimeSlot >= 0) {
-      syncEngine.updatePosition(currentPlaybackTimeSlot);
+      // Only update sync engine position if we're actually playing
+      // Don't update if we're paused (to maintain pause position)
+      if (isPlaying && pausedAtTimeSlot < 0) {
+        syncEngine.updatePosition(currentPlaybackTimeSlot);
+      }
     }
-  }, [currentPlaybackTimeSlot, syncEngine]);
+  }, [currentPlaybackTimeSlot, syncEngine, isPlaying, pausedAtTimeSlot]);
 
   const handleAddNote = (fret: number | null, duration: NoteDuration = selectedDuration, type: NoteType = selectedNoteType) => {
     setTabData(prevTabData => {
@@ -144,16 +148,22 @@ function AppContent() {
   };
 
   const handlePlayPause = () => {
+    console.log(`🎮 handlePlayPause called - current isPlaying: ${isPlaying}, pausedAtTimeSlot: ${pausedAtTimeSlot}`);
+    
     if (isPlaying) {
       // Pause both tab and video at current positions
       const currentSlot = currentPlaybackTimeSlot >= 0 ? currentPlaybackTimeSlot : syncEngine.state.currentPosition.timeSlot;
       
+      console.log(`⏸️ PAUSING - currentPlaybackTimeSlot: ${currentPlaybackTimeSlot}, syncEngine slot: ${syncEngine.state.currentPosition.timeSlot}, using: ${currentSlot}`);
+      
       // Store where we paused
       setPausedAtTimeSlot(currentSlot);
       
-      // Stop audio playback but preserve visual feedback (don't clear finger circles)
-      controlsRef.current?.stopPlayback(false); // Pass false to preserve visual feedback
+      // First pause the sync engine to stop video
       syncEngine.pause();
+      
+      // Then stop audio playback but preserve visual feedback (don't clear finger circles)
+      controlsRef.current?.stopPlayback(false); // Pass false to preserve visual feedback
       
       // Keep the playback indicator visible at the paused position
       setCurrentPlaybackTimeSlot(currentSlot);
@@ -163,15 +173,21 @@ function AppContent() {
       // Resume from paused position or cursor position
       const resumeFromSlot = pausedAtTimeSlot >= 0 ? pausedAtTimeSlot : cursorPosition.timeSlot;
       
+      console.log(`▶️ RESUMING - pausedAtTimeSlot: ${pausedAtTimeSlot}, cursorPosition: ${cursorPosition.timeSlot}, using: ${resumeFromSlot}`);
+      
       // Update cursor position to resume position
       setCursorPosition(prev => ({ ...prev, timeSlot: resumeFromSlot }));
       
       // Seek sync engine to resume position
       syncEngine.seekToSlot(resumeFromSlot);
       
-      // Start playback
+      // Start sync engine first
       syncEngine.play();
-      controlsRef.current?.playTab();
+      
+      // Then start audio playback
+      setTimeout(() => {
+        controlsRef.current?.playTab();
+      }, 50); // Small delay to ensure state is updated
       
       // Clear paused state
       setPausedAtTimeSlot(-1);
@@ -319,8 +335,12 @@ function AppContent() {
 
   // Sync play/pause with existing Controls component
   const handlePlaybackStateChange = (playing: boolean) => {
+    console.log(`🔄 handlePlaybackStateChange called - Controls reports: ${playing}, current isPlaying: ${isPlaying}`);
+    
     // Controls component reports playback state changes
+    // Only sync if there's a real mismatch to prevent loops
     if (playing !== isPlaying) {
+      console.log(`🔄 State mismatch detected - syncing states`);
       if (playing) {
         syncEngine.play();
       } else {

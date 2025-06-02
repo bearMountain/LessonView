@@ -547,7 +547,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   };
 
   const stopPlayback = (clearVisualFeedback: boolean = true) => {
-    console.log('🛑 Stopping Transport playback');
+    console.log('🛑 Stopping Transport playback, clearVisualFeedback:', clearVisualFeedback);
     
     try {
       // Clear any pending timeout
@@ -570,7 +570,13 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       // Reset UI state
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
-      setCurrentTimeSlot(-1);
+      
+      // Only reset currentTimeSlot if we're fully stopping (not pausing)
+      if (clearVisualFeedback) {
+        setCurrentTimeSlot(-1);
+        onCurrentTimeSlotChange?.(-1);
+      }
+      // If we're pausing (clearVisualFeedback=false), keep currentTimeSlot as is
       
       // Only clear visual feedback if requested
       if (clearVisualFeedback) {
@@ -583,8 +589,10 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       // Force reset even if cleanup failed
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
-      setCurrentTimeSlot(-1);
+      
       if (clearVisualFeedback) {
+        setCurrentTimeSlot(-1);
+        onCurrentTimeSlotChange?.(-1);
         clearAllPlayingNotes();
       }
       
