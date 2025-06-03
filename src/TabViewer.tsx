@@ -56,9 +56,10 @@ const TabViewer: React.FC<TabViewerProps> = ({
   currentToolMode,
   customMeasureLines
 }) => {
-  const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
-  const isResettingRef = useRef<boolean>(false); // Track when we're resetting via Cmd+Enter
+  const [currentFretInput, setCurrentFretInput] = useState<string>('');
+  const [isEditingLoadedNote, setIsEditingLoadedNote] = useState<boolean>(false); // Flag to track if we're editing a loaded note
+  const isResettingRef = useRef<boolean>(false); // Flag to skip sound when resetting cursor
   
   // Layout constants with zoom
   const stringSpacing = 60 * zoom;
@@ -99,6 +100,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (existingNote.type === 'note' && existingNote.fret !== null) {
         // Load the existing fret value into input for editing
         setCurrentFretInput(existingNote.fret.toString());
+        setIsEditingLoadedNote(true); // Mark that we've loaded an existing note
         // Play preview sound for the existing note (unless we're resetting via Cmd+Enter)
         if (onPlayPreviewNote && !isResettingRef.current) {
           onPlayPreviewNote(existingNote.fret, currentPosition.stringIndex);
@@ -106,10 +108,12 @@ const TabViewer: React.FC<TabViewerProps> = ({
       } else {
         // Rest or null fret, clear input
         setCurrentFretInput('');
+        setIsEditingLoadedNote(false);
       }
     } else {
       // No note at this position, clear input
       setCurrentFretInput('');
+      setIsEditingLoadedNote(false);
     }
     
     // Reset the flag after use
@@ -129,21 +133,25 @@ const TabViewer: React.FC<TabViewerProps> = ({
         case 'ArrowLeft':
           e.preventDefault();
           setCurrentFretInput(''); // Clear input when moving
+          setIsEditingLoadedNote(false); // Clear editing flag when moving
           onMoveCursor('left');
           break;
         case 'ArrowRight':
           e.preventDefault();
           setCurrentFretInput(''); // Clear input when moving
+          setIsEditingLoadedNote(false); // Clear editing flag when moving
           onMoveCursor('right');
           break;
         case 'ArrowUp':
           e.preventDefault();
           setCurrentFretInput(''); // Clear input when moving
+          setIsEditingLoadedNote(false); // Clear editing flag when moving
           onMoveCursor('up');
           break;
         case 'ArrowDown':
           e.preventDefault();
           setCurrentFretInput(''); // Clear input when moving
+          setIsEditingLoadedNote(false); // Clear editing flag when moving
           onMoveCursor('down');
           break;
         case 'Enter':
@@ -157,21 +165,25 @@ const TabViewer: React.FC<TabViewerProps> = ({
           } else if (selectedNoteType === 'rest') {
             onAddNote(null, selectedDuration, 'rest');
             setCurrentFretInput(''); // Clear input when moving
+            setIsEditingLoadedNote(false); // Clear editing flag when moving
             onMoveCursor('down'); // Move down after placing rest
           } else if (currentFretInput) {
             // Finalize the current note and move down
             setCurrentFretInput(''); // Clear input when moving
+            setIsEditingLoadedNote(false); // Clear editing flag when moving
             onMoveCursor('down');
           } else {
             // No current input, add a default note and move down
             onAddNote(0, selectedDuration, 'note');
             setCurrentFretInput(''); // Clear input when moving
+            setIsEditingLoadedNote(false); // Clear editing flag when moving
             onMoveCursor('down'); // Move down after placing note
           }
           break;
         case 'Tab': {
           e.preventDefault();
           setCurrentFretInput(''); // Always clear input when moving with Tab
+          setIsEditingLoadedNote(false); // Clear editing flag when moving
           if (selectedNoteType === 'rest') {
             onAddNote(null, selectedDuration, 'rest');
           }
@@ -193,27 +205,25 @@ const TabViewer: React.FC<TabViewerProps> = ({
         case '6': case '7': case '8': case '9': {
           e.preventDefault();
           
-          const newInput = currentFretInput + e.key;
+          // Store the current state before modifying it
+          const wasEditingLoadedNote = isEditingLoadedNote;
+          const wasEmpty = currentFretInput === '';
+          
+          // If we're editing a loaded note and this is the first keystroke, replace the value
+          const newInput = wasEditingLoadedNote ? e.key : currentFretInput + e.key;
           const potentialFret = parseInt(newInput);
           
           // Only allow up to 2 digits and frets up to 24
           if (newInput.length <= 2 && potentialFret <= 24) {
             setCurrentFretInput(newInput);
+            setIsEditingLoadedNote(false); // Clear the flag since we've started editing
             
-            // If this is the first digit, create a new note
-            if (currentFretInput === '') {
-              onAddNote(potentialFret, selectedDuration, 'note');
-              // Play preview sound for the new note
-              if (onPlayPreviewNote) {
-                onPlayPreviewNote(potentialFret, currentPosition.stringIndex);
-              }
-            } else {
-              // Update existing note by calling onAddNote again (it will replace the note at current position)
-              onAddNote(potentialFret, selectedDuration, 'note');
-              // Play preview sound for the updated note
-              if (onPlayPreviewNote) {
-                onPlayPreviewNote(potentialFret, currentPosition.stringIndex);
-              }
+            // Always create/update the note
+            onAddNote(potentialFret, selectedDuration, 'note');
+            
+            // Play preview sound for the note
+            if (onPlayPreviewNote) {
+              onPlayPreviewNote(potentialFret, currentPosition.stringIndex);
             }
           }
           break;
@@ -237,11 +247,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
         case 'Escape':
           e.preventDefault();
           setCurrentFretInput('');
+          setIsEditingLoadedNote(false); // Clear editing flag
           break;
         case 'r':
           e.preventDefault();
           onAddNote(null, selectedDuration, 'rest');
           setCurrentFretInput('');
+          setIsEditingLoadedNote(false); // Clear editing flag
           break;
         case 't':
         case 'T':
@@ -256,7 +268,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDuration, selectedNoteType, currentFretInput, onAddNote, onMoveCursor, onRemoveNote]);
+  }, [selectedDuration, selectedNoteType, currentFretInput, isEditingLoadedNote, onAddNote, onMoveCursor, onRemoveNote]);
 
   // Zoom event handlers
   useEffect(() => {
@@ -451,6 +463,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
     // Clear input when clicking to new position (unless shift-clicking for ties)
     if (!e.shiftKey) {
       setCurrentFretInput('');
+      setIsEditingLoadedNote(false); // Clear editing flag when clicking
     }
     
     // Focus the SVG element so keyboard input works after mouse click
