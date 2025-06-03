@@ -371,12 +371,14 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (notesAtSlot.length > 0) {
         const noteAtSlot = notesAtSlot[0];
         if (noteAtSlot.startSlot === slot) {
-          // Check if this note has a visual offset
-          const hasMeasureLine = customMeasureLines.some(line => 
-            line.noteAtSlot?.timeSlot === noteAtSlot.startSlot && 
-            line.noteAtSlot?.stringIndex === noteAtSlot.stringIndex
-          );
-          const visualOffset = hasMeasureLine ? slotWidth * 0.5 : 0;
+          // Calculate visual offset for pickup measure
+          let visualOffset = 0;
+          if (customMeasureLines.length > 0) {
+            const measureLine = customMeasureLines[0]; // Only one measure line allowed
+            if (noteAtSlot.startSlot >= measureLine.slot) {
+              visualOffset = slotWidth * 0.5; // Half a slot width offset for pickup measure visual effect
+            }
+          }
           
           // Check if click is close to the note position (including visual offset)
           const noteX = getSlotX(slot, leftMargin, slotWidth) + visualOffset;
@@ -582,14 +584,16 @@ const TabViewer: React.FC<TabViewerProps> = ({
           {/* Notes and rests - iterate through all slots */}
           {tabData.map((cell, slotIndex) => {
             return cell.notes.map((note, noteIndex) => {
-              // Check if this note has a measure line placed on it
-              const hasMeasureLine = customMeasureLines.some(line => 
-                line.noteAtSlot?.timeSlot === note.startSlot && 
-                line.noteAtSlot?.stringIndex === note.stringIndex
-              );
+              // Calculate visual offset for pickup measure
+              let visualOffset = 0;
               
-              // Apply visual offset if there's a measure line on this note
-              const visualOffset = hasMeasureLine ? slotWidth * 0.5 : 0; // Half a slot width offset
+              // If there's a custom measure line, apply offset to notes at the measure line position and after
+              if (customMeasureLines.length > 0) {
+                const measureLine = customMeasureLines[0]; // Only one measure line allowed
+                if (note.startSlot >= measureLine.slot) {
+                  visualOffset = slotWidth * 0.5; // Half a slot width offset for pickup measure visual effect
+                }
+              }
               
               const x = getSlotX(slotIndex, leftMargin, slotWidth) + visualOffset;
               const y = getStringY(note.stringIndex);

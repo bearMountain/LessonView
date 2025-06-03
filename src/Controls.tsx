@@ -458,8 +458,13 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
           
           // Main playback phase - check if we've reached the end
           if (tabCursor >= tabData.length) {
-            // Don't process any more notes, but keep the transport running
-            // The note completion callbacks will handle stopping when the last note finishes
+            // Tab has run out of notes - immediately complete playback
+            console.log('🏁 Tab completed, finishing playback...');
+            Tone.Transport.schedule(() => {
+              stopPlayback();
+              // Notify that playback completed naturally
+              onPlaybackComplete?.();
+            }, "+0.1");
             return;
           }
           

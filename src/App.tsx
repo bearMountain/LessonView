@@ -874,6 +874,7 @@ function AppContent() {
     }
     
     // Create new measure line at the specified slot (start of first full measure)
+    // The measure line goes at the exact slot where the note was clicked
     const newMeasureLine: CustomMeasureLine = {
       slot,
       measureNumber: 1,
