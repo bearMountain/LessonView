@@ -242,8 +242,8 @@ export const getPickupBeats = (customMeasureLines: CustomMeasureLine[], timeSign
     return 0; // No pickup measure
   }
   
-  // Get the first measure line
-  const firstMeasureLine = customMeasureLines.find(line => line.measureNumber === 1);
+  // Get the first (and only) measure line
+  const firstMeasureLine = customMeasureLines[0];
   if (!firstMeasureLine) {
     return 0;
   }
@@ -252,12 +252,13 @@ export const getPickupBeats = (customMeasureLines: CustomMeasureLine[], timeSign
   const beatsPerMeasure = numerator || 4;
   const slotsPerBeat = 4; // 4 sixteenth notes per beat
   
-  // Calculate how many beats from the start of the measure to the first measure line
-  const slotsFromMeasureStart = firstMeasureLine.slot % (beatsPerMeasure * slotsPerBeat);
-  const beatsFromMeasureStart = slotsFromMeasureStart / slotsPerBeat;
+  // Calculate how many beats the pickup measure contains
+  // The pickup measure goes from slot 0 to the measure line slot
+  const pickupSlots = firstMeasureLine.slot;
+  const pickupBeats = Math.ceil(pickupSlots / slotsPerBeat);
   
-  // Pickup beats are the remaining beats in the measure
-  return beatsPerMeasure - beatsFromMeasureStart;
+  // Count-in beats are the remaining beats to complete a full measure
+  return Math.max(0, beatsPerMeasure - pickupBeats);
 };
 
 // Helper function to get the longest duration at a time position

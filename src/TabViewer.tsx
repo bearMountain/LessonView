@@ -9,7 +9,7 @@ interface TabViewerProps {
   onAddNote: (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => void;
   onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
-  onCursorClick: (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => void;
+  onCursorClick: (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   selectedDuration: NoteDuration;
   selectedNoteType: NoteType;
@@ -324,6 +324,20 @@ const TabViewer: React.FC<TabViewerProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    // Check if we clicked on a measure line (only relevant in measure mode)
+    let clickedOnMeasureLine = false;
+    if (currentToolMode === 'measureLine') {
+      const measureLineClickTolerance = 10; // pixels
+      
+      for (const measureLine of customMeasureLines) {
+        const measureLineX = getMeasureLineX(measureLine.slot, leftMargin, slotWidth);
+        if (Math.abs(x - measureLineX) <= measureLineClickTolerance) {
+          clickedOnMeasureLine = true;
+          break;
+        }
+      }
+    }
+    
     // Determine which string was clicked
     let closestStringIndex = 2; // Default to Hi D
     let minDistance = Infinity;
@@ -340,6 +354,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
     // Determine time slot by converting X position
     const relativeX = x - leftMargin - slotWidth; // Account for the padding in getSlotX
     const clickedTimeSlot = Math.max(0, Math.round(relativeX / slotWidth));
+    
+    // If we clicked on a measure line, handle that first
+    if (clickedOnMeasureLine) {
+      onCursorClick(clickedTimeSlot, closestStringIndex, e.shiftKey, true);
+      svgRef.current.focus();
+      return;
+    }
     
     // First, check if we clicked directly on an existing note (within a reasonable radius)
     let clickedOnExistingNote = false;
@@ -370,19 +391,19 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (existingIndex >= 0) {
         // Deselect if already selected
         if (selectedNotes) {
-          onCursorClick(noteTimeSlot, closestStringIndex, true); // This will trigger handleNoteSelection with updated array
+          onCursorClick(noteTimeSlot, closestStringIndex, true, false); // This will trigger handleNoteSelection with updated array
         }
       } else {
         // Select note (max 2 notes for tie)
         if (selectedNotes) {
           if (selectedNotes.length >= 2) {
             // Replace first with second, add new
-            onCursorClick(noteTimeSlot, closestStringIndex, true); // This will update selection
+            onCursorClick(noteTimeSlot, closestStringIndex, true, false); // This will update selection
           } else {
-            onCursorClick(noteTimeSlot, closestStringIndex, true); // This will add to selection
+            onCursorClick(noteTimeSlot, closestStringIndex, true, false); // This will add to selection
           }
         } else {
-          onCursorClick(noteTimeSlot, closestStringIndex, true); // First selection
+          onCursorClick(noteTimeSlot, closestStringIndex, true, false); // First selection
         }
       }
       
@@ -395,7 +416,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
     // Normal click behavior (move cursor only, no highlighting)
     if (clickedOnExistingNote) {
       // Move cursor to the clicked note
-      onCursorClick(noteTimeSlot, closestStringIndex, false);
+      onCursorClick(noteTimeSlot, closestStringIndex, false, false);
     } else {
       // If we didn't click on an existing note, use smart positioning
       let finalTimeSlot = clickedTimeSlot;
@@ -424,7 +445,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
         finalTimeSlot = mostRecentNoteSlot + noteDurationSlots;
       }
       
-      onCursorClick(finalTimeSlot, closestStringIndex, false);
+      onCursorClick(finalTimeSlot, closestStringIndex, false, false);
     }
     
     // Clear input when clicking to new position (unless shift-clicking for ties)

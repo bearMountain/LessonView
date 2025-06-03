@@ -176,7 +176,11 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
           </button>
           <button 
             className={`toolbar-button ${currentToolMode === 'measureLine' ? 'active' : ''}`}
-            title="Measure Line Tool - Click after a note to place a measure line (for pickup measures)"
+            title={
+              currentToolMode === 'measureLine' 
+                ? "Click on a note to make it the first note of the first full measure, or click on an existing measure line to delete it"
+                : "Measure Line Tool - Click to add a pickup measure"
+            }
             onClick={() => onToolModeChange(currentToolMode === 'measureLine' ? 'note' : 'measureLine')}
           >
             <span className="toolbar-button__icon">

@@ -721,29 +721,25 @@ function AppContent() {
   };
 
   // Handle cursor click (for manual positioning)
-  const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
-    // Handle measure line placement
+  const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => {
+    // Handle measure line placement or deletion
     if (currentToolMode === 'measureLine') {
-      // Find the slot where the measure line should be placed
-      // Look for the most recent note and place the line after its duration
-      let measureLineSlot = timeSlot;
-      
-      // Search backwards to find the most recent note
-      for (let slot = timeSlot; slot >= 0; slot--) {
-        for (let str = 0; str < 3; str++) { // Check all strings
-          const notesAtSlot = getNotesAtSlot(tabData, slot, str);
-          if (notesAtSlot.length > 0) {
-            const note = notesAtSlot[0];
-            if (note.startSlot === slot) { // Note starts at this slot
-              const noteEndSlot = slot + getNoteDurationSlots(note.duration, note.isDotted);
-              measureLineSlot = Math.max(measureLineSlot, noteEndSlot);
-              break;
-            }
-          }
-        }
+      // If clicked on an existing measure line, delete it
+      if (clickedOnMeasureLine) {
+        deleteMeasureLine();
+        return;
       }
       
-      addMeasureLine(measureLineSlot);
+      // Check if we clicked on a note - if so, place measure line at that note's start
+      const notesAtPosition = getNotesAtSlot(tabData, timeSlot, stringIndex);
+      if (notesAtPosition.length > 0) {
+        const note = notesAtPosition[0];
+        // Place measure line at the start of this note (making it the first note of the first full measure)
+        addMeasureLine(note.startSlot);
+        return;
+      }
+      
+      // If we didn't click on a note or measure line, do nothing in measure mode
       return;
     }
     
@@ -865,27 +861,29 @@ function AppContent() {
 
   // Add a measure line at the specified slot
   const addMeasureLine = (slot: number) => {
-    // Find the highest existing measure number
-    const maxMeasureNumber = customMeasureLines.reduce((max, line) => Math.max(max, line.measureNumber), 0);
+    // Only allow one measure line
+    if (customMeasureLines.length > 0) {
+      console.log('Only one measure line is allowed');
+      return;
+    }
     
-    // Create new measure line
+    // Create new measure line at the specified slot (start of first full measure)
     const newMeasureLine: CustomMeasureLine = {
       slot,
-      measureNumber: maxMeasureNumber + 1
+      measureNumber: 1
     };
     
-    // Add to custom measure lines and sort by slot
-    const newMeasureLines = [...customMeasureLines, newMeasureLine].sort((a, b) => a.slot - b.slot);
-    
-    // Renumber measure lines sequentially
-    const renumberedLines = newMeasureLines.map((line, index) => ({
-      ...line,
-      measureNumber: index + 1
-    }));
-    
-    setCustomMeasureLines(renumberedLines);
+    setCustomMeasureLines([newMeasureLine]);
     
     // Switch back to note tool after placing measure line
+    setCurrentToolMode('note');
+  };
+
+  // Delete the measure line
+  const deleteMeasureLine = () => {
+    setCustomMeasureLines([]);
+    
+    // Switch back to note tool after deleting measure line
     setCurrentToolMode('note');
   };
 
