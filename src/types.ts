@@ -108,8 +108,8 @@ export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine
     }
   }
   
-  // Apply additional visual spacing for intelligent measure placement
-  visualOffset += getIntelligentVisualOffset(note.startSlot);
+  // Apply additional visual spacing for intelligent measure placement (convert slot units to pixels)
+  visualOffset += getIntelligentVisualOffset(note.startSlot) * slotWidth;
   
   return getSlotX(note.startSlot, leftMargin, slotWidth) + visualOffset;
 };
@@ -127,21 +127,21 @@ export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasu
     }
   }
   
-  // Apply additional visual spacing for intelligent measure placement
-  visualOffset += getIntelligentVisualOffset(timeSlot);
+  // Apply additional visual spacing for intelligent measure placement (convert slot units to pixels)
+  visualOffset += getIntelligentVisualOffset(timeSlot) * slotWidth;
   
   return getSlotX(timeSlot, leftMargin, slotWidth) + visualOffset;
 };
 
-// Calculate intelligent visual offset for a slot (for eighth and sixteenth note spacing)
+// Calculate intelligent visual offset for a slot (returns offset in slot units, will be multiplied by slotWidth)
 export const getIntelligentVisualOffset = (timeSlot: number): number => {
   try {
     const manager = VisualOffsetManager.getInstance();
     const offset = manager.getOffset(timeSlot);
     if (offset > 0) {
-      console.log(`🎵 getIntelligentVisualOffset(${timeSlot}) = ${offset}`);
+      console.log(`🎵 getIntelligentVisualOffset(${timeSlot}) = ${offset} slot units`);
     }
-    return offset;
+    return offset; // Return in slot units (1 = 1 slot width)
   } catch (error) {
     // Fallback to 0 if there's any issue
     console.warn('Unable to get intelligent visual offset:', error);
@@ -280,8 +280,17 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   if (customMeasureLines.length === 0) {
     // Use intelligent measure placement for auto-generated boundaries
     try {
+      console.log('🎵 getCustomMeasureBoundaries: Using intelligent placement, tabData length:', tabData.length);
       const placement = new IntelligentMeasurePlacement();
-      return placement.calculateMeasureBoundaries(tabData, customMeasureLines);
+      const boundaries = placement.calculateMeasureBoundaries(tabData, customMeasureLines);
+      console.log('🎵 getCustomMeasureBoundaries: Intelligent boundaries calculated:', boundaries);
+      
+      // Apply visual offsets from intelligent placement
+      const visualOffsetManager = VisualOffsetManager.getInstance();
+      visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+      console.log('🎵 getCustomMeasureBoundaries: Visual offsets updated');
+      
+      return boundaries;
     } catch (error) {
       console.warn('Unable to use intelligent measure placement, falling back to simple boundaries:', error);
       return getIntelligentMeasureBoundaries(tabData);
@@ -297,6 +306,17 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   sortedLines.forEach(line => {
     boundaries.push(line.slot);
   });
+  
+  // IMPORTANT: Apply intelligent visual offsets even for custom measure lines
+  // Custom measure lines may be auto-generated and need intelligent spacing
+  try {
+    console.log('🎵 getCustomMeasureBoundaries: Applying intelligent visual offsets for custom measure lines');
+    const visualOffsetManager = VisualOffsetManager.getInstance();
+    visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+    console.log('🎵 getCustomMeasureBoundaries: Visual offsets applied for custom measures');
+  } catch (error) {
+    console.warn('Unable to apply intelligent visual offsets for custom measure lines:', error);
+  }
   
   // Add intelligent boundaries after the last custom line
   const lastCustomSlot = sortedLines[sortedLines.length - 1]?.slot || 0;

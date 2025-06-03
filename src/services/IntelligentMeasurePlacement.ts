@@ -152,7 +152,7 @@ export class MeasurePlacementEngine {
 
     const visualAdjustments = visualAdjustment > 0 ? [{
       fromSlot: measureLineSlot,
-      visualOffset: visualAdjustment
+      visualOffset: visualAdjustment // This should be in slot units (1 = 1 slot width)
     }] : [];
 
     return {

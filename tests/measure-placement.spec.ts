@@ -78,8 +78,8 @@ test.describe('Intelligent Measure Placement', () => {
     // Wait for measure lines to be processed
     await page.waitForTimeout(3000);
 
-    // Take a screenshot before checking
-    await page.screenshot({ path: 'tests/screenshots/before-checks.png', fullPage: true });
+    // Skip screenshots for now to avoid hanging
+    // await page.screenshot({ path: 'tests/screenshots/before-checks.png', fullPage: true });
 
     // Check that measure lines exist in the DOM  
     const measureLines = page.locator('line.measure-line');
@@ -186,16 +186,31 @@ test.describe('Intelligent Measure Placement', () => {
         const expectedSlotSpacing = (noteAfter.x - noteBefore.x) / (noteAfter.slot - noteBefore.slot);
         console.log(`  Expected slot spacing: ${expectedSlotSpacing.toFixed(1)}px per slot`);
         
-        const expectedNoteAfterX = measureX + expectedSlotSpacing;
-        const actualOffset = noteAfter.x - expectedNoteAfterX;
-        console.log(`  Expected note after X: ${expectedNoteAfterX.toFixed(1)}`);
+        // For intelligent measure placement, notes after the measure line should be shifted by exactly 1 slot
+        const expectedNoteAfterX = measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing + expectedSlotSpacing; // +1 slot shift
+        const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing); // offset from normal position
+        console.log(`  Expected note after X (with 1-slot shift): ${expectedNoteAfterX.toFixed(1)}`);
         console.log(`  Actual note after X: ${noteAfter.x.toFixed(1)}`);
-        console.log(`  Visual offset applied: ${actualOffset.toFixed(1)}px`);
+        console.log(`  Visual offset applied: ${actualOffset.toFixed(1)}px (should be ${expectedSlotSpacing.toFixed(1)}px for 1-slot shift)`);
         
-        if (Math.abs(actualOffset) > expectedSlotSpacing * 0.2) {
-          console.log('✅ Significant visual offset detected - intelligent spacing working');
+        // Check if the offset is exactly 1 slot width (within small tolerance)
+        const tolerance = expectedSlotSpacing * 0.1; // 10% tolerance
+        const desiredOffset = expectedSlotSpacing; // Exactly 1 slot width
+        
+        if (Math.abs(actualOffset - desiredOffset) <= tolerance) {
+          console.log('✅ Correct 1-slot shift detected - intelligent spacing working perfectly');
+        } else if (actualOffset > desiredOffset + tolerance) {
+          console.log(`❌ Too much offset: ${actualOffset.toFixed(1)}px vs expected ${desiredOffset.toFixed(1)}px - notes shifted too far`);
+        } else if (actualOffset < desiredOffset - tolerance) {
+          console.log(`❌ Too little offset: ${actualOffset.toFixed(1)}px vs expected ${desiredOffset.toFixed(1)}px - notes not shifted enough`);
         } else {
-          console.log('❌ No significant visual offset - may need debugging');
+          console.log(`⚠️ Offset close but not exact: ${actualOffset.toFixed(1)}px vs expected ${desiredOffset.toFixed(1)}px`);
+        }
+        
+        // Assertion: The offset should be exactly 1 slot width
+        const offsetIsCorrect = Math.abs(actualOffset - desiredOffset) <= tolerance;
+        if (!offsetIsCorrect) {
+          console.log(`💥 TEST SHOULD FAIL: Expected 1-slot shift (${desiredOffset.toFixed(1)}px) but got ${actualOffset.toFixed(1)}px`);
         }
       }
     }
@@ -230,10 +245,10 @@ test.describe('Intelligent Measure Placement', () => {
       console.log('❌ Not enough notes found to trigger measure boundaries');
     }
 
-    // Take a final screenshot
-    await page.screenshot({ path: 'tests/screenshots/eighth-note-measure-placement.png', fullPage: true });
+    // Skip final screenshot to avoid hanging
+    // await page.screenshot({ path: 'tests/screenshots/eighth-note-measure-placement.png', fullPage: true });
     
-    console.log('✅ Test completed - screenshots saved');
+    console.log('✅ Test completed');
     
     // Basic assertions
     expect(noteCount).toBeGreaterThan(5); // Should have added some notes
@@ -241,6 +256,28 @@ test.describe('Intelligent Measure Placement', () => {
     // If we have enough notes for measure boundaries, they should exist
     if (noteCount >= 8) {
       expect(measureLineCount).toBeGreaterThan(0);
+      
+      // NEW: Assert that notes after measure lines are shifted by exactly 1 slot
+      if (visualPositions.length > 0) {
+        const measureLineSlots = visualPositions.filter(p => p.type === 'measure').map(p => p.slot);
+        if (measureLineSlots.length > 0) {
+          const measureSlot = measureLineSlots[0];
+          const measureX = visualPositions.find(p => p.slot === measureSlot && p.type === 'measure')?.x;
+          
+          const noteBefore = visualPositions.filter(p => p.type === 'note' && p.slot < measureSlot).pop();
+          const noteAfter = visualPositions.find(p => p.type === 'note' && p.slot > measureSlot);
+          
+          if (noteBefore && noteAfter && measureX !== undefined) {
+            const expectedSlotSpacing = (noteAfter.x - noteBefore.x) / (noteAfter.slot - noteBefore.slot);
+            const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing);
+            const desiredOffset = expectedSlotSpacing; // Exactly 1 slot width
+            const tolerance = expectedSlotSpacing * 0.1; // 10% tolerance
+            
+            // This assertion should FAIL until we fix the visual offset calculation
+            expect(Math.abs(actualOffset - desiredOffset)).toBeLessThanOrEqual(tolerance);
+          }
+        }
+      }
     }
   });
 
@@ -309,10 +346,7 @@ test.describe('Intelligent Measure Placement', () => {
       console.log(`Note ${i}: slot=${slot}, string=${string}`);
     }
 
-    // Check console messages
-    console.log('\n=== All console messages ===');
-    consoleMessages.forEach((msg, i) => console.log(`${i}: ${msg}`));
-
-    await page.screenshot({ path: 'tests/screenshots/debug-test.png', fullPage: true });
+    // Skip the screenshot for now to avoid hanging
+    // await page.screenshot({ path: 'tests/screenshots/debug-test.png', fullPage: true });
   });
 }); 

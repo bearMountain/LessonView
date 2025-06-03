@@ -123,7 +123,7 @@ function AppContent() {
   }, [tabData, tempo, timeSignature, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio]);
 
   // Update visual offsets when tab data or measure lines change
-  // TODO: Re-enable once infinite loop is identified
+  // TODO: Disabled due to infinite loop - the intelligent boundaries are calculated elsewhere
   // useEffect(() => {
   //   // Only update if there's actual data to process
   //   if (tabData.length === 0 && customMeasureLines.length === 0) {
