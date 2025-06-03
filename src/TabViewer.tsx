@@ -568,8 +568,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
             const topY = getStringY(2) - 10; // Hi D
             const bottomY = getStringY(0) + 10; // Low D
             
-            // Check if this is a custom measure line
-            const isCustomMeasureLine = customMeasureLines.some(line => line.slot === slotPosition);
+            // Check if this is a custom measure line (but not the pickup measure boundary at slot 0)
+            const isCustomMeasureLine = customMeasureLines.some(line => line.slot === slotPosition) && slotPosition !== 0;
             
             return (
               <line

@@ -261,6 +261,12 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   
   const boundaries: number[] = [];
   
+  // Add a measure line at slot 0 to mark the beginning of the pickup measure
+  // This gives the pickup measure the same visual treatment as regular measures
+  if (sortedLines.length > 0 && sortedLines[0].slot > 0) {
+    boundaries.push(0);
+  }
+  
   // Add all custom measure lines
   sortedLines.forEach(line => {
     boundaries.push(line.slot);
