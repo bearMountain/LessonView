@@ -5,7 +5,7 @@
 This document defines the behavior for automatic measure line placement between pairs of notes. There are two stages to the process:
 
 1. **Find the placement**: Determine where the measure line goes between two notes (mathematical, based on time signature and note durations)
-2. **Add line and adjust**: Insert the measure line and move the second note (and all subsequent notes) as needed to maintain proper visual spacing
+2. **Add line and adjust**: Insert the measure line and move the second note (and all subsequent notes) as needed to maintain proper visual spacing. These visual spacing adjustments do not affect the playback spacing.
 
 ## Notation System
 
@@ -34,47 +34,47 @@ This document defines the behavior for automatic measure line placement between 
 
 #### Whole Note + Other Notes
 ```
-[W---------------W---------------] -> 
-[W---------------H-------] -> 
-[W---------------Q---] -> 
-[W---------------E-] -> 
-[W---------------S] -> 
+[W---------------W---------------] -> [W---------------W---------------]
+[W---------------H-------] -> [W---------------H-------]
+[W---------------Q---] -> [W---------------Q---]
+[W---------------E-] -> [W---------------E-]
+[W---------------S] -> [W---------------S]
 ```
 
 #### Half Note + Other Notes
 ```
-[H-------W---------------] -> 
-[H-------H-------] -> 
-[H-------Q---] -> 
-[H-------E-] -> 
-[H-------S] -> 
+[H-------W---------------] -> [H-------W---------------]
+[H-------H-------] -> [H-------H-------]
+[H-------Q---] -> [H-------Q---]
+[H-------E-] -> [H-------E-]
+[H-------S] -> [H-------S]
 ```
 
 #### Quarter Note + Other Notes
 ```
-[Q---W---------------] -> 
-[Q---H-------] -> 
-[Q---Q---] -> 
-[Q---E-] -> 
-[Q---S] -> 
+[Q---W---------------] -> [Q---W---------------]
+[Q---H-------] -> [Q---H-------]
+[Q---Q---] -> [Q---Q---]
+[Q---E-] -> [Q---E-]
+[Q---S] -> [Q---S]
 ```
 
 #### Eighth Note + Other Notes
 ```
-[E-W---------------] -> 
-[E-H-------] -> 
-[E-Q---] -> 
-[E-E-] -> 
-[E-S] -> 
+[E-W---------------] -> [E-W---------------]
+[E-H-------] -> [E-H-------]
+[E-Q---] -> [E-Q---]
+[E-E-] -> [E-E-]
+[E-S] -> [E-S]
 ```
 
 #### Sixteenth Note + Other Notes
 ```
-[SW---------------] -> 
-[SH-------] -> 
-[SQ---] -> 
-[SE-] -> 
-[SS] -> 
+[SW---------------] -> [SW---------------]
+[SH-------] -> [SH-------]
+[SQ---] -> [SQ---]
+[SE-] -> [SE-]
+[SS] -> [SS]
 ```
 
 ## Implementation Notes
@@ -93,37 +93,6 @@ Each use case above translates directly to unit tests:
 - **Performance**: Ensure fast calculation
 - **Edge Case Coverage**: Handle unusual inputs
 
-## Priority Rules
-
-### Precedence Order (Highest to Lowest)
-1. **Never split tied notes**
-2. **Preserve quarter note integrity** 
-3. **Respect strong beat positions**
-4. **Keep eighth note pairs together**
-5. **Use beat subdivision boundaries**
-6. **Maintain musical phrase integrity**
-
-### Conflict Resolution
-When multiple rules conflict, apply highest priority rule. If same priority, choose option that:
-1. Creates most balanced measures
-2. Preserves most note groupings
-3. Follows standard musical notation practices
-
 ## Implementation Notes
-
-### Visual vs. Playback
-- Some cases may require visual-only slot adjustments (marked with `*`)
-- Playback timing remains unchanged
-- Visual spacing optimized for readability
-
-### User Override
-- All automatic placements can be manually overridden
-- User placements take precedence over automatic rules
-- System remembers user preferences for similar patterns
-
-### Performance Considerations
-- Rules should execute in < 5ms for typical measures
-- Complex cases may take longer but should remain responsive
-- Cache analysis results for repeated patterns
 
 This specification serves as both documentation and test case definition, ensuring consistent and musically appropriate measure placement behavior. 
