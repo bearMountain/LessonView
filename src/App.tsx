@@ -12,6 +12,7 @@ import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
 import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
 import { AutoSave } from './services/AutoSave'
+import { VisualOffsetManager } from './services/VisualOffsetManager'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData, ToolMode, CustomMeasureLine } from './types'
 import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, getNoteDurationSlots, getPickupBeats } from './types'
@@ -120,6 +121,13 @@ function AppContent() {
       autoSaveRef.current.markDirty();
     }
   }, [tabData, tempo, timeSignature, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio]);
+
+  // Update visual offsets when tab data or measure lines change
+  useEffect(() => {
+    console.log('🎵 Updating visual offsets for intelligent measure placement');
+    const visualOffsetManager = VisualOffsetManager.getInstance();
+    visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+  }, [tabData, customMeasureLines]);
 
   // Save/Load handlers
   const handleSave = async () => {

@@ -39,9 +39,9 @@ export class MusicalContextAnalyzer {
     
     return {
       firstNoteType: firstNote?.duration || null,
-      firstNoteSlot: firstNote?.startSlot || timeSlot,
+      firstNoteSlot: firstNote?.startSlot ?? timeSlot,
       secondNoteType: secondNote?.duration || null,
-      secondNoteSlot: secondNote?.startSlot || timeSlot,
+      secondNoteSlot: secondNote?.startSlot ?? timeSlot,
       measureLinePosition: timeSlot,
       visualAdjustment: 0
     };
@@ -51,12 +51,20 @@ export class MusicalContextAnalyzer {
    * Find the note at or immediately before the given slot
    */
   private static findNoteAtOrBefore(tabData: TabData, timeSlot: number): Note | null {
+    // Look backwards from the given slot to find any active note
     for (let slot = timeSlot; slot >= 0; slot--) {
       if (slot >= tabData.length) continue;
       
+      // Check all notes that start at this slot
       for (const note of tabData[slot].notes) {
         const noteEndSlot = note.startSlot + DURATION_SLOTS[note.duration];
+        // Check if this note is active at the timeSlot
         if (note.startSlot <= timeSlot && timeSlot < noteEndSlot) {
+          return note;
+        }
+        // If we found a note that starts at or before timeSlot, but doesn't contain it,
+        // it's still the most recent note before timeSlot
+        if (note.startSlot <= timeSlot) {
           return note;
         }
       }
@@ -69,9 +77,13 @@ export class MusicalContextAnalyzer {
    */
   private static findNoteAtOrAfter(tabData: TabData, timeSlot: number): Note | null {
     for (let slot = timeSlot; slot < tabData.length; slot++) {
-      for (const note of tabData[slot].notes) {
-        if (note.startSlot >= timeSlot) {
-          return note;
+      if (tabData[slot] && tabData[slot].notes.length > 0) {
+        // Return the first note that starts at or after the timeSlot
+        const notes = tabData[slot].notes;
+        for (const note of notes) {
+          if (note.startSlot >= timeSlot) {
+            return note;
+          }
         }
       }
     }

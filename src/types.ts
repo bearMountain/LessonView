@@ -132,9 +132,17 @@ export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasu
 
 // Calculate intelligent visual offset for a slot (for eighth and sixteenth note spacing)
 export const getIntelligentVisualOffset = (timeSlot: number): number => {
-  // This will be expanded later to track visual adjustments from intelligent placement
-  // For now, return 0 to maintain existing behavior
-  return 0;
+  // Import here to avoid circular dependencies
+  try {
+    // Dynamic import to get the visual offset manager
+    const { VisualOffsetManager } = require('./services/VisualOffsetManager');
+    const manager = VisualOffsetManager.getInstance();
+    return manager.getOffset(timeSlot);
+  } catch (error) {
+    // Fallback to 0 if there's any issue
+    console.warn('Unable to get intelligent visual offset:', error);
+    return 0;
+  }
 };
 
 // Calculate X position for measure lines - should stay at the original slot position
