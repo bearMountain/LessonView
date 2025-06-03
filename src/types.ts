@@ -137,7 +137,11 @@ export const getIntelligentVisualOffset = (timeSlot: number): number => {
     // Dynamic import to get the visual offset manager
     const { VisualOffsetManager } = require('./services/VisualOffsetManager');
     const manager = VisualOffsetManager.getInstance();
-    return manager.getOffset(timeSlot);
+    const offset = manager.getOffset(timeSlot);
+    if (offset > 0) {
+      console.log(`🎵 getIntelligentVisualOffset(${timeSlot}) = ${offset}`);
+    }
+    return offset;
   } catch (error) {
     // Fallback to 0 if there's any issue
     console.warn('Unable to get intelligent visual offset:', error);
@@ -275,7 +279,15 @@ export const getMeasureBoundaries = (tabData: TabData): number[] => {
 export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines: CustomMeasureLine[]): number[] => {
   if (customMeasureLines.length === 0) {
     // Use intelligent measure placement for auto-generated boundaries
-    return getIntelligentMeasureBoundaries(tabData);
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { IntelligentMeasurePlacement } = require('./services/IntelligentMeasurePlacement');
+      const placement = new IntelligentMeasurePlacement();
+      return placement.calculateMeasureBoundaries(tabData, customMeasureLines);
+    } catch (error) {
+      console.warn('Unable to use intelligent measure placement, falling back to simple boundaries:', error);
+      return getIntelligentMeasureBoundaries(tabData);
+    }
   }
   
   // Sort custom measure lines by slot position

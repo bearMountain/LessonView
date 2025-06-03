@@ -29,6 +29,7 @@ export class VisualOffsetManager {
     
     // Get intelligent measure boundaries which include visual adjustments
     const boundaries = this.intelligentPlacement.calculateMeasureBoundaries(tabData, customMeasureLines);
+    console.log('🎵 VisualOffsetManager: Calculated boundaries:', boundaries);
     
     // For each boundary, check if it needs visual adjustments
     boundaries.forEach(boundarySlot => {
@@ -38,8 +39,11 @@ export class VisualOffsetManager {
         boundarySlot
       );
       
+      console.log(`🎵 VisualOffsetManager: Boundary ${boundarySlot} placement:`, placement);
+      
       // Apply any visual adjustments
       placement.visualAdjustments.forEach(adjustment => {
+        console.log(`🎵 VisualOffsetManager: Applying adjustment:`, adjustment);
         // Apply visual offset to all slots at or after the adjustment point
         for (let slot = adjustment.fromSlot; slot < tabData.length; slot++) {
           const currentOffset = this.visualOffsets.get(slot) || 0;
@@ -47,6 +51,8 @@ export class VisualOffsetManager {
         }
       });
     });
+    
+    console.log('🎵 VisualOffsetManager: Final offsets:', Array.from(this.visualOffsets.entries()));
   }
 
   /**
