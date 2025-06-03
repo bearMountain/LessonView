@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+after every code change, add all the changed and new files to git and commit with a message that summarizes the changes

@@ -639,61 +639,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
 
   const handleStopClick = () => stopPlayback();
 
-  return (
-    <div className="controls">
-      <h3>Playback Controls</h3>
-      
-      <div style={{ marginBottom: '1rem' }}>
-        <label>
-          Tempo: {tempo} BPM
-          <input
-            type="range"
-            min="30"
-            max="400"
-            value={tempo}
-            onChange={(e) => onTempoChange(parseInt(e.target.value))}
-            style={{ marginLeft: '10px', width: '200px' }}
-          />
-        </label>
-      </div>
-      
-      <div>
-        <button 
-          onClick={isPlaying ? handleStopClick : playTab}
-          style={{
-            padding: '12px 24px',
-            fontSize: '16px',
-            backgroundColor: isPlaying ? '#dc3545' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            marginRight: '12px'
-          }}
-        >
-          {isPlaying ? 'Stop' : `Play from position ${cursorPosition.timeSlot + 1}`}
-        </button>
-      </div>
-      
-      {isPlaying && currentTimeSlot >= 0 && (
-        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#666' }}>
-          Playing time position {currentTimeSlot + 1} of {tabData.length}
-        </div>
-      )}
-      
-      {tabData.length === 0 && (
-        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#999' }}>
-          Add some notes to the tab to enable playback
-        </div>
-      )}
-      
-      {tabData.length > 0 && (
-        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#666' }}>
-          {tabData.length} time positions, {totalNotes} total notes
-        </div>
-      )}
-    </div>
-  );
+  return null; // No UI - this component only provides the imperative API
 });
 
 export default Controls;
