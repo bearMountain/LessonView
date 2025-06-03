@@ -22,23 +22,14 @@ This document defines the behavior for automatic measure line placement between 
 - **`[...]`**: Groups a snapshot of the two notes in question
 - **`->`**: Transformation (before to after)
 
-## Two-Note Combinations
-
-### Starting Examples
-```
-[Q---Q] -> [Q--|-Q]
-[E-E] -> [E-|-E] (here an extra slot was added visually only)
-[W--------------|-*---------------] -> [W--------------|-*---------------] (here '*' applies as a wild card - i.e. applies to any type of note)
-```
-
 ### All Note Type Combinations
 
 ```
 [W--------------|-*---------------] -> [W--------------|-*---------------]
-[H-------*-------] -> [H-------*-------]
-[Q---*---] -> [Q---*---]
-[E-*-] -> [E-*-]
-[S*] -> [S*]
+[H-------*-------] -> [H------|-*-------]
+[Q---*---] -> [Q--|-*---]
+[E-*-] -> [E-|-*-]
+[S*] -> [S-|-*]
 ```
 
 **Note**: The '*' wildcard represents any note type (W, H, Q, E, or S) since the measure line placement logic depends only on the first note type, not the second.

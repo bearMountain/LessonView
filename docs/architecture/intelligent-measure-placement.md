@@ -43,9 +43,9 @@ This document outlines a comprehensive plan for implementing intelligent measure
 - **Outputs**: Musical context classification and recommendations
 
 #### 2. Measure Placement Engine
-- **Purpose**: Determine optimal measure line positions based on musical context
-- **Logic**: Apply contextual rules to find best placement points
-- **Output**: Proposed measure boundaries with confidence scores
+- **Purpose**: Determine measure line positions based on deterministic rules
+- **Logic**: Apply rules from measure-placement-use-cases.md based on note types
+- **Output**: Exact measure line placement and note positioning adjustments
 
 #### 3. Note Movement System
 - **Purpose**: Handle note splitting, moving, and regrouping around measure boundaries
@@ -53,7 +53,6 @@ This document outlines a comprehensive plan for implementing intelligent measure
   - Split notes across measure boundaries
   - Move notes to better positions
   - Maintain playback timing accuracy
-  - Preserve musical intent
 
 #### 4. Visual-Playback Mapping
 - **Purpose**: Maintain relationship between visual positions and playback timing
@@ -64,113 +63,7 @@ This document outlines a comprehensive plan for implementing intelligent measure
   - Update mechanisms when positions change
 
 ## Musical Context Classification
-
-### Note Duration Contexts
-
-#### Quarter Note Context
-- **Scenario**: Measure boundary would split between two quarter notes
-- **Strategy**: Prefer to keep quarter notes intact within measures
-- **Actions**:
-  - Move measure line to before/after quarter note
-  - Consider grouping patterns (strong/weak beats)
-  - Maintain 4/4 measure integrity
-
-#### Eighth Note Context
-- **Scenario**: Measure boundary would split between eighth notes
-- **Strategy**: Allow some flexibility in eighth note grouping
-- **Actions**:
-  - Consider beam groupings
-  - Respect beat boundaries
-  - Allow splitting of eighth note pairs if musically appropriate
-
-#### Sixteenth Note Context
-- **Scenario**: Measure boundary affects sixteenth note patterns
-- **Strategy**: Most flexible, but consider subdivision patterns
-- **Actions**:
-  - Respect beat subdivisions
-  - Consider rhythmic patterns
-  - Allow granular adjustments
-
-#### Mixed Duration Context
-- **Scenario**: Multiple note durations around boundary
-- **Strategy**: Prioritize longer notes, consider overall rhythm
-- **Actions**:
-  - Weighted decision based on note importance
-  - Consider melodic lines vs rhythmic patterns
-  - Maintain musical flow
-
-### Rhythmic Pattern Recognition
-
-#### Common Patterns
-- **Pickup patterns**: Anacrusis leading to downbeat
-- **Syncopation**: Off-beat emphasis patterns
-- **Dotted rhythms**: Extended note patterns
-- **Triplets**: Three-note groupings
-- **Tied notes**: Extended duration patterns
-
-#### Pattern-Specific Rules
-- Each pattern type has specific handling rules
-- Priority system when multiple patterns conflict
-- Fallback strategies for unrecognized patterns
-
-## Decision Matrix for Measure Placement
-
-### Context-Based Rules Grid
-
-| Current Context | Next Context | Boundary Type | Action | Priority |
-|----------------|--------------|---------------|---------|----------|
-| Quarter Note End | Quarter Note Start | Natural | Place at boundary | High |
-| Quarter Note Middle | Any | Forced Split | Move boundary or split note | Medium |
-| Eighth Note Pair | Eighth Note Pair | Beat Boundary | Place at beat | High |
-| Eighth Note Pair | Quarter Note | Mixed | Favor quarter note | Medium |
-| Sixteenth Group | Any | Subdivision | Align to beat subdivision | Low |
-| Tied Notes | Any | Across Tie | Avoid splitting tie | High |
-| Rest | Any | Natural Break | Prefer rest position | High |
-| Syncopated Pattern | Any | Pattern Break | Preserve pattern | Medium |
-
-### Conflict Resolution
-- **Priority System**: High priority rules override lower priority
-- **Musical Score**: Each option gets scored based on musical appropriateness
-- **User Override**: Allow manual override of automatic decisions
-- **Fallback**: Default to current behavior if no clear winner
-
-## Note Movement Strategies
-
-### Movement Types
-
-#### 1. Note Splitting
-- **When**: Long note spans multiple measures
-- **Process**: 
-  - Create tied notes across measure boundary
-  - Maintain total duration
-  - Preserve musical intent
-
-#### 2. Note Shifting
-- **When**: Better musical grouping possible
-- **Process**:
-  - Move note to adjacent slot
-  - Update visual position
-  - Maintain playback relationships
-
-#### 3. Rest Insertion
-- **When**: Natural pause points exist
-- **Process**:
-  - Add rests to create clear boundaries
-  - Preserve existing note timing
-  - Improve measure balance
-
-#### 4. Grouping Adjustment
-- **When**: Note patterns don't align with measures
-- **Process**:
-  - Regroup related notes
-  - Adjust visual spacing
-  - Maintain rhythmic relationships
-
-### Constraints
-- **Playback Integrity**: Never change intended musical timing
-- **User Intent**: Preserve deliberately placed notes
-- **Musical Rules**: Follow standard notation practices
-- **Performance**: Keep movement calculations efficient
+- Follow rules from measure-placement-use-cases.md
 
 ## Implementation Phases
 
@@ -180,21 +73,13 @@ This document outlines a comprehensive plan for implementing intelligent measure
 - Implement basic note movement functions
 - Build decision matrix framework
 
-### Phase 2: Intelligence
-- Add pattern recognition
-- Implement context-based rules
-- Create note movement strategies
-- Build conflict resolution system
-
-### Phase 3: Integration
+### Phase 2: Integration
 - Apply to pickup measure placement
 - Extend to auto-generated measures
-- Add user interface controls
 - Implement performance optimizations
 
 ### Phase 4: Refinement
 - User testing and feedback
-- Pattern recognition improvements
 - Performance optimization
 - Edge case handling
 
@@ -202,55 +87,20 @@ This document outlines a comprehensive plan for implementing intelligent measure
 
 ### Performance
 - **Lazy Evaluation**: Only calculate when needed
-- **Caching**: Store analysis results
 - **Incremental Updates**: Update only affected regions
-- **Background Processing**: Heavy analysis in web workers
 
 ### Data Structures
 - **Position Mapping**: Efficient visual-to-playback conversion
-- **Context Cache**: Store musical context analysis
 - **Movement History**: Track note movements for undo/redo
 - **Rule Engine**: Fast pattern matching and rule application
 
-### User Interface
-- **Visual Indicators**: Show automatic vs manual placements
-- **Override Controls**: Allow user to modify automatic decisions
-- **Preview Mode**: Show proposed changes before applying
-- **Undo/Redo**: Support for reverting automatic changes
-
 ## Success Metrics
-
-### Musical Quality
-- Measures feel "musically correct"
-- Better note groupings within measures
-- Clearer visual separation of musical phrases
-- Improved readability for musicians
 
 ### Technical Performance
 - Fast analysis and placement calculations
 - Smooth visual updates
 - Accurate playback timing
 - Minimal memory overhead
-
-### User Experience
-- Intuitive automatic behavior
-- Easy manual override when needed
-- Clear feedback about automatic decisions
-- Consistent behavior across different musical styles
-
-## Future Extensions
-
-### Advanced Features
-- **Style-Specific Rules**: Different rules for different musical genres
-- **Learning System**: Adapt to user preferences over time
-- **Collaborative Editing**: Handle multiple users editing measures
-- **Export Integration**: Ensure exported files respect measure decisions
-
-### Musical Enhancements
-- **Harmony Analysis**: Consider chord progressions in placement
-- **Melodic Analysis**: Respect melodic phrase boundaries
-- **Tempo Changes**: Handle measure placement with tempo variations
-- **Complex Time Signatures**: Support for irregular meters
 
 ## Unit Testing Strategy
 
@@ -307,41 +157,40 @@ The intelligent measure placement system requires comprehensive testing due to i
 
 ### Test Data Management
 
-#### Musical Test Cases
+#### Multi-Measure Test Tabs
 
-##### Simple Scenarios
-- **Single note types**: Quarter, eighth, sixteenth notes in isolation
-- **Basic patterns**: Simple 4/4 measures with standard rhythms
-- **Clean boundaries**: Measure lines at natural musical breaks
-- **No conflicts**: Clear optimal placement decisions
+The primary testing approach uses complete tablature pieces with multiple measures to verify proper measure line placement across various note combinations.
 
-##### Complex Scenarios  
-- **Mixed durations**: Combinations of different note lengths
-- **Syncopated rhythms**: Off-beat emphasis patterns
-- **Tied notes**: Notes spanning multiple measures
-- **Pickup measures**: Anacrusis with various note groupings
-- **Irregular patterns**: Non-standard rhythmic combinations
+##### Basic Multi-Measure Tests
+- **All Quarter Notes**: `[Q---Q---Q---Q---Q---Q---Q---Q---]` → Verify measures at 16-slot intervals
+- **All Eighth Notes**: `[E-E-E-E-E-E-E-E-E-E-E-E-E-E-E-E-]` → Verify measures respect eighth note groupings  
+- **All Sixteenth Notes**: `[SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS]` → Verify measures at beat boundaries
+- **Mixed Quarter/Eighth**: `[Q---E-E-Q---E-E-Q---E-E-Q---E-E-]` → Verify rules from use cases
+- **Whole Note Spans**: `[W---------------W---------------]` → Verify long note handling
 
-##### Edge Cases
-- **Empty measures**: No notes in affected time spans
-- **Dense notation**: Many notes in small time windows  
-- **Extreme durations**: Very long or very short notes
-- **Boundary conflicts**: Multiple equally valid placement options
-- **User overrides**: Manual placements conflicting with automatic logic
+##### Complex Pattern Tests
+- **Pickup Measure**: `[E-E-|Q---Q---Q---Q---Q---Q---Q---]` → Verify pickup + regular measures
+- **Mixed Durations**: `[H-------Q---E-E-Q---H-------E-E-]` → Verify multiple rule applications
+- **Dense Notation**: `[SSSSQ---SSSSE-E-Q---SSSSSSSSSSSS]` → Verify performance with many notes
 
-#### Test Data Sets
+##### Edge Case Tests  
+- **Empty Sections**: `[Q-------------Q-------------Q---]` → Verify spacing with gaps
+- **Very Long Notes**: `[W-------------------------------]` → Verify measure splitting
+- **Irregular Patterns**: `[Q-E-Q-E-E-Q-H-------E-E-Q-Q-E-]` → Verify complex combinations
 
-##### Generated Test Data
-- **Algorithmic patterns**: Programmatically created musical scenarios
-- **Permutation testing**: All combinations of common note patterns
-- **Stress testing**: Large volumes of notes and measures
-- **Random scenarios**: Fuzz testing with random note placements
+#### Test Validation
+Each test tab validates:
+1. **Correct measure count**: Expected number of measures generated
+2. **Proper placement**: Measure lines follow use case rules  
+3. **Visual spacing**: Notes positioned correctly after adjustments
+4. **Playback integrity**: Musical timing preserved
+5. **Performance**: Fast calculation for all test cases
 
-##### Real-World Test Data
-- **Common songs**: Popular tablature patterns
-- **Classical pieces**: Traditional musical structures
-- **User submissions**: Anonymized real user content
-- **Genre variety**: Different musical styles and conventions
+#### Test Generation
+- **Programmatic creation**: Generate test tabs covering all note type combinations
+- **Rule verification**: Each use case rule tested in multi-measure context
+- **Regression prevention**: Failed cases become permanent test tabs
+- **Performance benchmarks**: Large test tabs for speed validation
 
 ### Core Testing Areas
 
