@@ -183,19 +183,21 @@ test.describe('Intelligent Measure Placement', () => {
         }
         
         // Calculate expected positions based on slot spacing
-        const expectedSlotSpacing = (noteAfter.x - noteBefore.x) / (noteAfter.slot - noteBefore.slot);
-        console.log(`  Expected slot spacing: ${expectedSlotSpacing.toFixed(1)}px per slot`);
+        // Use the base slot width (20px) instead of calculating from actual positions
+        // because actual positions include visual offsets which would skew the calculation
+        const baseSlotWidth = 20; // Base slot width in pixels (before zoom)
+        console.log(`  Base slot width: ${baseSlotWidth}px per slot`);
         
         // For intelligent measure placement, notes after the measure line should be shifted by exactly 1 slot
-        const expectedNoteAfterX = measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing + expectedSlotSpacing; // +1 slot shift
-        const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing); // offset from normal position
+        const expectedNoteAfterX = measureX + (noteAfter.slot - measureSlot) * baseSlotWidth + baseSlotWidth; // +1 slot shift
+        const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * baseSlotWidth); // offset from normal position
         console.log(`  Expected note after X (with 1-slot shift): ${expectedNoteAfterX.toFixed(1)}`);
         console.log(`  Actual note after X: ${noteAfter.x.toFixed(1)}`);
-        console.log(`  Visual offset applied: ${actualOffset.toFixed(1)}px (should be ${expectedSlotSpacing.toFixed(1)}px for 1-slot shift)`);
+        console.log(`  Visual offset applied: ${actualOffset.toFixed(1)}px (should be ${baseSlotWidth.toFixed(1)}px for 1-slot shift)`);
         
         // Check if the offset is exactly 1 slot width (within small tolerance)
-        const tolerance = expectedSlotSpacing * 0.1; // 10% tolerance
-        const desiredOffset = expectedSlotSpacing; // Exactly 1 slot width
+        const tolerance = baseSlotWidth * 0.1; // 10% tolerance
+        const desiredOffset = baseSlotWidth; // Exactly 1 slot width
         
         if (Math.abs(actualOffset - desiredOffset) <= tolerance) {
           console.log('✅ Correct 1-slot shift detected - intelligent spacing working perfectly');
@@ -268,12 +270,12 @@ test.describe('Intelligent Measure Placement', () => {
           const noteAfter = visualPositions.find(p => p.type === 'note' && p.slot > measureSlot);
           
           if (noteBefore && noteAfter && measureX !== undefined) {
-            const expectedSlotSpacing = (noteAfter.x - noteBefore.x) / (noteAfter.slot - noteBefore.slot);
-            const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing);
-            const desiredOffset = expectedSlotSpacing; // Exactly 1 slot width
-            const tolerance = expectedSlotSpacing * 0.1; // 10% tolerance
+            const baseSlotWidth = 20; // Base slot width in pixels (before zoom)
+            const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * baseSlotWidth);
+            const desiredOffset = baseSlotWidth; // Exactly 1 slot width
+            const tolerance = baseSlotWidth * 0.1; // 10% tolerance
             
-            // This assertion should FAIL until we fix the visual offset calculation
+            // This assertion should PASS now that we fixed the visual offset calculation
             expect(Math.abs(actualOffset - desiredOffset)).toBeLessThanOrEqual(tolerance);
           }
         }

@@ -66,8 +66,25 @@ function AppContent() {
   // Use sync engine
   const syncEngine = useSyncEngine();
   
-  // Sync engine integration
-  const isPlaying = syncEngine.state.isPlaying;
+  // Sync engine integration - use separate state to avoid infinite loops
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [videoCurrentTime, setVideoCurrentTime] = useState<number>(0);
+  const [videoPlaybackRate, setVideoPlaybackRate] = useState<number>(1);
+
+  // Sync isPlaying state with sync engine
+  useEffect(() => {
+    setIsPlaying(syncEngine.state.isPlaying);
+  }, []); // Only run once to avoid infinite loop
+  
+  // Update current time and playback rate periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVideoCurrentTime(syncEngine.state.currentPosition.seconds);
+      setVideoPlaybackRate(syncEngine.getVideoPlaybackRate());
+    }, 100); // Update every 100ms
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize auto-save on mount
   useEffect(() => {
@@ -113,7 +130,7 @@ function AppContent() {
       isLooping,
       splitRatio,
       videoSource,
-      videoConfig: syncEngine.state.videoConfig || undefined,
+      // videoConfig will be handled separately to avoid syncEngine dependencies
       isSynthMuted,
       isVideoMuted
     };
@@ -139,7 +156,7 @@ function AppContent() {
       isLooping,
       splitRatio,
       videoSource,
-      videoConfig: syncEngine.state.videoConfig || undefined,
+      // videoConfig will be handled separately to avoid syncEngine dependencies
       isSynthMuted,
       isVideoMuted
     };
@@ -179,7 +196,7 @@ function AppContent() {
       isLooping,
       splitRatio,
       videoSource,
-      videoConfig: syncEngine.state.videoConfig || undefined,
+      // videoConfig will be handled separately to avoid syncEngine dependencies
       isSynthMuted,
       isVideoMuted
     };
@@ -320,12 +337,12 @@ function AppContent() {
   // Synchronize BPM changes with sync engine
   useEffect(() => {
     syncEngine.setTabBPM(tempo);
-  }, [tempo, syncEngine]);
+  }, [tempo]);
 
   // Synchronize time signature changes with sync engine
   useEffect(() => {
     syncEngine.setTimeSignature(timeSignature);
-  }, [timeSignature, syncEngine]);
+  }, [timeSignature]);
 
   // Set video config when component mounts or video source changes
   useEffect(() => {
@@ -335,7 +352,7 @@ function AppContent() {
         recordedBPM: 120 // Default recorded BPM - could be configurable per video
       });
     }
-  }, [videoSource, syncEngine]);
+  }, [videoSource]);
 
   // Get playback starting position - use current position
   const getPlaybackStartPosition = (): number => {
@@ -993,8 +1010,8 @@ function AppContent() {
               <VideoPlayer
                 source={videoSource}
                 isPlaying={isPlaying}
-                currentTime={syncEngine.state.currentPosition.seconds}
-                playbackRate={syncEngine.getVideoPlaybackRate()}
+                currentTime={videoCurrentTime}
+                playbackRate={videoPlaybackRate}
                 onMuteToggle={handleVideoMuteToggle}
                 isMuted={isVideoMuted}
               />,

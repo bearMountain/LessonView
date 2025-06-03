@@ -99,16 +99,7 @@ export const getSlotX = (timeSlot: number, leftMargin: number, slotWidth: number
 export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine[], leftMargin: number, slotWidth: number): number => {
   let visualOffset = 0;
   
-  // If there's a custom measure line, apply offset to notes at the measure line position and after
-  if (customMeasureLines.length > 0) {
-    const measureLine = customMeasureLines[0]; // Only one measure line allowed
-    if (note.startSlot >= measureLine.slot) {
-      // Use the same offset as the first note's indentation (full slotWidth)
-      visualOffset = slotWidth * 1.0; // Full slot width offset to match first note's padding
-    }
-  }
-  
-  // Apply additional visual spacing for intelligent measure placement (convert slot units to pixels)
+  // Apply visual spacing for intelligent measure placement (convert slot units to pixels)
   visualOffset += getIntelligentVisualOffset(note.startSlot) * slotWidth;
   
   return getSlotX(note.startSlot, leftMargin, slotWidth) + visualOffset;
@@ -118,16 +109,7 @@ export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine
 export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasureLine[], leftMargin: number, slotWidth: number): number => {
   let visualOffset = 0;
   
-  // If there's a custom measure line, apply offset to slots at the measure line position and after
-  if (customMeasureLines.length > 0) {
-    const measureLine = customMeasureLines[0]; // Only one measure line allowed
-    if (timeSlot >= measureLine.slot) {
-      // Use the same offset as the first note's indentation (full slotWidth)
-      visualOffset = slotWidth * 1.0; // Full slot width offset to match first note's padding
-    }
-  }
-  
-  // Apply additional visual spacing for intelligent measure placement (convert slot units to pixels)
+  // Apply visual spacing for intelligent measure placement (convert slot units to pixels)
   visualOffset += getIntelligentVisualOffset(timeSlot) * slotWidth;
   
   return getSlotX(timeSlot, leftMargin, slotWidth) + visualOffset;
@@ -138,9 +120,7 @@ export const getIntelligentVisualOffset = (timeSlot: number): number => {
   try {
     const manager = VisualOffsetManager.getInstance();
     const offset = manager.getOffset(timeSlot);
-    if (offset > 0) {
-      console.log(`🎵 getIntelligentVisualOffset(${timeSlot}) = ${offset} slot units`);
-    }
+    console.log(`🎵 getIntelligentVisualOffset(${timeSlot}) = ${offset} slot units`);
     return offset; // Return in slot units (1 = 1 slot width)
   } catch (error) {
     // Fallback to 0 if there's any issue
@@ -287,10 +267,10 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
       const boundaries = placement.calculateMeasureBoundaries(tabData, customMeasureLines);
       console.log('🎵 getCustomMeasureBoundaries: Intelligent boundaries calculated:', boundaries);
       
-      // TEMPORARILY DISABLED: Apply visual offsets from intelligent placement
-      // const visualOffsetManager = VisualOffsetManager.getInstance();
-      // visualOffsetManager.updateOffsets(tabData, customMeasureLines);
-      // console.log('🎵 getCustomMeasureBoundaries: Visual offsets updated');
+      // Apply visual offsets from intelligent placement
+      const visualOffsetManager = VisualOffsetManager.getInstance();
+      visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+      console.log('🎵 getCustomMeasureBoundaries: Visual offsets updated');
       
       return boundaries;
     } catch (error) {

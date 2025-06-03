@@ -59,7 +59,11 @@ export class VisualOffsetManager {
    * Get visual offset for a specific slot
    */
   getOffset(timeSlot: number): number {
-    return this.visualOffsets.get(timeSlot) || 0;
+    const offset = this.visualOffsets.get(timeSlot) || 0;
+    if (offset > 0) {
+      console.log(`🎵 VisualOffsetManager.getOffset(${timeSlot}) = ${offset}`);
+    }
+    return offset;
   }
 
   /**
