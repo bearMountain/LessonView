@@ -24,8 +24,8 @@ export interface ControlsRef {
 }
 
 const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature, isMuted }, ref) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTimeSlot, setCurrentTimeSlot] = useState<number>(-1);
+  const [, setIsPlaying] = useState(false);
+  const [, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<{ dispose: () => void } | null>(null);
   const synthsRef = useRef<{
     strings: Array<{
@@ -627,17 +627,12 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
     }
   };
 
-  // Count total notes for display
-  const totalNotes = tabData.reduce((count, timePos) => count + timePos.notes.length, 0);
-
   useEffect(() => {
     return () => {
       stopPlayback();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleStopClick = () => stopPlayback();
 
   return null; // No UI - this component only provides the imperative API
 });

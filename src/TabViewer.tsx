@@ -21,6 +21,8 @@ interface TabViewerProps {
   currentPlaybackTimeSlot?: number;
   selectedNotes?: Array<{ timeSlot: number; stringIndex: number }>;
   onCreateTie?: () => void;
+  isSynthMuted?: boolean;
+  onSynthMuteToggle?: () => void;
 }
 
 // String labels (reversed order - Hi D on top)
@@ -44,7 +46,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
   isPlaying,
   currentPlaybackTimeSlot,
   selectedNotes,
-  onCreateTie
+  onCreateTie,
+  isSynthMuted,
+  onSynthMuteToggle
 }) => {
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
@@ -465,7 +469,16 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
   return (
     <div className="tab-viewer">
-      <div className="tab-scroll-container" style={{ overflow: 'auto', width: '100%', height: '100%', position: 'relative' }}>
+      <div className="tab-scroll-container">
+        {onSynthMuteToggle && (
+          <button 
+            className="synth-mute-button"
+            onClick={onSynthMuteToggle}
+            title={isSynthMuted ? "Unmute Synth" : "Mute Synth"}
+          >
+            {isSynthMuted ? '🔇' : '🎵'}
+          </button>
+        )}
         <svg 
           ref={svgRef}
           width={totalWidth} 

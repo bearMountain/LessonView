@@ -609,6 +609,13 @@ function AppContent() {
             isModified={isModified}
           />
         }
+        fretboard={
+          showFretboard ? (
+            <Fretboard
+              currentlyPlaying={currentlyPlaying}
+            />
+          ) : undefined
+        }
         bottomPanel={
           <PlaybackBar
             isPlaying={isPlaying}
@@ -660,13 +667,9 @@ function AppContent() {
                   currentPlaybackTimeSlot={currentPlaybackTimeSlot}
                   selectedNotes={selectedNotes}
                   onCreateTie={handleCreateTie}
+                  isSynthMuted={isSynthMuted}
+                  onSynthMuteToggle={handleSynthMuteToggle}
                 />
-                
-                {showFretboard && (
-                  <Fretboard
-                    currentlyPlaying={currentlyPlaying}
-                  />
-                )}
                 
                 <Controls
                   ref={controlsRef}
@@ -681,15 +684,6 @@ function AppContent() {
                   timeSignature={timeSignature}
                   isMuted={isSynthMuted}
                 />
-                
-                {/* Synth Mute Button */}
-                <button 
-                  className="synth-mute-button"
-                  onClick={handleSynthMuteToggle}
-                  title={isSynthMuted ? "Unmute Synth" : "Mute Synth"}
-                >
-                  {isSynthMuted ? '🔇' : '🎵'}
-                </button>
               </div>
             ]}
           </SplitPane>
