@@ -686,16 +686,48 @@ function AppContent() {
     // Note: no need to set selection - current position automatically means selected
   };
 
-  // Remove note at current position
+  // Remove note at current position and jump to previous note
   const removeNote = () => {
     const notesToRemove = getNotesAtSlot(tabData, currentPosition.timeSlot, currentPosition.stringIndex);
     
     if (notesToRemove.length > 0) {
+      // Before removing, find the previous note to jump to
+      const currentSlot = currentPosition.timeSlot;
+      const currentString = currentPosition.stringIndex;
+      
+      // Look backwards from current position to find the previous note on any string
+      let previousNotePosition: { timeSlot: number; stringIndex: number } | null = null;
+      
+      // Search backwards through time slots
+      for (let slot = currentSlot - 1; slot >= 0; slot--) {
+        // Check all strings for notes at this slot
+        for (let stringIndex = 0; stringIndex < 3; stringIndex++) {
+          const notesAtSlot = getNotesAtSlot(tabData, slot, stringIndex);
+          if (notesAtSlot.length > 0) {
+            // Found a note that starts at this slot
+            const note = notesAtSlot[0];
+            if (note.startSlot === slot) {
+              previousNotePosition = { timeSlot: slot, stringIndex };
+              break;
+            }
+          }
+        }
+        if (previousNotePosition) break;
+      }
+      
+      // Remove the current note(s)
       let newTabData = tabData;
       notesToRemove.forEach(note => {
         newTabData = removeNoteFromGrid(newTabData, note);
       });
       setTabData(newTabData);
+      
+      // Jump to previous note if found
+      if (previousNotePosition) {
+        setCurrentPosition(previousNotePosition);
+        // Update sync engine to new position
+        syncEngine.seekToSlot(previousNotePosition.timeSlot);
+      }
     }
   };
 

@@ -4,6 +4,6 @@ globs:
 alwaysApply: false
 ---
 after every code change:
-git add -A (add all changed and new files - well structured format)
-git commit -m "descriptive message" (commit with summary)
+git add -A (add all changed and new files)
+git commit -m "descriptive message line 1" -m "line 2" (commit with formatted summary)
 git push (push to remote)
