@@ -124,16 +124,16 @@ export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasu
   return getSlotX(timeSlot, leftMargin, slotWidth) + visualOffset;
 };
 
-// Calculate X position for measure lines - should align with the visual position of the note
+// Calculate X position for measure lines - should stay at the original slot position
 export const getMeasureLineX = (timeSlot: number, leftMargin: number, slotWidth: number, customMeasureLines: CustomMeasureLine[]): number => {
-  // For pickup measure lines, the line should be placed at the exact visual position where the note appears
-  // This means we need to account for the visual offset that will be applied to the note
+  // For custom measure lines, the line should stay at the exact original slot position
+  // where the note was when clicked, not where the note gets visually shifted to
   if (customMeasureLines.length > 0) {
     const measureLine = customMeasureLines[0];
     if (measureLine.slot === timeSlot) {
-      // This is the measure line we're positioning - place it at the note's visual position
-      const noteX = getSlotX(timeSlot, leftMargin, slotWidth) + (slotWidth * 1.0); // Full offset like the note
-      return noteX - (slotWidth * 0.5); // Position line halfway to the left of the note
+      // This is the custom measure line we're positioning - place it at the original slot position
+      // Don't apply any visual offset - this marks where the note originally was
+      return getSlotX(timeSlot, leftMargin, slotWidth);
     }
   }
   
