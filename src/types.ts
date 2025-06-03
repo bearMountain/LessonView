@@ -100,11 +100,28 @@ export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine
   if (customMeasureLines.length > 0) {
     const measureLine = customMeasureLines[0]; // Only one measure line allowed
     if (note.startSlot >= measureLine.slot) {
-      visualOffset = slotWidth * 0.5; // Half a slot width offset for pickup measure visual effect
+      // Use the same offset as the first note's indentation (full slotWidth)
+      visualOffset = slotWidth * 1.0; // Full slot width offset to match first note's padding
     }
   }
   
   return getSlotX(note.startSlot, leftMargin, slotWidth) + visualOffset;
+};
+
+// Calculate visual X position for any slot position, accounting for pickup measure offset
+export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasureLine[], leftMargin: number, slotWidth: number): number => {
+  let visualOffset = 0;
+  
+  // If there's a custom measure line, apply offset to slots at the measure line position and after
+  if (customMeasureLines.length > 0) {
+    const measureLine = customMeasureLines[0]; // Only one measure line allowed
+    if (timeSlot >= measureLine.slot) {
+      // Use the same offset as the first note's indentation (full slotWidth)
+      visualOffset = slotWidth * 1.0; // Full slot width offset to match first note's padding
+    }
+  }
+  
+  return getSlotX(timeSlot, leftMargin, slotWidth) + visualOffset;
 };
 
 // Calculate X position for measure lines - should align with the visual position of the note
@@ -115,8 +132,8 @@ export const getMeasureLineX = (timeSlot: number, leftMargin: number, slotWidth:
     const measureLine = customMeasureLines[0];
     if (measureLine.slot === timeSlot) {
       // This is the measure line we're positioning - place it at the note's visual position
-      const noteX = getSlotX(timeSlot, leftMargin, slotWidth) + (slotWidth * 0.5);
-      return noteX - (slotWidth * 0.25); // Position line just to the left of the note
+      const noteX = getSlotX(timeSlot, leftMargin, slotWidth) + (slotWidth * 1.0); // Full offset like the note
+      return noteX - (slotWidth * 0.5); // Position line halfway to the left of the note
     }
   }
   

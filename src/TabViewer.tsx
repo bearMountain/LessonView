@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
 import type { Note, NoteDuration, CursorPosition, TabData, NoteType, ToolMode, CustomMeasureLine } from './types';
-import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries, getVisualNoteX } from './types';
+import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries, getVisualNoteX, getVisualSlotX } from './types';
 
 interface TabViewerProps {
   tabData: TabData;
@@ -663,19 +663,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
           {/* Selected notes highlighting (for tie mode) */}
           {selectedNotes && selectedNotes.map((selectedNote, index) => {
-            // Find the actual note to get the correct visual position
-            const notesAtPosition = getNotesAtSlot(tabData, selectedNote.timeSlot, selectedNote.stringIndex);
-            const actualNote = notesAtPosition.length > 0 ? notesAtPosition[0] : null;
-            
-            let x;
-            if (actualNote) {
-              // Use visual position for existing notes
-              x = getVisualNoteX(actualNote, customMeasureLines, leftMargin, slotWidth);
-            } else {
-              // Fallback to slot position for positions without notes
-              x = getSlotX(selectedNote.timeSlot, leftMargin, slotWidth);
-            }
-            
+            // Use getVisualSlotX for consistent positioning
+            const x = getVisualSlotX(selectedNote.timeSlot, customMeasureLines, leftMargin, slotWidth);
             const y = getStringY(selectedNote.stringIndex);
             
             return (
@@ -696,18 +685,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
           {/* Selected note for editing highlighting */}
           {selectedNoteForEditing && (
             (() => {
-              // Find the actual note to get the correct visual position
-              const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
-              const actualNote = notesAtPosition.length > 0 ? notesAtPosition[0] : null;
-              
-              let x;
-              if (actualNote) {
-                // Use visual position for existing notes
-                x = getVisualNoteX(actualNote, customMeasureLines, leftMargin, slotWidth);
-              } else {
-                // Fallback to slot position for positions without notes
-                x = getSlotX(selectedNoteForEditing.timeSlot, leftMargin, slotWidth);
-              }
+              // Use getVisualSlotX for consistent positioning
+              const x = getVisualSlotX(selectedNoteForEditing.timeSlot, customMeasureLines, leftMargin, slotWidth);
               
               return (
                 <circle

@@ -854,6 +854,10 @@ function AppContent() {
   const handlePlaybackComplete = () => {
     console.log('🏁 Playback completed naturally');
     setPausedAtTimeSlot(-1); // Clear any paused position since playback ended
+    
+    // Pause the sync engine when tab completes to ensure button state is correct
+    // This allows the video to continue playing while showing the correct UI state
+    syncEngine.pause();
   };
 
   // Handle current time slot change (playback indicator)
