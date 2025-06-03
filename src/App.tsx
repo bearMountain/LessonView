@@ -342,6 +342,7 @@ function AppContent() {
       
       // Store current position for resume
       setPausedAtTimeSlot(currentPlaybackTimeSlot);
+      console.log(`📍 Storing pause position: ${currentPlaybackTimeSlot}`);
       
       // Pause sync engine first
       syncEngine.pause();
@@ -354,12 +355,24 @@ function AppContent() {
       // We're currently paused/stopped, so play
       console.log('▶️ Starting playback...');
       
+      // Determine where to start playback
+      const startPosition = pausedAtTimeSlot >= 0 ? pausedAtTimeSlot : cursorPosition.timeSlot;
+      console.log(`📍 Starting playback from position: ${startPosition} (paused: ${pausedAtTimeSlot}, cursor: ${cursorPosition.timeSlot})`);
+      
       // Play sync engine first 
       syncEngine.play();
       
-      // Then start the Controls component
+      // Then start the Controls component from the appropriate position
       if (controlsRef.current) {
-        controlsRef.current.playTab();
+        if (pausedAtTimeSlot >= 0) {
+          // Resume from paused position
+          controlsRef.current.playFromPosition(pausedAtTimeSlot);
+          // Clear the paused position since we're now playing
+          setPausedAtTimeSlot(-1);
+        } else {
+          // Start from cursor position (fresh start)
+          controlsRef.current.playTab();
+        }
       }
     }
   };
@@ -383,6 +396,7 @@ function AppContent() {
   // Handle reset cursor to start (cmd+enter shortcut) 
   const handleResetCursor = () => {
     setCursorPosition({ timeSlot: 0, stringIndex: 2 }); // Reset to start, Hi D string
+    setPausedAtTimeSlot(-1); // Clear any paused position
     syncEngine.seekToSlot(0); // Reset sync engine time as well
   };
 
@@ -569,6 +583,12 @@ function AppContent() {
     setCurrentlyPlaying(notes);
   };
 
+  // Handle when playback naturally completes
+  const handlePlaybackComplete = () => {
+    console.log('🏁 Playback completed naturally');
+    setPausedAtTimeSlot(-1); // Clear any paused position since playback ended
+  };
+
   // Handle current time slot change (playback indicator)
   const handleCurrentTimeSlotChange = (timeSlot: number) => {
     setCurrentPlaybackTimeSlot(timeSlot);
@@ -680,6 +700,7 @@ function AppContent() {
                   onTempoChange={setTempo}
                   onPlaybackStateChange={handlePlaybackStateChange}
                   onCurrentTimeSlotChange={handleCurrentTimeSlotChange}
+                  onPlaybackComplete={handlePlaybackComplete}
                   countInEnabled={countInEnabled}
                   timeSignature={timeSignature}
                   isMuted={isSynthMuted}

@@ -12,6 +12,7 @@ interface ControlsProps {
   onPlaybackStateChange?: (isPlaying: boolean) => void;
   onCurrentTimeSlotChange?: (timeSlot: number) => void;
   onCountInStateChange?: (isCountingIn: boolean, beat?: number, totalBeats?: number) => void;
+  onPlaybackComplete?: () => void;
   countInEnabled?: boolean;
   timeSignature?: string;
   isMuted?: boolean;
@@ -20,10 +21,11 @@ interface ControlsProps {
 export interface ControlsRef {
   playPreviewNote: (fret: number, stringIndex: number) => void;
   playTab: () => void;
+  playFromPosition: (startPosition: number) => void;
   stopPlayback: (clearVisualFeedback?: boolean) => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, countInEnabled, timeSignature, isMuted }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, isMuted }, ref) => {
   const [, setIsPlaying] = useState(false);
   const [, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<{ dispose: () => void } | null>(null);
@@ -337,14 +339,19 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   useImperativeHandle(ref, () => ({
     playPreviewNote: playPreviewNote,
     playTab: playTab,
+    playFromPosition: playFromPosition,
     stopPlayback: stopPlayback,
   }));
 
   const playTab = async () => {
+    await playFromPosition(cursorPosition.timeSlot);
+  };
+
+  const playFromPosition = async (startPosition: number) => {
     if (tabData.length === 0) return;
     
     console.log('=== STARTING TRANSPORT-BASED PLAYBACK ===');
-    console.log(`Starting from cursor position: timeSlot=${cursorPosition.timeSlot}`);
+    console.log(`Starting from position: timeSlot=${startPosition}`);
     console.log(`Count-in enabled: ${countInEnabled}`);
     
     try {
@@ -371,9 +378,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       setIsPlaying(true);
       onPlaybackStateChange?.(true);
       
-      // Set initial playback indicator position to cursor location
-      setCurrentTimeSlot(cursorPosition.timeSlot);
-      onCurrentTimeSlotChange?.(cursorPosition.timeSlot);
+      // Set initial playback indicator position to start location
+      setCurrentTimeSlot(startPosition);
+      onCurrentTimeSlotChange?.(startPosition);
       
       // Parse time signature to get beats per measure
       const [numerator] = (timeSignature || '4/4').split('/').map(Number);
@@ -404,7 +411,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       
       // Track current position
       let absoluteSlot = 0; // Absolute position including count-in
-      let tabCursor = cursorPosition.timeSlot; // Position in the actual tab data
+      let tabCursor = startPosition; // Position in the actual tab data
       let countInBeat = 0;
       
       // The metronome: fires every sixteenth note
@@ -439,7 +446,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
               }
             }
             
-            // Keep the indicator at cursor position during count-in
+            // Keep the indicator at start position during count-in
             // Don't change currentTimeSlot during count-in
             
             absoluteSlot++;
@@ -501,6 +508,8 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
                     // Schedule stop in next tick to ensure clean shutdown
                     Tone.Transport.schedule(() => {
                       stopPlayback();
+                      // Notify that playback completed naturally
+                      onPlaybackComplete?.();
                     }, "+0.1");
                   }
                 });
@@ -526,13 +535,13 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       // Store the metronome ID for cleanup
       partRef.current = { dispose: () => Tone.Transport.clear(metronomeId) };
       
-      // If starting from a cursor position with count-in, we need to account for that
+      // If starting from a start position with count-in, we need to account for that
       if (countInEnabled) {
         // Start from the beginning to include count-in
         Tone.Transport.position = "0:0:0";
       } else {
-        // Jump directly to cursor position
-        const transportPosition = `0:0:${cursorPosition.timeSlot}`;
+        // Jump directly to start position
+        const transportPosition = `0:0:${startPosition}`;
         Tone.Transport.position = transportPosition;
         console.log(`📍 Set transport position to ${transportPosition}`);
       }
@@ -543,6 +552,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       Tone.Transport.scheduleOnce(() => {
         console.log('⏰ Maximum playback time reached, stopping...');
         stopPlayback();
+        onPlaybackComplete?.();
       }, `+${maxPlaybackTime}`);
       
       // Start the transport
@@ -551,7 +561,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       console.log(`✅ Transport started at ${tempo} BPM`);
       console.log('=== PLAYBACK RUNNING ===');
     } catch (error) {
-      console.error('Error in playTab:', error);
+      console.error('Error in playFromPosition:', error);
       setIsPlaying(false);
       onPlaybackStateChange?.(false);
       setCurrentTimeSlot(-1);
