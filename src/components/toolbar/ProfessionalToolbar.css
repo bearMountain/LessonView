@@ -88,6 +88,22 @@
   white-space: nowrap;
 }
 
+/* Modified save button style */
+.toolbar-button.modified {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+}
+
+.toolbar-button.modified:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.toolbar-button.modified .toolbar-button__text {
+  font-weight: 600;
+}
+
 .toolbar-separator {
   width: 1px;
   height: 24px;

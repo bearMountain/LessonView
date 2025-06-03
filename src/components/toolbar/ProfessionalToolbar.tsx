@@ -16,6 +16,12 @@ interface ProfessionalToolbarProps {
   onTimeSignatureChange: (signature: string) => void;
   tieMode: boolean;
   onTieModeChange: (enabled: boolean) => void;
+  // Save/Load functionality
+  onSave?: () => void;
+  onLoad?: () => void;
+  onNew?: () => void;
+  onSaveAs?: () => void;
+  isModified?: boolean;
 }
 
 interface ToolbarSection {
@@ -35,6 +41,11 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   onTimeSignatureChange,
   tieMode,
   onTieModeChange,
+  onSave,
+  onLoad,
+  onNew,
+  onSaveAs,
+  isModified = false,
 }) => {
   const sections: ToolbarSection[] = [
     {
@@ -42,17 +53,39 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
       title: 'File',
       component: (
         <div className="toolbar-section__content">
-          <button className="toolbar-button" title="New (Ctrl+N)">
+          <button 
+            className="toolbar-button" 
+            title="New (Ctrl+N)"
+            onClick={onNew}
+          >
             <span className="toolbar-button__icon">📄</span>
             <span className="toolbar-button__text">New</span>
           </button>
-          <button className="toolbar-button" title="Open (Ctrl+O)">
+          <button 
+            className="toolbar-button" 
+            title="Open (Ctrl+O)"
+            onClick={onLoad}
+          >
             <span className="toolbar-button__icon">📁</span>
             <span className="toolbar-button__text">Open</span>
           </button>
-          <button className="toolbar-button" title="Save (Ctrl+S)">
+          <button 
+            className={`toolbar-button ${isModified ? 'modified' : ''}`}
+            title={`Save (Ctrl+S)${isModified ? ' - Unsaved changes' : ''}`}
+            onClick={onSave}
+          >
             <span className="toolbar-button__icon">💾</span>
-            <span className="toolbar-button__text">Save</span>
+            <span className="toolbar-button__text">
+              Save{isModified ? '*' : ''}
+            </span>
+          </button>
+          <button 
+            className="toolbar-button" 
+            title="Save As... (Ctrl+Shift+S)"
+            onClick={onSaveAs}
+          >
+            <span className="toolbar-button__icon">💾</span>
+            <span className="toolbar-button__text">Save As...</span>
           </button>
         </div>
       ),

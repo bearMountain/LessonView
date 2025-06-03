@@ -9,6 +9,9 @@ import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import VideoPlayer from './components/video/VideoPlayer'
 import SplitPane from './components/layout/SplitPane'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
+import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
+import { FileManager, type AppState, type StrumstickProjectData, type ProjectMetadata } from './services/FileManager'
+import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
 import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie } from './types'
@@ -44,295 +47,319 @@ function AppContent() {
   const [isVideoMuted, setIsVideoMuted] = useState<boolean>(false);
   const [isSynthMuted, setIsSynthMuted] = useState<boolean>(false);
   
+  // Save/Load state
+  const [isModified, setIsModified] = useState<boolean>(false);
+  const [currentProjectMetadata, setCurrentProjectMetadata] = useState<Partial<ProjectMetadata>>({});
+  const [saveDialogOpen, setSaveDialogOpen] = useState<boolean>(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState<boolean>(false);
+  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState<boolean>(false);
+  
   const controlsRef = useRef<ControlsRef>(null);
+  
+  // File management services
+  const fileManagerRef = useRef<FileManager>(new FileManager());
+  const autoSaveRef = useRef<AutoSave>(new AutoSave(fileManagerRef.current));
   
   // Use sync engine
   const syncEngine = useSyncEngine();
   
   // Sync engine integration
   const isPlaying = syncEngine.state.isPlaying;
-  const currentVideoTime = syncEngine.state.currentPosition.seconds;
-  const videoPlaybackRate = syncEngine.getVideoPlaybackRate();
 
-  // Initialize video config
+  // Initialize auto-save on mount
   useEffect(() => {
-    syncEngine.setVideoConfig({
-      source: videoSource,
-      recordedBPM: 120, // TODO: Make this configurable per video
-    });
-    syncEngine.setTabBPM(tempo);
-    syncEngine.setTimeSignature(timeSignature);
-  }, [videoSource, syncEngine]);
+    console.log('🔄 Initializing auto-save service...');
+    
+    // Check for recovery data on startup
+    const recoveryInfo = autoSaveRef.current.getRecoveryInfo();
+    if (recoveryInfo.hasRecoveryData) {
+      console.log('🔄 Recovery data found, offering to restore...');
+      // TODO: Show recovery dialog
+    }
+    
+    // Start auto-save
+    autoSaveRef.current.start();
+    
+    return () => {
+      autoSaveRef.current.stop();
+    };
+  }, []);
 
-  // Sync tempo changes
+  // Auto-save on state changes
+  useEffect(() => {
+    if (isModified) {
+      const currentAppState: AppState = {
+        tabData,
+        tempo,
+        timeSignature,
+        cursorPosition,
+        selectedDuration,
+        selectedNoteType,
+        zoom,
+        showFretboard,
+        countInEnabled,
+        isLooping,
+        splitRatio,
+        videoSource,
+        videoConfig: syncEngine.state.videoConfig || undefined,
+        isSynthMuted,
+        isVideoMuted
+      };
+      
+      autoSaveRef.current.performAutoSave(currentAppState);
+    }
+  }, [tabData, tempo, timeSignature, isModified, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio, videoSource, isSynthMuted, isVideoMuted]);
+
+  // Mark as modified when tab data changes
+  useEffect(() => {
+    if (tabData.length > 0 || currentProjectMetadata.title) {
+      setIsModified(true);
+      autoSaveRef.current.markDirty();
+    }
+  }, [tabData, tempo, timeSignature, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio]);
+
+  // Save/Load handlers
+  const handleSave = async () => {
+    console.log('💾 Save button clicked');
+    
+    const currentAppState: AppState = {
+      tabData,
+      tempo,
+      timeSignature,
+      cursorPosition,
+      selectedDuration,
+      selectedNoteType,
+      zoom,
+      showFretboard,
+      countInEnabled,
+      isLooping,
+      splitRatio,
+      videoSource,
+      videoConfig: syncEngine.state.videoConfig || undefined,
+      isSynthMuted,
+      isVideoMuted
+    };
+
+    const result = await fileManagerRef.current.saveProject(currentAppState, undefined, currentProjectMetadata);
+    
+    if (result.success) {
+      console.log('✅ Project saved successfully');
+      setIsModified(false);
+      autoSaveRef.current.markClean();
+      // TODO: Show success notification
+    } else {
+      console.error('❌ Save failed:', result.error);
+      alert(`Failed to save project: ${result.error}`);
+    }
+  };
+
+  const handleSaveAs = () => {
+    console.log('💾 Save As clicked');
+    setSaveDialogOpen(true);
+  };
+
+  const handleSaveDialog = async (filename: string, metadata: Partial<ProjectMetadata>) => {
+    console.log('💾 Save dialog confirmed:', filename, metadata);
+    
+    const currentAppState: AppState = {
+      tabData,
+      tempo,
+      timeSignature,
+      cursorPosition,
+      selectedDuration,
+      selectedNoteType,
+      zoom,
+      showFretboard,
+      countInEnabled,
+      isLooping,
+      splitRatio,
+      videoSource,
+      videoConfig: syncEngine.state.videoConfig || undefined,
+      isSynthMuted,
+      isVideoMuted
+    };
+
+    const result = await fileManagerRef.current.saveProject(currentAppState, filename, metadata);
+    
+    if (result.success) {
+      console.log('✅ Project saved successfully');
+      setCurrentProjectMetadata(metadata);
+      setIsModified(false);
+      autoSaveRef.current.markClean();
+      // TODO: Show success notification
+    } else {
+      console.error('❌ Save failed:', result.error);
+      alert(`Failed to save project: ${result.error}`);
+    }
+  };
+
+  const handleLoad = () => {
+    console.log('📂 Load button clicked');
+    setLoadDialogOpen(true);
+  };
+
+  const handleLoadFile = async (file: File) => {
+    console.log('📂 Loading file:', file.name);
+    
+    const result = await fileManagerRef.current.loadProject(file);
+    
+    if (result.success && result.data) {
+      console.log('✅ Project loaded successfully');
+      
+      // Apply the loaded state
+      const appState = fileManagerRef.current.deserializeState(result.data);
+      
+      if (appState.tabData) setTabData(appState.tabData);
+      if (appState.tempo) setTempo(appState.tempo);
+      if (appState.timeSignature) setTimeSignature(appState.timeSignature);
+      if (appState.selectedDuration) setSelectedDuration(appState.selectedDuration);
+      if (appState.selectedNoteType) setSelectedNoteType(appState.selectedNoteType);
+      if (appState.zoom !== undefined) setZoom(appState.zoom);
+      if (appState.showFretboard !== undefined) setShowFretboard(appState.showFretboard);
+      if (appState.countInEnabled !== undefined) setCountInEnabled(appState.countInEnabled);
+      if (appState.isLooping !== undefined) setIsLooping(appState.isLooping);
+      if (appState.splitRatio !== undefined) setSplitRatio(appState.splitRatio);
+      if (appState.videoSource) setVideoSource(appState.videoSource);
+      if (appState.isSynthMuted !== undefined) setIsSynthMuted(appState.isSynthMuted);
+      if (appState.isVideoMuted !== undefined) setIsVideoMuted(appState.isVideoMuted);
+      
+      // Update sync engine if video config exists
+      if (appState.videoConfig) {
+        syncEngine.setVideoConfig(appState.videoConfig);
+      }
+      
+      // Reset cursor to beginning
+      setCursorPosition({ timeSlot: 0, stringIndex: 2 });
+      
+      // Update project metadata
+      setCurrentProjectMetadata(result.data.metadata);
+      setIsModified(false);
+      autoSaveRef.current.markClean();
+      
+      // TODO: Show success notification
+    } else {
+      console.error('❌ Load failed:', result.error);
+      alert(`Failed to load project: ${result.error}`);
+    }
+  };
+
+  const handleNew = () => {
+    console.log('📄 New project button clicked');
+    setNewProjectDialogOpen(true);
+  };
+
+  const handleNewProject = () => {
+    console.log('📄 Creating new project');
+    
+    // Reset to initial state
+    setTabData(initialTabData);
+    setCursorPosition({ timeSlot: 0, stringIndex: 2 });
+    setTempo(120);
+    setTimeSignature('4/4');
+    setSelectedDuration('quarter');
+    setSelectedNoteType('note');
+    setZoom(1.0);
+    setShowFretboard(true);
+    setCountInEnabled(false);
+    setIsLooping(false);
+    setSplitRatio(0.4);
+    setVideoSource('/videos/test-vid-1.mp4');
+    setIsSynthMuted(false);
+    setIsVideoMuted(false);
+    
+    // Reset project metadata
+    setCurrentProjectMetadata({});
+    setIsModified(false);
+    autoSaveRef.current.markClean();
+    
+    // Reset sync engine
+    syncEngine.seekToSlot(0);
+    
+    console.log('✅ New project created');
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 's':
+            e.preventDefault();
+            if (e.shiftKey) {
+              handleSaveAs();
+            } else {
+              handleSave();
+            }
+            break;
+          case 'o':
+            e.preventDefault();
+            handleLoad();
+            break;
+          case 'n':
+            e.preventDefault();
+            handleNew();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentProjectMetadata, tabData, tempo, timeSignature]);
+
+  // Synchronize BPM changes with sync engine
   useEffect(() => {
     syncEngine.setTabBPM(tempo);
   }, [tempo, syncEngine]);
 
-  // Sync time signature changes
+  // Synchronize time signature changes with sync engine
   useEffect(() => {
     syncEngine.setTimeSignature(timeSignature);
   }, [timeSignature, syncEngine]);
 
-  // Sync current playback position from Controls component
+  // Set video config when component mounts or video source changes
   useEffect(() => {
-    if (currentPlaybackTimeSlot >= 0) {
-      // Only update sync engine position if we're actually playing
-      // Don't update if we're paused (to maintain pause position)
-      if (isPlaying && pausedAtTimeSlot < 0) {
-        syncEngine.updatePosition(currentPlaybackTimeSlot);
-      }
+    if (videoSource) {
+      syncEngine.setVideoConfig({
+        source: videoSource,
+        recordedBPM: 120 // Default recorded BPM - could be configurable per video
+      });
     }
-  }, [currentPlaybackTimeSlot, syncEngine, isPlaying, pausedAtTimeSlot]);
+  }, [videoSource, syncEngine]);
 
-  const handleAddNote = (fret: number | null, duration: NoteDuration = selectedDuration, type: NoteType = selectedNoteType) => {
-    setTabData(prevTabData => {
-      // Place note directly at cursor position (user controls placement)
-      const startSlot = cursorPosition.timeSlot;
-      
-      // Create new note
-      const newNote: Note = {
-        type,
-        fret,
-        duration,
-        stringIndex: cursorPosition.stringIndex,
-        startSlot: startSlot
-      };
-
-      // Add note to grid (this will replace any existing note at this position)
-      return addNoteToGrid(prevTabData, newNote);
-    });
-  };
-
-  const handleRemoveNote = () => {
-    setTabData(prevTabData => {
-      // Find note at current cursor position
-      const notesAtCursor = getNotesAtSlot(prevTabData, cursorPosition.timeSlot, cursorPosition.stringIndex);
-      
-      if (notesAtCursor.length > 0) {
-        // Remove the first note found at this position
-        const noteToRemove = notesAtCursor[0];
-        return removeNoteFromGrid(prevTabData, noteToRemove);
-      }
-      
-      return prevTabData; // No note to remove
-    });
-  };
-
-  const moveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
-    setCursorPosition(prev => {
-      const newPosition = { ...prev };
-      
-      switch (direction) {
-        case 'left':
-          newPosition.timeSlot = Math.max(0, prev.timeSlot - 1);
-          break;
-        case 'right':
-          newPosition.timeSlot = prev.timeSlot + 1; // No upper limit - grid can grow
-          break;
-        case 'up':
-          newPosition.stringIndex = Math.min(2, prev.stringIndex + 1); // Hi D is index 2
-          break;
-        case 'down':
-          newPosition.stringIndex = Math.max(0, prev.stringIndex - 1); // Low D is index 0
-          break;
-      }
-      
-      return newPosition;
-    });
-  };
-
-  const handleNotesPlaying = (notes: { fret: number; stringIndex: number }[]) => {
-    setCurrentlyPlaying(notes);
-  };
-
-  const handleTempoChange = (newTempo: number) => {
-    setTempo(newTempo);
-    // Sync engine will automatically recalculate video playback rate
-  };
-
+  // Handle play/pause button press (space bar or transport controls)
   const handlePlayPause = () => {
-    console.log(`🎮 handlePlayPause called - current isPlaying: ${isPlaying}, pausedAtTimeSlot: ${pausedAtTimeSlot}`);
+    console.log(`🎮 handlePlayPause called - current isPlaying: ${isPlaying}`);
     
     if (isPlaying) {
-      // Pause both tab and video at current positions
-      const currentSlot = currentPlaybackTimeSlot >= 0 ? currentPlaybackTimeSlot : syncEngine.state.currentPosition.timeSlot;
+      // We're currently playing, so pause
+      console.log('⏸️ Pausing playback...');
       
-      console.log(`⏸️ PAUSING - currentPlaybackTimeSlot: ${currentPlaybackTimeSlot}, syncEngine slot: ${syncEngine.state.currentPosition.timeSlot}, using: ${currentSlot}`);
+      // Store current position for resume
+      setPausedAtTimeSlot(currentPlaybackTimeSlot);
       
-      // Store where we paused
-      setPausedAtTimeSlot(currentSlot);
-      
-      // First pause the sync engine to stop video
+      // Pause sync engine first
       syncEngine.pause();
       
-      // Then stop audio playback but preserve visual feedback (don't clear finger circles)
-      controlsRef.current?.stopPlayback(false); // Pass false to preserve visual feedback
-      
-      // Keep the playback indicator visible at the paused position
-      setCurrentPlaybackTimeSlot(currentSlot);
-      
-      console.log(`⏸️ Paused at timeSlot: ${currentSlot}`);
+      // Then stop the Controls component (with clearVisualFeedback=false to preserve visual state)
+      if (controlsRef.current) {
+        controlsRef.current.stopPlayback(false); // false = don't clear visual feedback, just pause
+      }
     } else {
-      // Resume from paused position or cursor position
-      const resumeFromSlot = pausedAtTimeSlot >= 0 ? pausedAtTimeSlot : cursorPosition.timeSlot;
+      // We're currently paused/stopped, so play
+      console.log('▶️ Starting playback...');
       
-      console.log(`▶️ RESUMING - pausedAtTimeSlot: ${pausedAtTimeSlot}, cursorPosition: ${cursorPosition.timeSlot}, using: ${resumeFromSlot}`);
-      
-      // Update cursor position to resume position
-      setCursorPosition(prev => ({ ...prev, timeSlot: resumeFromSlot }));
-      
-      // Seek sync engine to resume position
-      syncEngine.seekToSlot(resumeFromSlot);
-      
-      // Start sync engine first
+      // Play sync engine first 
       syncEngine.play();
       
-      // Then start audio playback
-      setTimeout(() => {
-        controlsRef.current?.playTab();
-      }, 50); // Small delay to ensure state is updated
-      
-      // Clear paused state
-      setPausedAtTimeSlot(-1);
-      
-      console.log(`▶️ Resuming from timeSlot: ${resumeFromSlot}`);
-    }
-  };
-
-  const handleLoopToggle = () => {
-    setIsLooping(!isLooping);
-  };
-
-  const handleFretboardToggle = () => {
-    setShowFretboard(!showFretboard);
-  };
-
-  const handleCountInToggle = () => {
-    setCountInEnabled(!countInEnabled);
-  };
-
-  const handleTieModeChange = () => {
-    // Removed unused parameter - function not currently used
-  };
-
-  const handleCreateTie = () => {
-    if (selectedNotes.length === 2) {
-      const [note1, note2] = selectedNotes;
-      
-      // Ensure same string and same fret
-      if (note1.stringIndex !== note2.stringIndex) {
-        console.log('Cannot tie notes on different strings');
-        return;
-      }
-      
-      const notes1 = getNotesAtSlot(tabData, note1.timeSlot, note1.stringIndex);
-      const notes2 = getNotesAtSlot(tabData, note2.timeSlot, note2.stringIndex);
-      
-      if (notes1.length === 0 || notes2.length === 0) {
-        console.log('Cannot tie: one or both notes do not exist');
-        return;
-      }
-      
-      if (notes1[0].fret !== notes2[0].fret) {
-        console.log('Cannot tie notes with different frets');
-        return;
-      }
-      
-      // Create the tie (from earlier to later note)
-      const fromSlot = Math.min(note1.timeSlot, note2.timeSlot);
-      const toSlot = Math.max(note1.timeSlot, note2.timeSlot);
-      
-      // Check if tie already exists
-      const existingTies = getAllTies(tabData);
-      const existingTie = existingTies.find(tie => 
-        tie.fromSlot === fromSlot && tie.toSlot === toSlot && tie.stringIndex === note1.stringIndex
-      );
-      
-      setTabData(prevTabData => {
-        if (existingTie) {
-          // Remove existing tie
-          return removeTie(prevTabData, fromSlot, toSlot, note1.stringIndex);
-        } else {
-          // Create new tie
-          return createTie(prevTabData, fromSlot, toSlot, note1.stringIndex);
-        }
-      });
-      
-      // Don't clear selection after creating/removing tie - keep notes selected
-    }
-  };
-
-  // Video event handlers
-  const handleVideoTimeUpdate = (time: number) => {
-    // Video reports its time updates during playback
-    // We don't need to update sync engine as it's handling this
-  };
-
-  const handleVideoDurationChange = (duration: number) => {
-    // Video duration loaded - could be used for validation
-    console.log('Video duration:', duration);
-  };
-
-  const handleVideoPlayStateChange = (playing: boolean) => {
-    // Video player reports state changes - for error handling
-    if (playing !== isPlaying) {
-      console.log('Video/sync state mismatch - video:', playing, 'sync:', isPlaying);
-    }
-  };
-
-  // Handle cursor clicks - this should seek both video and tab
-  const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
-    setCursorPosition({ timeSlot, stringIndex });
-    
-    // Seek sync engine to this position (will update video)
-    syncEngine.seekToSlot(timeSlot);
-    
-    // Clear any paused state since we're seeking to a new position
-    setPausedAtTimeSlot(-1);
-    
-    // If currently playing, restart playback from new position
-    if (isPlaying) {
-      controlsRef.current?.stopPlayback();
-      controlsRef.current?.playTab();
-    }
-    
-    if (shiftHeld) {
-      // Shift+click: handle pair selection for ties
-      const noteKey = { timeSlot, stringIndex };
-      const existingIndex = selectedNotes.findIndex(n => n.timeSlot === timeSlot && n.stringIndex === stringIndex);
-      
-      if (existingIndex >= 0) {
-        // Deselect if already selected
-        setSelectedNotes(prev => prev.filter((_, i) => i !== existingIndex));
-        setFirstSelectedNote(null);
-      } else {
-        // Add to selection
-        if (firstSelectedNote) {
-          // We have a first note, create the pair
-          setSelectedNotes([firstSelectedNote, noteKey]);
-          setFirstSelectedNote(null); // Clear first selection since we now have a pair
-        } else if (selectedNotes.length === 2) {
-          // We already have a pair, replace with new pair starting from this note
-          setFirstSelectedNote(noteKey);
-          setSelectedNotes([]);
-        } else {
-          // Start new selection with this note
-          setFirstSelectedNote(noteKey);
-          setSelectedNotes([]);
-        }
-      }
-    } else {
-      // Normal click: track as first selection (no highlights yet)
-      const notes = getNotesAtSlot(tabData, timeSlot, stringIndex);
-      if (notes.length > 0) {
-        // Clicked on an existing note, track it as first selection
-        setFirstSelectedNote({ timeSlot, stringIndex });
-        setSelectedNotes([]); // Clear any existing pair selection
-      } else {
-        // Clicked on empty space, clear selections
-        setFirstSelectedNote(null);
-        setSelectedNotes([]);
+      // Then start the Controls component
+      if (controlsRef.current) {
+        controlsRef.current.playTab();
       }
     }
   };
@@ -393,144 +420,307 @@ function AppContent() {
     return !!existingTie;
   };
 
+  // Handle tie mode change
+  const handleTieModeChange = (enabled: boolean) => {
+    if (!enabled) {
+      // Clear selection when turning off tie mode
+      setSelectedNotes([]);
+      setFirstSelectedNote(null);
+    }
+  };
+
+  // Add a note at the current cursor position with selected duration
+  const addNote = (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => {
+    const noteDuration = duration || selectedDuration;
+    const noteType = type || selectedNoteType;
+    
+    const newNote: Note = {
+      type: noteType,
+      fret,
+      duration: noteDuration,
+      stringIndex: cursorPosition.stringIndex,
+      startSlot: cursorPosition.timeSlot,
+    };
+
+    setTabData(prevData => addNoteToGrid(prevData, newNote));
+  };
+
+  // Remove note at current cursor position
+  const removeNote = () => {
+    const notesToRemove = getNotesAtSlot(tabData, cursorPosition.timeSlot, cursorPosition.stringIndex);
+    
+    if (notesToRemove.length > 0) {
+      let newTabData = tabData;
+      notesToRemove.forEach(note => {
+        newTabData = removeNoteFromGrid(newTabData, note);
+      });
+      setTabData(newTabData);
+    }
+  };
+
+  // Move cursor
+  const moveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
+    setCursorPosition(prev => {
+      let newTimeSlot = prev.timeSlot;
+      let newStringIndex = prev.stringIndex;
+
+      switch (direction) {
+        case 'left':
+          newTimeSlot = Math.max(0, prev.timeSlot - 1);
+          break;
+        case 'right':
+          newTimeSlot = prev.timeSlot + 1;
+          break;
+        case 'up':
+          newStringIndex = Math.min(2, prev.stringIndex + 1); // Max Hi D (index 2)
+          break;
+        case 'down':
+          newStringIndex = Math.max(0, prev.stringIndex - 1); // Min Low D (index 0)
+          break;
+      }
+
+      return { timeSlot: newTimeSlot, stringIndex: newStringIndex };
+    });
+  };
+
+  // Handle cursor click (for manual positioning)
+  const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
+    // Check if we're in tie mode (when we have selected notes)
+    const inTieMode = selectedNotes.length > 0;
+    
+    if (inTieMode && shiftHeld) {
+      // Multi-select for tie creation
+      const newSelection = { timeSlot, stringIndex };
+      
+      // Check if this position is already selected
+      const alreadySelected = selectedNotes.some(note => 
+        note.timeSlot === timeSlot && note.stringIndex === stringIndex
+      );
+      
+      if (alreadySelected) {
+        // Deselect
+        setSelectedNotes(prev => prev.filter(note => 
+          !(note.timeSlot === timeSlot && note.stringIndex === stringIndex)
+        ));
+        
+        // Clear first note if we're deselecting it
+        if (firstSelectedNote?.timeSlot === timeSlot && firstSelectedNote?.stringIndex === stringIndex) {
+          setFirstSelectedNote(null);
+        }
+      } else {
+        // Select (limit to 2 for tie creation)
+        if (selectedNotes.length < 2) {
+          setSelectedNotes(prev => [...prev, newSelection]);
+          
+          // Set as first note if none selected yet
+          if (!firstSelectedNote) {
+            setFirstSelectedNote(newSelection);
+          }
+        }
+      }
+    } else {
+      // Normal cursor movement - clear any tie selection
+      setCursorPosition({ timeSlot, stringIndex });
+      setSelectedNotes([]);
+      setFirstSelectedNote(null);
+    }
+  };
+
+  // Handle tie creation
+  const handleCreateTie = () => {
+    if (selectedNotes.length === 2) {
+      const [note1, note2] = selectedNotes;
+      
+      // Ensure same string
+      if (note1.stringIndex !== note2.stringIndex) {
+        alert('Ties can only be created between notes on the same string');
+        return;
+      }
+      
+      const fromSlot = Math.min(note1.timeSlot, note2.timeSlot);
+      const toSlot = Math.max(note1.timeSlot, note2.timeSlot);
+      
+      // Check if tie already exists
+      const currentTieState = getCurrentTieState();
+      
+      if (currentTieState) {
+        // Remove existing tie
+        setTabData(prevData => removeTie(prevData, fromSlot, toSlot, note1.stringIndex));
+      } else {
+        // Create new tie
+        setTabData(prevData => createTie(prevData, fromSlot, toSlot, note1.stringIndex));
+      }
+      
+      // Clear selection after tie operation
+      setSelectedNotes([]);
+      setFirstSelectedNote(null);
+    }
+  };
+
+  // Handle preview note (when hovering over fretboard)
+  const handlePlayPreviewNote = (fret: number, stringIndex: number) => {
+    if (controlsRef.current) {
+      controlsRef.current.playPreviewNote(fret, stringIndex);
+    }
+  };
+
+  // Update the currently playing notes (visual feedback)
+  const handleNotesPlaying = (notes: { fret: number; stringIndex: number }[]) => {
+    setCurrentlyPlaying(notes);
+  };
+
+  // Handle current time slot change (playback indicator)
+  const handleCurrentTimeSlotChange = (timeSlot: number) => {
+    setCurrentPlaybackTimeSlot(timeSlot);
+    // Update sync engine position when Controls updates
+    if (timeSlot >= 0) {
+      syncEngine.updatePosition(timeSlot);
+    }
+  };
+
+  // Video ref for controlling playback
+  const videoRef = useRef<{ 
+    play: () => void; 
+    pause: () => void; 
+    seek: (time: number) => void;
+    getCurrentTime: () => number;
+  }>(null);
+
   return (
-    <MainLayout
-      toolbar={
-        <ProfessionalToolbar
-          selectedDuration={selectedDuration}
-          onDurationChange={setSelectedDuration}
-          tempo={tempo}
-          onTempoChange={setTempo}
-          timeSignature={timeSignature}
-          onTimeSignatureChange={setTimeSignature}
-          selectedNoteType={selectedNoteType}
-          onNoteTypeChange={setSelectedNoteType}
-          tieMode={getCurrentTieState()}
-          onTieModeChange={handleTieModeChange}
-        />
-      }
-      centerWorkspace={
-        <SplitPane
-          defaultSplitRatio={splitRatio}
-          minPaneSize={200}
-          orientation="horizontal"
-          onSplitChange={setSplitRatio}
-        >
-          <VideoPlayer
-            source={videoSource}
-            currentTime={currentVideoTime}
-            isPlaying={isPlaying}
-            playbackRate={videoPlaybackRate}
-            isMuted={isVideoMuted}
-            onTimeUpdate={handleVideoTimeUpdate}
-            onDurationChange={handleVideoDurationChange}
-            onPlayStateChange={handleVideoPlayStateChange}
-            onMuteToggle={handleVideoMuteToggle}
+    <div className="app">
+      <MainLayout 
+        toolbar={
+          <ProfessionalToolbar
+            selectedDuration={selectedDuration}
+            onDurationChange={setSelectedDuration}
+            selectedNoteType={selectedNoteType}
+            onNoteTypeChange={setSelectedNoteType}
+            tempo={tempo}
+            onTempoChange={setTempo}
+            timeSignature={timeSignature}
+            onTimeSignatureChange={setTimeSignature}
+            tieMode={selectedNotes.length > 0}
+            onTieModeChange={handleTieModeChange}
+            // Save/Load handlers
+            onSave={handleSave}
+            onLoad={handleLoad}
+            onNew={handleNew}
+            onSaveAs={handleSaveAs}
+            isModified={isModified}
           />
-          <div style={{ position: 'relative', width: '100%', height: '100%', padding: '24px' }}>
-            {/* Floating zoom controls */}
-            <div className="floating-zoom-controls">
-              <button 
-                onClick={() => setZoom(prev => Math.max(0.6, prev - 0.1))}
-                title="Zoom Out (Ctrl + Mouse Wheel)"
-              >
-                🔍-
-              </button>
-              <span className="zoom-display">{Math.round(zoom * 100)}%</span>
-              <button 
-                onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
-                title="Zoom In (Ctrl + Mouse Wheel)"
-              >
-                🔍+
-              </button>
-              <button 
-                onClick={() => setZoom(1)}
-                title="Reset Zoom"
-              >
-                Reset
-              </button>
-            </div>
-            
-            {/* Synth Mute Button - Bottom Left */}
-            <div className="floating-synth-controls">
-              <button 
-                onClick={handleSynthMuteToggle}
-                title={isSynthMuted ? 'Unmute Synth' : 'Mute Synth'}
-                className="synth-mute-button"
-              >
-                {isSynthMuted ? '🔇' : '🎵'}
-              </button>
-            </div>
-            
-            <TabViewer 
-              tabData={tabData} 
-              cursorPosition={cursorPosition}
-              onAddNote={handleAddNote}
-              onRemoveNote={handleRemoveNote}
-              onMoveCursor={moveCursor}
-              onCursorClick={handleCursorClick}
-              onPlayPreviewNote={(fret: number, stringIndex: number) => controlsRef.current?.playPreviewNote(fret, stringIndex)}
-              selectedDuration={selectedDuration}
-              onTogglePlayback={handlePlayPause}
-              onResetCursor={handleResetCursor}
-              selectedNoteType={selectedNoteType}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              isPlaying={isPlaying}
-              currentPlaybackTimeSlot={currentPlaybackTimeSlot}
-              selectedNotes={selectedNotes}
-              onCreateTie={handleCreateTie}
-            />
-          </div>
-        </SplitPane>
-      }
-      fretboard={showFretboard ? (
-        <div style={{ width: '100%' }}>
-          <Fretboard currentlyPlaying={currentlyPlaying} />
-        </div>
-      ) : null}
-      bottomPanel={
-        <>
-          {/* Professional Playback Bar */}
+        }
+        bottomPanel={
           <PlaybackBar
             isPlaying={isPlaying}
-            tempo={tempo}
+            onPlayPause={handlePlayPause}
             currentTime={currentTime}
             totalTime={totalTime}
-            trackTitle="Untitled"
-            onPlayPause={handlePlayPause}
-            onTempoChange={handleTempoChange}
-            onLoopToggle={handleLoopToggle}
-            onFretboardToggle={handleFretboardToggle}
-            onCountInToggle={handleCountInToggle}
+            tempo={tempo}
+            trackTitle={currentProjectMetadata.title || 'Untitled Song'}
+            onTempoChange={setTempo}
+            onLoopToggle={() => setIsLooping(!isLooping)}
+            onFretboardToggle={() => setShowFretboard(!showFretboard)}
+            onCountInToggle={() => setCountInEnabled(!countInEnabled)}
             isLooping={isLooping}
             showFretboard={showFretboard}
             countInEnabled={countInEnabled}
           />
-          
-          {/* Hidden Controls component for audio functionality */}
-          <div style={{ display: 'none' }}>
-            <Controls 
-              ref={controlsRef}
-              tabData={tabData} 
-              cursorPosition={cursorPosition}
-              onNotesPlaying={handleNotesPlaying}
-              tempo={tempo}
-              onTempoChange={handleTempoChange}
-              onPlaybackStateChange={handlePlaybackStateChange}
-              onCurrentTimeSlotChange={setCurrentPlaybackTimeSlot}
-              countInEnabled={countInEnabled}
-              timeSignature={timeSignature}
-              isMuted={isSynthMuted}
-            />
-          </div>
-        </>
-      }
-    />
-  )
+        }
+        centerWorkspace={
+          <SplitPane
+            defaultSplitRatio={splitRatio}
+            onSplitChange={setSplitRatio}
+            orientation="horizontal"
+          >
+            {[
+              <VideoPlayer
+                source={videoSource}
+                isPlaying={isPlaying}
+                currentTime={syncEngine.state.currentPosition.seconds}
+                playbackRate={syncEngine.getVideoPlaybackRate()}
+                onMuteToggle={handleVideoMuteToggle}
+                isMuted={isVideoMuted}
+              />,
+              <div className="tab-editor-pane">
+                <TabViewer
+                  tabData={tabData}
+                  cursorPosition={cursorPosition}
+                  onAddNote={addNote}
+                  onRemoveNote={removeNote}
+                  onMoveCursor={moveCursor}
+                  onCursorClick={handleCursorClick}
+                  onPlayPreviewNote={handlePlayPreviewNote}
+                  selectedDuration={selectedDuration}
+                  selectedNoteType={selectedNoteType}
+                  onTogglePlayback={handlePlayPause}
+                  onResetCursor={handleResetCursor}
+                  zoom={zoom}
+                  onZoomChange={setZoom}
+                  isPlaying={isPlaying}
+                  currentPlaybackTimeSlot={currentPlaybackTimeSlot}
+                  selectedNotes={selectedNotes}
+                  onCreateTie={handleCreateTie}
+                />
+                
+                {showFretboard && (
+                  <Fretboard
+                    currentlyPlaying={currentlyPlaying}
+                  />
+                )}
+                
+                <Controls
+                  ref={controlsRef}
+                  tabData={tabData}
+                  cursorPosition={cursorPosition}
+                  onNotesPlaying={handleNotesPlaying}
+                  tempo={tempo}
+                  onTempoChange={setTempo}
+                  onPlaybackStateChange={handlePlaybackStateChange}
+                  onCurrentTimeSlotChange={handleCurrentTimeSlotChange}
+                  countInEnabled={countInEnabled}
+                  timeSignature={timeSignature}
+                  isMuted={isSynthMuted}
+                />
+                
+                {/* Synth Mute Button */}
+                <button 
+                  className="synth-mute-button"
+                  onClick={handleSynthMuteToggle}
+                  title={isSynthMuted ? "Unmute Synth" : "Mute Synth"}
+                >
+                  {isSynthMuted ? '🔇' : '🎵'}
+                </button>
+              </div>
+            ]}
+          </SplitPane>
+        }
+      />
+
+      {/* Save/Load Dialogs */}
+      <SaveDialog
+        isOpen={saveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        onSave={handleSaveDialog}
+        currentMetadata={currentProjectMetadata}
+      />
+      
+      <LoadDialog
+        isOpen={loadDialogOpen}
+        onClose={() => setLoadDialogOpen(false)}
+        onLoad={handleLoadFile}
+        recentFiles={fileManagerRef.current.getRecentFiles()}
+      />
+      
+      <NewProjectDialog
+        isOpen={newProjectDialogOpen}
+        onClose={() => setNewProjectDialogOpen(false)}
+        onConfirm={handleNewProject}
+        hasUnsavedChanges={isModified}
+      />
+    </div>
+  );
 }
 
-// Main App component with SyncEngineProvider
 function App() {
   return (
     <SyncEngineProvider>
