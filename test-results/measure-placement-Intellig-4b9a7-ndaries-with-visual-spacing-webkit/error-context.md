@@ -67,7 +67,6 @@ Received:    30
   - button "↔️ Fit Width"
 - main:
   - button "🔊"
-  - text: "Video error: DEMUXER_ERROR_NO_SUPPORTED_STREAMS: FFmpegDemuxer: no supported streams"
   - button "🎵"
   - img: d A D 0 0 0 0 0 0 0 0 0 0 0 0
 - img "Fretboard"
