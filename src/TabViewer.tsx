@@ -573,6 +573,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
             return (
               <line
                 key={`measure-${slotPosition}`}
+                className="measure-line"
+                data-slot={slotPosition}
                 x1={x}
                 y1={topY}
                 x2={x}
@@ -610,7 +612,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
               } else {
                 // Render note
                 return (
-                  <g key={`note-${slotIndex}-${noteIndex}`}>
+                  <g key={`note-${slotIndex}-${noteIndex}`} className="note-symbol" data-slot={note.startSlot} data-string={note.stringIndex}>
                     <circle
                       cx={x}
                       cy={y}
