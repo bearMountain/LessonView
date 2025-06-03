@@ -80,9 +80,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
     return topMargin + (displayIndex * stringSpacing);
   };
 
-  // Get cursor position in pixels
+  // Get cursor position in pixels - respects measure line offset
   const getCursorX = () => {
-    return getSlotX(currentPosition.timeSlot, leftMargin, slotWidth);
+    return getVisualSlotX(currentPosition.timeSlot, customMeasureLines, leftMargin, slotWidth);
   };
 
   const getCursorY = () => {
