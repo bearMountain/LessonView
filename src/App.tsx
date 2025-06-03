@@ -851,6 +851,23 @@ function AppContent() {
     }
   };
 
+  // Handle when tab playback completes (tab ends before video)
+  const handlePlaybackComplete = () => {
+    console.log('🏁 Tab playback completed - stopping video and updating UI');
+    
+    // Stop the sync engine (this stops the video)
+    syncEngine.pause();
+    
+    // Clear paused position since playback ended normally
+    setPausedAtTimeSlot(-1);
+    
+    // Clear playback indicator
+    setCurrentPlaybackTimeSlot(-1);
+    
+    // The Controls component will handle stopping its own audio playback
+    console.log('✅ Video and UI state updated after tab completion');
+  };
+
   // Add a measure line at the specified slot
   const addMeasureLine = (slot: number, notePosition?: { timeSlot: number; stringIndex: number }) => {
     // Only allow one measure line
@@ -983,6 +1000,7 @@ function AppContent() {
                   tempo={tempo}
                   onPlaybackStateChange={handlePlaybackStateChange}
                   onCurrentTimeSlotChange={handleCurrentTimeSlotChange}
+                  onPlaybackComplete={handlePlaybackComplete}
                   countInEnabled={countInEnabled}
                   timeSignature={timeSignature}
                   pickupBeats={getPickupBeats(customMeasureLines, timeSignature)}
