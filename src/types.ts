@@ -285,10 +285,10 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
       const boundaries = placement.calculateMeasureBoundaries(tabData, customMeasureLines);
       console.log('🎵 getCustomMeasureBoundaries: Intelligent boundaries calculated:', boundaries);
       
-      // Apply visual offsets from intelligent placement
-      const visualOffsetManager = VisualOffsetManager.getInstance();
-      visualOffsetManager.updateOffsets(tabData, customMeasureLines);
-      console.log('🎵 getCustomMeasureBoundaries: Visual offsets updated');
+      // TEMPORARILY DISABLED: Apply visual offsets from intelligent placement
+      // const visualOffsetManager = VisualOffsetManager.getInstance();
+      // visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+      // console.log('🎵 getCustomMeasureBoundaries: Visual offsets updated');
       
       return boundaries;
     } catch (error) {
@@ -307,16 +307,16 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
     boundaries.push(line.slot);
   });
   
-  // IMPORTANT: Apply intelligent visual offsets even for custom measure lines
+  // TEMPORARILY DISABLED: Apply intelligent visual offsets even for custom measure lines
   // Custom measure lines may be auto-generated and need intelligent spacing
-  try {
-    console.log('🎵 getCustomMeasureBoundaries: Applying intelligent visual offsets for custom measure lines');
-    const visualOffsetManager = VisualOffsetManager.getInstance();
-    visualOffsetManager.updateOffsets(tabData, customMeasureLines);
-    console.log('🎵 getCustomMeasureBoundaries: Visual offsets applied for custom measures');
-  } catch (error) {
-    console.warn('Unable to apply intelligent visual offsets for custom measure lines:', error);
-  }
+  // try {
+  //   console.log('🎵 getCustomMeasureBoundaries: Applying intelligent visual offsets for custom measure lines');
+  //   const visualOffsetManager = VisualOffsetManager.getInstance();
+  //   visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+  //   console.log('🎵 getCustomMeasureBoundaries: Visual offsets applied for custom measures');
+  // } catch (error) {
+  //   console.warn('Unable to apply intelligent visual offsets for custom measure lines:', error);
+  // }
   
   // Add intelligent boundaries after the last custom line
   const lastCustomSlot = sortedLines[sortedLines.length - 1]?.slot || 0;
