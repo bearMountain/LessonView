@@ -568,9 +568,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
             const topY = getStringY(2) - 10; // Hi D
             const bottomY = getStringY(0) + 10; // Low D
             
-            // Check if this is a custom measure line (but not the pickup measure boundary at slot 0)
-            const isCustomMeasureLine = customMeasureLines.some(line => line.slot === slotPosition) && slotPosition !== 0;
-            
+            // Style all measure lines the same way (including custom/pickup measure lines)
+            // This gives pickup measures the same visual appearance as regular measures
             return (
               <line
                 key={`measure-${slotPosition}`}
@@ -578,9 +577,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
                 y1={topY}
                 x2={x}
                 y2={bottomY}
-                stroke={isCustomMeasureLine ? "#ff6b35" : "#666"}
-                strokeWidth={isCustomMeasureLine ? "3" : "2"}
-                strokeDasharray={isCustomMeasureLine ? "3,2" : "5,5"}
+                stroke="#666"
+                strokeWidth="2"
+                strokeDasharray="5,5"
               />
             );
           })}
