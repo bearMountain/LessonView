@@ -92,8 +92,35 @@ export const getSlotX = (timeSlot: number, leftMargin: number, slotWidth: number
   return leftMargin + padding + (timeSlot * slotWidth);
 };
 
-// Calculate X position for measure lines (no padding, exact slot boundaries)
-export const getMeasureLineX = (timeSlot: number, leftMargin: number, slotWidth: number): number => {
+// Calculate visual X position for notes, accounting for pickup measure offset
+export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine[], leftMargin: number, slotWidth: number): number => {
+  let visualOffset = 0;
+  
+  // If there's a custom measure line, apply offset to notes at the measure line position and after
+  if (customMeasureLines.length > 0) {
+    const measureLine = customMeasureLines[0]; // Only one measure line allowed
+    if (note.startSlot >= measureLine.slot) {
+      visualOffset = slotWidth * 0.5; // Half a slot width offset for pickup measure visual effect
+    }
+  }
+  
+  return getSlotX(note.startSlot, leftMargin, slotWidth) + visualOffset;
+};
+
+// Calculate X position for measure lines - should align with the visual position of the note
+export const getMeasureLineX = (timeSlot: number, leftMargin: number, slotWidth: number, customMeasureLines: CustomMeasureLine[]): number => {
+  // For pickup measure lines, the line should be placed at the exact visual position where the note appears
+  // This means we need to account for the visual offset that will be applied to the note
+  if (customMeasureLines.length > 0) {
+    const measureLine = customMeasureLines[0];
+    if (measureLine.slot === timeSlot) {
+      // This is the measure line we're positioning - place it at the note's visual position
+      const noteX = getSlotX(timeSlot, leftMargin, slotWidth) + (slotWidth * 0.5);
+      return noteX - (slotWidth * 0.25); // Position line just to the left of the note
+    }
+  }
+  
+  // For regular measure lines, use the original calculation
   const padding = slotWidth * 1; // Same padding as notes for consistency
   return leftMargin + padding + (timeSlot * slotWidth) - (slotWidth * 1.5); // Move line further left for better visual separation
 };

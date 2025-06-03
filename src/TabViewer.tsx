@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
 import type { Note, NoteDuration, CursorPosition, TabData, NoteType, ToolMode, CustomMeasureLine } from './types';
-import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries } from './types';
+import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries, getVisualNoteX } from './types';
 
 interface TabViewerProps {
   tabData: TabData;
@@ -330,7 +330,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
       const measureLineClickTolerance = 10; // pixels
       
       for (const measureLine of customMeasureLines) {
-        const measureLineX = getMeasureLineX(measureLine.slot, leftMargin, slotWidth);
+        const measureLineX = getMeasureLineX(measureLine.slot, leftMargin, slotWidth, customMeasureLines);
         if (Math.abs(x - measureLineX) <= measureLineClickTolerance) {
           clickedOnMeasureLine = true;
           break;
@@ -371,17 +371,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (notesAtSlot.length > 0) {
         const noteAtSlot = notesAtSlot[0];
         if (noteAtSlot.startSlot === slot) {
-          // Calculate visual offset for pickup measure
-          let visualOffset = 0;
-          if (customMeasureLines.length > 0) {
-            const measureLine = customMeasureLines[0]; // Only one measure line allowed
-            if (noteAtSlot.startSlot >= measureLine.slot) {
-              visualOffset = slotWidth * 0.5; // Half a slot width offset for pickup measure visual effect
-            }
-          }
-          
-          // Check if click is close to the note position (including visual offset)
-          const noteX = getSlotX(slot, leftMargin, slotWidth) + visualOffset;
+          // Use the new helper function for consistent visual positioning
+          const noteX = getVisualNoteX(noteAtSlot, customMeasureLines, leftMargin, slotWidth);
           const distance = Math.abs(x - noteX);
           if (distance < slotWidth * 0.8) { // Within 80% of slot width
             noteTimeSlot = slot;
@@ -560,7 +551,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
           {/* Measure separators */}
           {measureBoundaries.map((slotPosition) => {
-            const x = getMeasureLineX(slotPosition, leftMargin, slotWidth);
+            const x = getMeasureLineX(slotPosition, leftMargin, slotWidth, customMeasureLines);
             const topY = getStringY(2) - 10; // Hi D
             const bottomY = getStringY(0) + 10; // Low D
             
@@ -584,18 +575,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
           {/* Notes and rests - iterate through all slots */}
           {tabData.map((cell, slotIndex) => {
             return cell.notes.map((note, noteIndex) => {
-              // Calculate visual offset for pickup measure
-              let visualOffset = 0;
-              
-              // If there's a custom measure line, apply offset to notes at the measure line position and after
-              if (customMeasureLines.length > 0) {
-                const measureLine = customMeasureLines[0]; // Only one measure line allowed
-                if (note.startSlot >= measureLine.slot) {
-                  visualOffset = slotWidth * 0.5; // Half a slot width offset for pickup measure visual effect
-                }
-              }
-              
-              const x = getSlotX(slotIndex, leftMargin, slotWidth) + visualOffset;
+              // Use the new helper function for consistent visual positioning
+              const x = getVisualNoteX(note, customMeasureLines, leftMargin, slotWidth);
               const y = getStringY(note.stringIndex);
               const visual = DURATION_VISUALS[note.duration];
               
@@ -682,7 +663,19 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
           {/* Selected notes highlighting (for tie mode) */}
           {selectedNotes && selectedNotes.map((selectedNote, index) => {
-            const x = getSlotX(selectedNote.timeSlot, leftMargin, slotWidth);
+            // Find the actual note to get the correct visual position
+            const notesAtPosition = getNotesAtSlot(tabData, selectedNote.timeSlot, selectedNote.stringIndex);
+            const actualNote = notesAtPosition.length > 0 ? notesAtPosition[0] : null;
+            
+            let x;
+            if (actualNote) {
+              // Use visual position for existing notes
+              x = getVisualNoteX(actualNote, customMeasureLines, leftMargin, slotWidth);
+            } else {
+              // Fallback to slot position for positions without notes
+              x = getSlotX(selectedNote.timeSlot, leftMargin, slotWidth);
+            }
+            
             const y = getStringY(selectedNote.stringIndex);
             
             return (
@@ -702,15 +695,32 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
           {/* Selected note for editing highlighting */}
           {selectedNoteForEditing && (
-            <circle
-              cx={getSlotX(selectedNoteForEditing.timeSlot, leftMargin, slotWidth)}
-              cy={getStringY(selectedNoteForEditing.stringIndex)}
-              r="16"
-              fill="none"
-              stroke="#ff6b35"
-              strokeWidth="3"
-              opacity="0.9"
-            />
+            (() => {
+              // Find the actual note to get the correct visual position
+              const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
+              const actualNote = notesAtPosition.length > 0 ? notesAtPosition[0] : null;
+              
+              let x;
+              if (actualNote) {
+                // Use visual position for existing notes
+                x = getVisualNoteX(actualNote, customMeasureLines, leftMargin, slotWidth);
+              } else {
+                // Fallback to slot position for positions without notes
+                x = getSlotX(selectedNoteForEditing.timeSlot, leftMargin, slotWidth);
+              }
+              
+              return (
+                <circle
+                  cx={x}
+                  cy={getStringY(selectedNoteForEditing.stringIndex)}
+                  r="16"
+                  fill="none"
+                  stroke="#ff6b35"
+                  strokeWidth="3"
+                  opacity="0.9"
+                />
+              );
+            })()
           )}
 
           {/* Cursor */}
