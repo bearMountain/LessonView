@@ -1,21 +1,118 @@
 # Test info
 
-- Name: Intelligent Measure Placement >> debugging test - add just a few notes and inspect state
-- Location: /Users/gizmo/strumstick-tab-viewer/tests/measure-placement.spec.ts:284:3
+- Name: Intelligent Measure Placement >> should add eighth notes and create proper measure boundaries with visual spacing
+- Location: /Users/gizmo/strumstick-tab-viewer/tests/measure-placement.spec.ts:24:3
 
 # Error details
 
 ```
-Error: locator.textContent: Test timeout of 15000ms exceeded.
-Call log:
-  - waiting for locator('button').nth(7)
+Error: expect(received).toBeLessThanOrEqual(expected)
 
-    at /Users/gizmo/strumstick-tab-viewer/tests/measure-placement.spec.ts:297:44
+Expected: <= 2
+Received:    10
+    at /Users/gizmo/strumstick-tab-viewer/tests/measure-placement.spec.ts:277:60
+```
+
+# Page snapshot
+
+```yaml
+- banner:
+  - text: File
+  - button "📄 New"
+  - button "📁 Open"
+  - button "💾 Save*"
+  - button "💾 Save As..."
+  - text: Edit
+  - button "↶ Undo"
+  - button "↷ Redo"
+  - button "✂️ Cut"
+  - button "📋 Copy"
+  - button "📄 Paste"
+  - text: "Notes Duration:"
+  - button "Whole Note":
+    - img "Whole note"
+  - button "Whole Rest": 𝄻
+  - button "Half Note":
+    - img "Half note"
+  - button "Half Rest": 𝄼
+  - button "Quarter Note":
+    - img "Quarter note"
+  - button "Quarter Rest": 𝄽
+  - button "Eighth Note":
+    - img "Eighth note"
+  - button "Eighth Rest": 𝄾
+  - button "Sixteenth Note":
+    - img "Sixteenth note"
+  - button "Sixteenth Rest": 𝄿
+  - button "Tie":
+    - img
+    - text: Tie
+  - button "♪ Dotted" [disabled]
+  - button "📏 Measure"
+  - text: "Time Time:"
+  - combobox "Time Signature":
+    - option "4/4" [selected]
+    - option "3/4"
+    - option "2/4"
+    - option "6/8"
+    - option "12/8"
+    - option "2/2"
+  - text: "4/4 Tempo:"
+  - button "−"
+  - text: 120 BPM
+  - button "+"
+  - text: Layout
+  - button "🔍 Zoom In"
+  - button "🔍 Zoom Out"
+  - button "↔️ Fit Width"
+- main:
+  - button "🔊"
+  - button "🎵"
+  - img: dAD000000000000
+- img "Fretboard"
+- img
+- contentinfo:
+  - button "Play":
+    - img
+  - text: Untitled Song 0:00 / 0:01
+  - button "Toggle count-in":
+    - img "Metronome"
+  - button "Decrease tempo":
+    - img
+  - text: 120 BPM
+  - button "Increase tempo":
+    - img
+  - button "Toggle loop":
+    - img
+    - text: Loop
+  - button "Toggle fretboard":
+    - img
+    - text: Fretboard
 ```
 
 # Test source
 
 ```ts
+  177 |         if (afterSpacing > beforeSpacing * 1.5) {
+  178 |           console.log('✅ Visual spacing detected: [E-|-*-] pattern');
+  179 |         } else if (afterSpacing < beforeSpacing * 0.5) {
+  180 |           console.log('❌ No visual spacing: [E-|*-] pattern (notes too close to measure line)');
+  181 |         } else {
+  182 |           console.log('⚠️ Minimal visual spacing: between [E-|*-] and [E-|-*-]');
+  183 |         }
+  184 |         
+  185 |         // Calculate expected positions based on slot spacing
+  186 |         const expectedSlotSpacing = (noteAfter.x - noteBefore.x) / (noteAfter.slot - noteBefore.slot);
+  187 |         console.log(`  Expected slot spacing: ${expectedSlotSpacing.toFixed(1)}px per slot`);
+  188 |         
+  189 |         // For intelligent measure placement, notes after the measure line should be shifted by exactly 1 slot
+  190 |         const expectedNoteAfterX = measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing + expectedSlotSpacing; // +1 slot shift
+  191 |         const actualOffset = noteAfter.x - (measureX + (noteAfter.slot - measureSlot) * expectedSlotSpacing); // offset from normal position
+  192 |         console.log(`  Expected note after X (with 1-slot shift): ${expectedNoteAfterX.toFixed(1)}`);
+  193 |         console.log(`  Actual note after X: ${noteAfter.x.toFixed(1)}`);
+  194 |         console.log(`  Visual offset applied: ${actualOffset.toFixed(1)}px (should be ${expectedSlotSpacing.toFixed(1)}px for 1-slot shift)`);
+  195 |         
+  196 |         // Check if the offset is exactly 1 slot width (within small tolerance)
   197 |         const tolerance = expectedSlotSpacing * 0.1; // 10% tolerance
   198 |         const desiredOffset = expectedSlotSpacing; // Exactly 1 slot width
   199 |         
@@ -96,7 +193,8 @@ Call log:
   274 |             const tolerance = expectedSlotSpacing * 0.1; // 10% tolerance
   275 |             
   276 |             // This assertion should FAIL until we fix the visual offset calculation
-  277 |             expect(Math.abs(actualOffset - desiredOffset)).toBeLessThanOrEqual(tolerance);
+> 277 |             expect(Math.abs(actualOffset - desiredOffset)).toBeLessThanOrEqual(tolerance);
+      |                                                            ^ Error: expect(received).toBeLessThanOrEqual(expected)
   278 |           }
   279 |         }
   280 |       }
@@ -116,8 +214,7 @@ Call log:
   294 |     console.log(`Found ${buttonCount} buttons total`);
   295 |     
   296 |     for (let i = 0; i < Math.min(buttonCount, 20); i++) {
-> 297 |       const text = await allButtons.nth(i).textContent();
-      |                                            ^ Error: locator.textContent: Test timeout of 15000ms exceeded.
+  297 |       const text = await allButtons.nth(i).textContent();
   298 |       console.log(`Button ${i}: "${text}"`);
   299 |     }
   300 |

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './TabViewer.css';
 import type { Note, NoteDuration, CursorPosition, TabData, NoteType, ToolMode, CustomMeasureLine } from './types';
 import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries, getVisualNoteX, getVisualSlotX } from './types';
@@ -505,7 +505,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
   };
 
   // Get measure boundaries for drawing measure lines
-  const measureBoundaries = getCustomMeasureBoundaries(tabData, customMeasureLines);
+  const measureBoundaries = useMemo(() => getCustomMeasureBoundaries(tabData, customMeasureLines), [tabData, customMeasureLines]);
 
   return (
     <div className="tab-viewer">

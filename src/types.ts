@@ -281,7 +281,9 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
     // Use intelligent measure placement for auto-generated boundaries
     try {
       console.log('🎵 getCustomMeasureBoundaries: Using intelligent placement, tabData length:', tabData.length);
-      const placement = new IntelligentMeasurePlacement();
+      
+      // Use a singleton instance to avoid creating new objects on every call
+      const placement = getIntelligentPlacementInstance();
       const boundaries = placement.calculateMeasureBoundaries(tabData, customMeasureLines);
       console.log('🎵 getCustomMeasureBoundaries: Intelligent boundaries calculated:', boundaries);
       
@@ -333,6 +335,15 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   }
   
   return boundaries.filter((boundary, index, arr) => arr.indexOf(boundary) === index).sort((a, b) => a - b);
+};
+
+// Singleton instance for IntelligentMeasurePlacement to avoid creating new instances
+let intelligentPlacementInstance: IntelligentMeasurePlacement | null = null;
+const getIntelligentPlacementInstance = (): IntelligentMeasurePlacement => {
+  if (!intelligentPlacementInstance) {
+    intelligentPlacementInstance = new IntelligentMeasurePlacement();
+  }
+  return intelligentPlacementInstance;
 };
 
 // Basic intelligent measure boundaries implementation

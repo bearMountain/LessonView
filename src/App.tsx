@@ -90,50 +90,36 @@ function AppContent() {
 
   // Auto-save on state changes
   useEffect(() => {
-    if (isModified) {
-      const currentAppState: AppState = {
-        tabData,
-        tempo,
-        timeSignature,
-        cursorPosition: currentPosition,
-        selectedDuration,
-        selectedNoteType,
-        customMeasureLines,
-        zoom,
-        showFretboard,
-        countInEnabled,
-        isLooping,
-        splitRatio,
-        videoSource,
-        videoConfig: syncEngine.state.videoConfig || undefined,
-        isSynthMuted,
-        isVideoMuted
-      };
-      
-      autoSaveRef.current.performAutoSave(currentAppState);
+    // Skip auto-save on initial load when everything is default
+    if (tabData.length === 0 && tempo === 120 && timeSignature === '4/4' && !currentProjectMetadata.title) {
+      return;
     }
-  }, [tabData, tempo, timeSignature, isModified, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio, videoSource, isSynthMuted, isVideoMuted]);
-
-  // Mark as modified when tab data changes
-  useEffect(() => {
-    if (tabData.length > 0 || currentProjectMetadata.title) {
-      setIsModified(true);
-      autoSaveRef.current.markDirty();
-    }
-  }, [tabData, tempo, timeSignature, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio]);
-
-  // Update visual offsets when tab data or measure lines change
-  // TODO: Disabled due to infinite loop - the intelligent boundaries are calculated elsewhere
-  // useEffect(() => {
-  //   // Only update if there's actual data to process
-  //   if (tabData.length === 0 && customMeasureLines.length === 0) {
-  //     return;
-  //   }
     
-  //   console.log('🎵 Updating visual offsets for intelligent measure placement');
-  //   const visualOffsetManager = VisualOffsetManager.getInstance();
-  //   visualOffsetManager.updateOffsets(tabData, customMeasureLines);
-  // }, [tabData.length, customMeasureLines.length]); // Only depend on lengths to avoid infinite loops
+    // Mark as modified and perform auto-save
+    setIsModified(true);
+    autoSaveRef.current.markDirty();
+    
+    const currentAppState: AppState = {
+      tabData,
+      tempo,
+      timeSignature,
+      cursorPosition: currentPosition,
+      selectedDuration,
+      selectedNoteType,
+      customMeasureLines,
+      zoom,
+      showFretboard,
+      countInEnabled,
+      isLooping,
+      splitRatio,
+      videoSource,
+      videoConfig: syncEngine.state.videoConfig || undefined,
+      isSynthMuted,
+      isVideoMuted
+    };
+    
+    autoSaveRef.current.performAutoSave(currentAppState);
+  }, [tabData, tempo, timeSignature, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio, videoSource, isSynthMuted, isVideoMuted]);
 
   // Save/Load handlers
   const handleSave = async () => {
