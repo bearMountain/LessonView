@@ -3,7 +3,7 @@ import './ProfessionalToolbar.css';
 import NoteValuePalette from './NoteValuePalette';
 import TimeSignatureSelector from './TimeSignatureSelector';
 import TempoControls from './TempoControls';
-import type { NoteDuration, NoteType } from '../../types';
+import type { NoteDuration, NoteType, ToolMode } from '../../types';
 import { getNotesAtSlot } from '../../types';
 
 interface ProfessionalToolbarProps {
@@ -11,6 +11,8 @@ interface ProfessionalToolbarProps {
   onDurationChange: (duration: NoteDuration) => void;
   selectedNoteType: NoteType;
   onNoteTypeChange: (type: NoteType) => void;
+  currentToolMode: ToolMode;
+  onToolModeChange: (mode: ToolMode) => void;
   tempo: number;
   onTempoChange: (tempo: number) => void;
   timeSignature: string;
@@ -40,6 +42,8 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   onDurationChange,
   selectedNoteType,
   onNoteTypeChange,
+  currentToolMode,
+  onToolModeChange,
   tempo,
   onTempoChange,
   timeSignature,
@@ -169,6 +173,16 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
               })()}
             </span>
             <span className="toolbar-button__text">Dotted</span>
+          </button>
+          <button 
+            className={`toolbar-button ${currentToolMode === 'measureLine' ? 'active' : ''}`}
+            title="Measure Line Tool - Click after a note to place a measure line (for pickup measures)"
+            onClick={() => onToolModeChange(currentToolMode === 'measureLine' ? 'note' : 'measureLine')}
+          >
+            <span className="toolbar-button__icon">
+              📏
+            </span>
+            <span className="toolbar-button__text">Measure</span>
           </button>
         </div>
       ),

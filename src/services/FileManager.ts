@@ -1,4 +1,4 @@
-import type { TabData, NoteDuration, NoteType, CursorPosition } from '../types';
+import type { TabData, NoteDuration, NoteType, CursorPosition, CustomMeasureLine } from '../types';
 import type { VideoConfig } from '../components/sync/SyncEngine';
 
 // Project data structure for serialization
@@ -28,6 +28,7 @@ export interface TabSerializedData {
   bpm: number;
   totalTimeSlots: number;
   data: TabData; // Raw tab data
+  customMeasureLines?: CustomMeasureLine[]; // Custom measure lines for pickup measures
 }
 
 export interface PlaybackSettings {
@@ -64,6 +65,7 @@ export interface AppState {
   cursorPosition: CursorPosition;
   selectedDuration: NoteDuration;
   selectedNoteType: NoteType;
+  customMeasureLines: CustomMeasureLine[];
   zoom: number;
   showFretboard: boolean;
   countInEnabled: boolean;
@@ -252,7 +254,8 @@ export class FileManager {
         timeSignature: { numerator: numerator || 4, denominator: denominator || 4 },
         bpm: appState.tempo,
         totalTimeSlots: appState.tabData.length,
-        data: appState.tabData
+        data: appState.tabData,
+        customMeasureLines: appState.customMeasureLines
       },
       playback: {
         loopEnabled: appState.isLooping,
@@ -290,6 +293,7 @@ export class FileManager {
       timeSignature,
       selectedDuration: projectData.ui?.selectedDuration || 'quarter',
       selectedNoteType: projectData.ui?.selectedNoteType || 'note',
+      customMeasureLines: projectData.tab.customMeasureLines || [],
       zoom: projectData.ui?.zoom || 1.0,
       showFretboard: projectData.ui?.fretboardVisible ?? true,
       countInEnabled: projectData.playback.countInEnabled,

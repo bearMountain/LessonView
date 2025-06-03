@@ -14,6 +14,7 @@ interface ControlsProps {
   onPlaybackComplete?: () => void;
   countInEnabled?: boolean;
   timeSignature?: string;
+  pickupBeats?: number;
   isMuted?: boolean;
 }
 
@@ -24,7 +25,7 @@ export interface ControlsRef {
   stopPlayback: (clearVisualFeedback?: boolean) => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, isMuted }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, pickupBeats, isMuted }, ref) => {
   const [, setIsPlaying] = useState(false);
   const [, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<{ dispose: () => void } | null>(null);
@@ -385,6 +386,9 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       const [numerator] = (timeSignature || '4/4').split('/').map(Number);
       const beatsPerMeasure = numerator || 4;
       
+      // Determine count-in beats (use pickup beats if available, otherwise full measure)
+      const countInBeats = pickupBeats && pickupBeats > 0 ? pickupBeats : beatsPerMeasure;
+      
       // Create metronome synth for count-in clicks
       let clickSynth: Tone.MembraneSynth | null = null;
       if (countInEnabled) {
@@ -404,8 +408,8 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
       let countInSlots = 0;
       if (countInEnabled) {
         // Each beat is 4 sixteenth notes
-        countInSlots = beatsPerMeasure * 4;
-        console.log(`📍 Count-in will use ${countInSlots} slots (${beatsPerMeasure} beats)`);
+        countInSlots = countInBeats * 4;
+        console.log(`📍 Count-in will use ${countInSlots} slots (${countInBeats} beats)`);
       }
       
       // Track current position
@@ -422,17 +426,17 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
             // Play click on every 4th slot (quarter notes)
             if (absoluteSlot % 4 === 0) {
               countInBeat++;
-              console.log(`🎵 Count-in beat ${countInBeat}/${beatsPerMeasure}`);
+              console.log(`🎵 Count-in beat ${countInBeat}/${countInBeats}`);
               
               // Update count-in state
-              onCountInStateChange?.(true, countInBeat, beatsPerMeasure);
+              onCountInStateChange?.(true, countInBeat, countInBeats);
               
               // Play click sound (higher pitch for beat 1)
               const pitch = countInBeat === 1 ? 'C5' : 'C4';
               clickSynth!.triggerAttackRelease(pitch, '8n', time);
               
               // On the last count-in beat, notify completion
-              if (countInBeat === beatsPerMeasure) {
+              if (countInBeat === countInBeats) {
                 // Schedule the count-in state change for after this beat
                 Tone.Transport.schedule(() => {
                   onCountInStateChange?.(false);

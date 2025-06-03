@@ -13,8 +13,8 @@ import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLo
 import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
-import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
-import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, DURATION_SLOTS, getNoteDurationSlots } from './types'
+import type { Note, NoteDuration, NoteType, CursorPosition, TabData, ToolMode, CustomMeasureLine } from './types'
+import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, DURATION_SLOTS, getNoteDurationSlots, getCustomMeasureBoundaries, getPickupBeats } from './types'
 
 // Start with empty tab data
 const initialTabData: TabData = [];
@@ -29,6 +29,8 @@ function AppContent() {
   const [showFretboard, setShowFretboard] = useState<boolean>(true);
   const [selectedDuration, setSelectedDuration] = useState<NoteDuration>('quarter'); // Default note duration
   const [selectedNoteType, setSelectedNoteType] = useState<NoteType>('note'); // Default to note
+  const [currentToolMode, setCurrentToolMode] = useState<ToolMode>('note'); // Default to note tool
+  const [customMeasureLines, setCustomMeasureLines] = useState<CustomMeasureLine[]>([]);
   const [timeSignature, setTimeSignature] = useState<string>('4/4'); // Default time signature
   const [zoom, setZoom] = useState<number>(1.0);
   const [currentPlaybackTimeSlot, setCurrentPlaybackTimeSlot] = useState<number>(-1);
@@ -98,6 +100,7 @@ function AppContent() {
         cursorPosition,
         selectedDuration,
         selectedNoteType,
+        customMeasureLines,
         zoom,
         showFretboard,
         countInEnabled,
@@ -132,6 +135,7 @@ function AppContent() {
       cursorPosition,
       selectedDuration,
       selectedNoteType,
+      customMeasureLines,
       zoom,
       showFretboard,
       countInEnabled,
@@ -171,6 +175,7 @@ function AppContent() {
       cursorPosition,
       selectedDuration,
       selectedNoteType,
+      customMeasureLines,
       zoom,
       showFretboard,
       countInEnabled,
@@ -717,6 +722,31 @@ function AppContent() {
 
   // Handle cursor click (for manual positioning)
   const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean) => {
+    // Handle measure line placement
+    if (currentToolMode === 'measureLine') {
+      // Find the slot where the measure line should be placed
+      // Look for the most recent note and place the line after its duration
+      let measureLineSlot = timeSlot;
+      
+      // Search backwards to find the most recent note
+      for (let slot = timeSlot; slot >= 0; slot--) {
+        for (let str = 0; str < 3; str++) { // Check all strings
+          const notesAtSlot = getNotesAtSlot(tabData, slot, str);
+          if (notesAtSlot.length > 0) {
+            const note = notesAtSlot[0];
+            if (note.startSlot === slot) { // Note starts at this slot
+              const noteEndSlot = slot + getNoteDurationSlots(note.duration, note.isDotted);
+              measureLineSlot = Math.max(measureLineSlot, noteEndSlot);
+              break;
+            }
+          }
+        }
+      }
+      
+      addMeasureLine(measureLineSlot);
+      return;
+    }
+    
     // Check if we're in tie mode (when we have selected notes)
     const inTieMode = selectedNotes.length > 0;
     
@@ -833,6 +863,32 @@ function AppContent() {
     }
   };
 
+  // Add a measure line at the specified slot
+  const addMeasureLine = (slot: number) => {
+    // Find the highest existing measure number
+    const maxMeasureNumber = customMeasureLines.reduce((max, line) => Math.max(max, line.measureNumber), 0);
+    
+    // Create new measure line
+    const newMeasureLine: CustomMeasureLine = {
+      slot,
+      measureNumber: maxMeasureNumber + 1
+    };
+    
+    // Add to custom measure lines and sort by slot
+    const newMeasureLines = [...customMeasureLines, newMeasureLine].sort((a, b) => a.slot - b.slot);
+    
+    // Renumber measure lines sequentially
+    const renumberedLines = newMeasureLines.map((line, index) => ({
+      ...line,
+      measureNumber: index + 1
+    }));
+    
+    setCustomMeasureLines(renumberedLines);
+    
+    // Switch back to note tool after placing measure line
+    setCurrentToolMode('note');
+  };
+
   return (
     <div className="app">
       <MainLayout 
@@ -842,6 +898,8 @@ function AppContent() {
             onDurationChange={handleDurationChange}
             selectedNoteType={selectedNoteType}
             onNoteTypeChange={setSelectedNoteType}
+            currentToolMode={currentToolMode}
+            onToolModeChange={setCurrentToolMode}
             tempo={tempo}
             onTempoChange={setTempo}
             timeSignature={timeSignature}
@@ -910,6 +968,8 @@ function AppContent() {
                   onPlayPreviewNote={handlePlayPreviewNote}
                   selectedDuration={selectedDuration}
                   selectedNoteType={selectedNoteType}
+                  currentToolMode={currentToolMode}
+                  customMeasureLines={customMeasureLines}
                   onTogglePlayback={handlePlayPause}
                   onResetCursor={handleResetCursor}
                   zoom={zoom}
@@ -934,6 +994,7 @@ function AppContent() {
                   onPlaybackComplete={handlePlaybackComplete}
                   countInEnabled={countInEnabled}
                   timeSignature={timeSignature}
+                  pickupBeats={getPickupBeats(customMeasureLines, timeSignature)}
                   isMuted={isSynthMuted}
                 />
               </div>

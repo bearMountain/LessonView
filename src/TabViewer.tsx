@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
-import type { Note, NoteDuration, CursorPosition, TabData, NoteType } from './types';
-import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots } from './types';
+import type { Note, NoteDuration, CursorPosition, TabData, NoteType, ToolMode, CustomMeasureLine } from './types';
+import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries } from './types';
 
 interface TabViewerProps {
   tabData: TabData;
@@ -13,6 +13,8 @@ interface TabViewerProps {
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
   selectedDuration: NoteDuration;
   selectedNoteType: NoteType;
+  currentToolMode: ToolMode;
+  customMeasureLines: CustomMeasureLine[];
   onTogglePlayback?: () => void;
   onResetCursor?: () => void;
   zoom: number;
@@ -50,7 +52,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
   onCreateTie,
   isSynthMuted,
   onSynthMuteToggle,
-  selectedNoteForEditing
+  selectedNoteForEditing,
+  currentToolMode,
+  customMeasureLines
 }) => {
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
@@ -467,7 +471,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
   };
 
   // Get measure boundaries for drawing measure lines
-  const measureBoundaries = getMeasureBoundaries(tabData);
+  const measureBoundaries = getCustomMeasureBoundaries(tabData, customMeasureLines);
 
   return (
     <div className="tab-viewer">

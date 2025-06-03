@@ -4,6 +4,15 @@ export type NoteDuration = 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'
 // Note types - can be a note with fret or a rest
 export type NoteType = 'note' | 'rest';
 
+// Tool types for the toolbar
+export type ToolMode = 'note' | 'measureLine';
+
+// Custom measure line placement
+export interface CustomMeasureLine {
+  slot: number; // The slot where the measure line appears
+  measureNumber: number; // Which measure this starts (1, 2, 3...)
+}
+
 // Individual note/rest with duration and starting time slot
 export interface Note {
   type: NoteType;
@@ -194,6 +203,61 @@ export const getMeasureBoundaries = (tabData: TabData): number[] => {
   }
   
   return boundaries;
+};
+
+// Get custom measure boundaries including pickup measure support
+export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines: CustomMeasureLine[]): number[] => {
+  if (customMeasureLines.length === 0) {
+    return getMeasureBoundaries(tabData);
+  }
+  
+  // Sort custom measure lines by slot position
+  const sortedLines = [...customMeasureLines].sort((a, b) => a.slot - b.slot);
+  
+  const boundaries: number[] = [];
+  
+  // Add all custom measure lines
+  sortedLines.forEach(line => {
+    boundaries.push(line.slot);
+  });
+  
+  // Add regular measure boundaries after the last custom line
+  const lastCustomSlot = sortedLines[sortedLines.length - 1]?.slot || 0;
+  const slotsPerMeasure = 16;
+  
+  // Find the next regular measure boundary after the last custom line
+  let nextBoundary = Math.ceil((lastCustomSlot + 1) / slotsPerMeasure) * slotsPerMeasure;
+  
+  while (nextBoundary < tabData.length) {
+    boundaries.push(nextBoundary);
+    nextBoundary += slotsPerMeasure;
+  }
+  
+  return boundaries.filter((boundary, index, arr) => arr.indexOf(boundary) === index).sort((a, b) => a - b);
+};
+
+// Calculate pickup measure beats for count-in
+export const getPickupBeats = (customMeasureLines: CustomMeasureLine[], timeSignature: string = '4/4'): number => {
+  if (customMeasureLines.length === 0) {
+    return 0; // No pickup measure
+  }
+  
+  // Get the first measure line
+  const firstMeasureLine = customMeasureLines.find(line => line.measureNumber === 1);
+  if (!firstMeasureLine) {
+    return 0;
+  }
+  
+  const [numerator] = timeSignature.split('/').map(Number);
+  const beatsPerMeasure = numerator || 4;
+  const slotsPerBeat = 4; // 4 sixteenth notes per beat
+  
+  // Calculate how many beats from the start of the measure to the first measure line
+  const slotsFromMeasureStart = firstMeasureLine.slot % (beatsPerMeasure * slotsPerBeat);
+  const beatsFromMeasureStart = slotsFromMeasureStart / slotsPerBeat;
+  
+  // Pickup beats are the remaining beats in the measure
+  return beatsPerMeasure - beatsFromMeasureStart;
 };
 
 // Helper function to get the longest duration at a time position
