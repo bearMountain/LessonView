@@ -23,6 +23,7 @@ interface TabViewerProps {
   onCreateTie?: () => void;
   isSynthMuted?: boolean;
   onSynthMuteToggle?: () => void;
+  selectedNoteForEditing?: { timeSlot: number; stringIndex: number } | null;
 }
 
 // String labels (reversed order - Hi D on top)
@@ -48,7 +49,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
   selectedNotes,
   onCreateTie,
   isSynthMuted,
-  onSynthMuteToggle
+  onSynthMuteToggle,
+  selectedNoteForEditing
 }) => {
   const [currentFretInput, setCurrentFretInput] = useState<string>(''); // Track current fret being typed
   const svgRef = useRef<SVGSVGElement>(null);
@@ -639,6 +641,19 @@ const TabViewer: React.FC<TabViewerProps> = ({
               />
             );
           })}
+
+          {/* Selected note for editing highlighting */}
+          {selectedNoteForEditing && (
+            <circle
+              cx={getSlotX(selectedNoteForEditing.timeSlot, leftMargin, slotWidth)}
+              cy={getStringY(selectedNoteForEditing.stringIndex)}
+              r="16"
+              fill="none"
+              stroke="#ff6b35"
+              strokeWidth="3"
+              opacity="0.9"
+            />
+          )}
 
           {/* Cursor */}
           <g className="cursor">

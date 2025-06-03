@@ -14,7 +14,7 @@ import { FileManager, type AppState, type StrumstickProjectData, type ProjectMet
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
-import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie } from './types'
+import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, DURATION_SLOTS } from './types'
 
 // Start with empty tab data
 const initialTabData: TabData = [];
@@ -35,6 +35,9 @@ function AppContent() {
   const [countInEnabled, setCountInEnabled] = useState<boolean>(false);
   const [selectedNotes, setSelectedNotes] = useState<Array<{ timeSlot: number; stringIndex: number }>>([]);
   const [firstSelectedNote, setFirstSelectedNote] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
+  
+  // Add state for single note selection (for duration editing)
+  const [selectedNoteForEditing, setSelectedNoteForEditing] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
   
   // Video sync state
   const [videoSource, setVideoSource] = useState<string>('/videos/test-vid-1.mp4');
@@ -444,6 +447,119 @@ function AppContent() {
     }
   };
 
+  // Change note duration and shift subsequent notes
+  const changeNoteDuration = (timeSlot: number, stringIndex: number, newDuration: NoteDuration) => {
+    // Find the note at the specified position
+    const notesAtPosition = getNotesAtSlot(tabData, timeSlot, stringIndex);
+    if (notesAtPosition.length === 0) return;
+    
+    const noteToChange = notesAtPosition[0];
+    const oldDuration = noteToChange.duration;
+    const oldSlots = DURATION_SLOTS[oldDuration];
+    const newSlots = DURATION_SLOTS[newDuration];
+    const slotDifference = newSlots - oldSlots;
+    
+    // If no change needed, return
+    if (slotDifference === 0) return;
+    
+    // Create new tab data
+    let newTabData = [...tabData];
+    
+    // Remove the old note
+    newTabData = removeNoteFromGrid(newTabData, noteToChange);
+    
+    // Create updated note with new duration
+    const updatedNote: Note = {
+      ...noteToChange,
+      duration: newDuration
+    };
+    
+    // If expanding the note (positive slotDifference), shift all subsequent notes forward
+    if (slotDifference > 0) {
+      // Collect all notes that start after this note's current end position
+      const noteEndSlot = timeSlot + oldSlots;
+      const notesToShift: Array<{ note: Note; oldSlot: number }> = [];
+      
+      // Find all notes that need to be shifted
+      for (let slot = noteEndSlot; slot < newTabData.length; slot++) {
+        if (newTabData[slot] && newTabData[slot].notes) {
+          for (const note of newTabData[slot].notes) {
+            if (note.startSlot === slot) { // Only shift notes that actually start at this slot
+              notesToShift.push({ note, oldSlot: slot });
+            }
+          }
+        }
+      }
+      
+      // Remove all notes that need to be shifted
+      for (const { note } of notesToShift) {
+        newTabData = removeNoteFromGrid(newTabData, note);
+      }
+      
+      // Add them back at their new positions
+      for (const { note } of notesToShift) {
+        const shiftedNote: Note = {
+          ...note,
+          startSlot: note.startSlot + slotDifference
+        };
+        newTabData = addNoteToGrid(newTabData, shiftedNote);
+      }
+    }
+    
+    // If shrinking the note (negative slotDifference), shift all subsequent notes backward
+    else if (slotDifference < 0) {
+      // Collect all notes that start after this note's new end position
+      const newNoteEndSlot = timeSlot + newSlots;
+      const notesToShift: Array<{ note: Note; oldSlot: number }> = [];
+      
+      // Find all notes that need to be shifted
+      for (let slot = newNoteEndSlot; slot < newTabData.length; slot++) {
+        if (newTabData[slot] && newTabData[slot].notes) {
+          for (const note of newTabData[slot].notes) {
+            if (note.startSlot === slot) { // Only shift notes that actually start at this slot
+              notesToShift.push({ note, oldSlot: slot });
+            }
+          }
+        }
+      }
+      
+      // Remove all notes that need to be shifted
+      for (const { note } of notesToShift) {
+        newTabData = removeNoteFromGrid(newTabData, note);
+      }
+      
+      // Add them back at their new positions (shifted backward)
+      for (const { note } of notesToShift) {
+        const newSlot = Math.max(newNoteEndSlot, note.startSlot + slotDifference);
+        const shiftedNote: Note = {
+          ...note,
+          startSlot: newSlot
+        };
+        newTabData = addNoteToGrid(newTabData, shiftedNote);
+      }
+    }
+    
+    // Add the updated note
+    newTabData = addNoteToGrid(newTabData, updatedNote);
+    
+    // Update the tab data
+    setTabData(newTabData);
+    
+    // Clear the selected note since we've made the change
+    setSelectedNoteForEditing(null);
+  };
+
+  // Handle duration change from toolbar
+  const handleDurationChange = (newDuration: NoteDuration) => {
+    // If we have a note selected for editing, change its duration
+    if (selectedNoteForEditing) {
+      changeNoteDuration(selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex, newDuration);
+    } else {
+      // Otherwise, just update the default duration for new notes
+      setSelectedDuration(newDuration);
+    }
+  };
+
   // Add a note at the current cursor position with selected duration
   const addNote = (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => {
     const noteDuration = duration || selectedDuration;
@@ -496,6 +612,9 @@ function AppContent() {
 
       return { timeSlot: newTimeSlot, stringIndex: newStringIndex };
     });
+    
+    // Clear selected note for editing when moving cursor manually
+    setSelectedNoteForEditing(null);
   };
 
   // Handle cursor click (for manual positioning)
@@ -538,6 +657,16 @@ function AppContent() {
       setCursorPosition({ timeSlot, stringIndex });
       setSelectedNotes([]);
       setFirstSelectedNote(null);
+      
+      // Check if we clicked on an existing note to select it for editing
+      const notesAtPosition = getNotesAtSlot(tabData, timeSlot, stringIndex);
+      if (notesAtPosition.length > 0) {
+        // Select this note for duration editing
+        setSelectedNoteForEditing({ timeSlot, stringIndex });
+      } else {
+        // Clear selection if clicking on empty space
+        setSelectedNoteForEditing(null);
+      }
       
       // Clear paused state and playback indicator when manually moving cursor
       setPausedAtTimeSlot(-1);
@@ -620,7 +749,7 @@ function AppContent() {
         toolbar={
           <ProfessionalToolbar
             selectedDuration={selectedDuration}
-            onDurationChange={setSelectedDuration}
+            onDurationChange={handleDurationChange}
             selectedNoteType={selectedNoteType}
             onNoteTypeChange={setSelectedNoteType}
             tempo={tempo}
@@ -697,6 +826,7 @@ function AppContent() {
                   onCreateTie={handleCreateTie}
                   isSynthMuted={isSynthMuted}
                   onSynthMuteToggle={handleSynthMuteToggle}
+                  selectedNoteForEditing={selectedNoteForEditing}
                 />
                 
                 <Controls
