@@ -270,8 +270,10 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   const lastCustomSlot = sortedLines[sortedLines.length - 1]?.slot || 0;
   const slotsPerMeasure = 16;
   
-  // Find the next regular measure boundary after the last custom line
-  let nextBoundary = Math.ceil((lastCustomSlot + 1) / slotsPerMeasure) * slotsPerMeasure;
+  // Calculate subsequent measure boundaries starting from the custom measure line position
+  // The custom measure line marks the start of the first full measure, so subsequent
+  // measures should be at regular intervals from that point
+  let nextBoundary = lastCustomSlot + slotsPerMeasure;
   
   while (nextBoundary < tabData.length) {
     boundaries.push(nextBoundary);
