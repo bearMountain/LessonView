@@ -28,54 +28,20 @@ This document defines the behavior for automatic measure line placement between 
 ```
 [Q---Q] -> [Q--|-Q]
 [E-E] -> [E-|-E] (here an extra slot was added visually only)
+[W--------------|-*---------------] -> [W--------------|-*---------------] (here '*' applies as a wild card - i.e. applies to any type of note)
 ```
 
-### All Possible Combinations
+### All Note Type Combinations
 
-#### Whole Note + Other Notes
 ```
-[W---------------W---------------] -> [W---------------W---------------]
-[W---------------H-------] -> [W---------------H-------]
-[W---------------Q---] -> [W---------------Q---]
-[W---------------E-] -> [W---------------E-]
-[W---------------S] -> [W---------------S]
-```
-
-#### Half Note + Other Notes
-```
-[H-------W---------------] -> [H-------W---------------]
-[H-------H-------] -> [H-------H-------]
-[H-------Q---] -> [H-------Q---]
-[H-------E-] -> [H-------E-]
-[H-------S] -> [H-------S]
+[W--------------|-*---------------] -> [W--------------|-*---------------]
+[H-------*-------] -> [H-------*-------]
+[Q---*---] -> [Q---*---]
+[E-*-] -> [E-*-]
+[S*] -> [S*]
 ```
 
-#### Quarter Note + Other Notes
-```
-[Q---W---------------] -> [Q---W---------------]
-[Q---H-------] -> [Q---H-------]
-[Q---Q---] -> [Q---Q---]
-[Q---E-] -> [Q---E-]
-[Q---S] -> [Q---S]
-```
-
-#### Eighth Note + Other Notes
-```
-[E-W---------------] -> [E-W---------------]
-[E-H-------] -> [E-H-------]
-[E-Q---] -> [E-Q---]
-[E-E-] -> [E-E-]
-[E-S] -> [E-S]
-```
-
-#### Sixteenth Note + Other Notes
-```
-[SW---------------] -> [SW---------------]
-[SH-------] -> [SH-------]
-[SQ---] -> [SQ---]
-[SE-] -> [SE-]
-[SS] -> [SS]
-```
+**Note**: The '*' wildcard represents any note type (W, H, Q, E, or S) since the measure line placement logic depends only on the first note type, not the second.
 
 ## Implementation Notes
 
