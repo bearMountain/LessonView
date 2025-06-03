@@ -5,7 +5,7 @@ import { getTotalNoteDuration } from './types';
 
 interface ControlsProps {
   tabData: TabData;
-  cursorPosition: { timeSlot: number; stringIndex: number };
+  currentPosition: { timeSlot: number; stringIndex: number };
   onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
   onPlaybackStateChange?: (isPlaying: boolean) => void;
@@ -25,7 +25,7 @@ export interface ControlsRef {
   stopPlayback: (clearVisualFeedback?: boolean) => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, pickupBeats, isMuted }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, currentPosition, onNotesPlaying, tempo, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, pickupBeats, isMuted }, ref) => {
   const [, setIsPlaying] = useState(false);
   const [, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<{ dispose: () => void } | null>(null);
@@ -344,7 +344,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPositi
   }));
 
   const playTab = async () => {
-    await playFromPosition(cursorPosition.timeSlot);
+    await playFromPosition(currentPosition.timeSlot);
   };
 
   const playFromPosition = async (startPosition: number) => {

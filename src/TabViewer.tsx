@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
 import type { Note, NoteDuration, CursorPosition, TabData, NoteType, ToolMode, CustomMeasureLine } from './types';
-import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries, getVisualNoteX, getVisualSlotX } from './types';
+import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getNotesAtSlot, getAllTies, getNoteDurationSlots, getCustomMeasureBoundaries, getVisualNoteX, getVisualSlotX } from './types';
 
 interface TabViewerProps {
   tabData: TabData;
-  cursorPosition: CursorPosition;
+  currentPosition: CursorPosition;
   onAddNote: (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => void;
   onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
@@ -25,7 +25,7 @@ interface TabViewerProps {
   onCreateTie?: () => void;
   isSynthMuted?: boolean;
   onSynthMuteToggle?: () => void;
-  selectedNoteForEditing?: { timeSlot: number; stringIndex: number } | null;
+  noteAtCurrentPosition?: Note | null;
 }
 
 // String labels (reversed order - Hi D on top)
@@ -34,7 +34,7 @@ const stringIndices = [2, 1, 0]; // Data indices: Hi D=2, A=1, Low D=0
 
 const TabViewer: React.FC<TabViewerProps> = ({ 
   tabData, 
-  cursorPosition, 
+  currentPosition, 
   onAddNote, 
   onRemoveNote,
   onMoveCursor,
@@ -52,7 +52,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
   onCreateTie,
   isSynthMuted,
   onSynthMuteToggle,
-  selectedNoteForEditing,
+  noteAtCurrentPosition,
   currentToolMode,
   customMeasureLines
 }) => {
@@ -69,7 +69,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
   const slotWidth = 20 * zoom; // Width of each sixteenth note slot
 
   // Calculate total width needed
-  const minSlots = Math.max(tabData.length, cursorPosition.timeSlot + 8); // Show at least 8 slots ahead of cursor
+  const minSlots = Math.max(tabData.length, currentPosition.timeSlot + 8); // Show at least 8 slots ahead of cursor
   const totalWidth = leftMargin + (minSlots * slotWidth) + rightMargin;
   const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing)) * zoom;
 
@@ -82,17 +82,17 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
   // Get cursor position in pixels
   const getCursorX = () => {
-    return getSlotX(cursorPosition.timeSlot, leftMargin, slotWidth);
+    return getSlotX(currentPosition.timeSlot, leftMargin, slotWidth);
   };
 
   const getCursorY = () => {
-    return getStringY(cursorPosition.stringIndex);
+    return getStringY(currentPosition.stringIndex);
   };
 
   // Load existing note into currentFretInput when cursor moves to it
   const loadExistingNote = () => {
     // Check if there's a note at the current cursor position
-    const notesAtCursor = getNotesAtSlot(tabData, cursorPosition.timeSlot, cursorPosition.stringIndex);
+    const notesAtCursor = getNotesAtSlot(tabData, currentPosition.timeSlot, currentPosition.stringIndex);
     
     if (notesAtCursor.length > 0) {
       const existingNote = notesAtCursor[0];
@@ -101,7 +101,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
         setCurrentFretInput(existingNote.fret.toString());
         // Play preview sound for the existing note (unless we're resetting via Cmd+Enter)
         if (onPlayPreviewNote && !isResettingRef.current) {
-          onPlayPreviewNote(existingNote.fret, cursorPosition.stringIndex);
+          onPlayPreviewNote(existingNote.fret, currentPosition.stringIndex);
         }
       } else {
         // Rest or null fret, clear input
@@ -120,7 +120,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
   useEffect(() => {
     loadExistingNote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursorPosition]);
+  }, [currentPosition]);
 
   // Handle keyboard input
   useEffect(() => {
@@ -205,14 +205,14 @@ const TabViewer: React.FC<TabViewerProps> = ({
               onAddNote(potentialFret, selectedDuration, 'note');
               // Play preview sound for the new note
               if (onPlayPreviewNote) {
-                onPlayPreviewNote(potentialFret, cursorPosition.stringIndex);
+                onPlayPreviewNote(potentialFret, currentPosition.stringIndex);
               }
             } else {
               // Update existing note by calling onAddNote again (it will replace the note at current position)
               onAddNote(potentialFret, selectedDuration, 'note');
               // Play preview sound for the updated note
               if (onPlayPreviewNote) {
-                onPlayPreviewNote(potentialFret, cursorPosition.stringIndex);
+                onPlayPreviewNote(potentialFret, currentPosition.stringIndex);
               }
             }
           }
@@ -682,44 +682,29 @@ const TabViewer: React.FC<TabViewerProps> = ({
             );
           })}
 
-          {/* Selected note for editing highlighting */}
-          {selectedNoteForEditing && (
-            (() => {
-              // Use getVisualSlotX for consistent positioning
-              const x = getVisualSlotX(selectedNoteForEditing.timeSlot, customMeasureLines, leftMargin, slotWidth);
-              
-              return (
-                <circle
-                  cx={x}
-                  cy={getStringY(selectedNoteForEditing.stringIndex)}
-                  r="16"
-                  fill="none"
-                  stroke="#ff6b35"
-                  strokeWidth="3"
-                  opacity="0.9"
-                />
-              );
-            })()
-          )}
-
-          {/* Cursor */}
-          <g className="cursor">
-            <line
-              x1={getCursorX()}
-              y1={getCursorY() - 20}
-              x2={getCursorX()}
-              y2={getCursorY() + 20}
-              stroke="#ff0000"
-              strokeWidth="3"
-            />
+          {/* Current position indicator - always visible orange circle */}
+          <g className="current-position">
             <circle
               cx={getCursorX()}
               cy={getCursorY()}
-              r="8"
+              r="16"
               fill="none"
-              stroke="#ff0000"
-              strokeWidth="2"
+              stroke="#ff6b35"
+              strokeWidth="3"
+              opacity={noteAtCurrentPosition ? "0.9" : "0.6"} // More prominent when there's a note
             />
+            {/* Additional inner circle when there's a note at current position */}
+            {noteAtCurrentPosition && (
+              <circle
+                cx={getCursorX()}
+                cy={getCursorY()}
+                r="12"
+                fill="none"
+                stroke="#ff6b35"
+                strokeWidth="2"
+                opacity="0.5"
+              />
+            )}
           </g>
 
           {/* Playback indicator - shows current playing position */}

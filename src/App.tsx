@@ -14,7 +14,7 @@ import { FileManager, type AppState, type ProjectMetadata } from './services/Fil
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData, ToolMode, CustomMeasureLine } from './types'
-import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, DURATION_SLOTS, getNoteDurationSlots, getCustomMeasureBoundaries, getPickupBeats } from './types'
+import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, getNoteDurationSlots, getPickupBeats } from './types'
 
 // Start with empty tab data
 const initialTabData: TabData = [];
@@ -22,7 +22,7 @@ const initialTabData: TabData = [];
 // Main App Content Component (needs to be inside SyncEngineProvider)
 function AppContent() {
   const [tabData, setTabData] = useState<TabData>(initialTabData);
-  const [cursorPosition, setCursorPosition] = useState<CursorPosition>({ timeSlot: 0, stringIndex: 2 }); // Start on Hi D string
+  const [currentPosition, setCurrentPosition] = useState<CursorPosition>({ timeSlot: 0, stringIndex: 2 }); // Unified position state
   const [currentlyPlaying, setCurrentlyPlaying] = useState<{ fret: number; stringIndex: number }[]>([]);
   const [tempo, setTempo] = useState<number>(120); // Default 120 BPM
   const [isLooping, setIsLooping] = useState<boolean>(false);
@@ -37,9 +37,6 @@ function AppContent() {
   const [countInEnabled, setCountInEnabled] = useState<boolean>(false);
   const [selectedNotes, setSelectedNotes] = useState<Array<{ timeSlot: number; stringIndex: number }>>([]);
   const [firstSelectedNote, setFirstSelectedNote] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
-  
-  // Add state for single note selection (for duration editing)
-  const [selectedNoteForEditing, setSelectedNoteForEditing] = useState<{ timeSlot: number; stringIndex: number } | null>(null);
   
   // Video sync state
   const [videoSource, setVideoSource] = useState<string>('/videos/test-vid-1.mp4');
@@ -97,7 +94,7 @@ function AppContent() {
         tabData,
         tempo,
         timeSignature,
-        cursorPosition,
+        cursorPosition: currentPosition,
         selectedDuration,
         selectedNoteType,
         customMeasureLines,
@@ -132,7 +129,7 @@ function AppContent() {
       tabData,
       tempo,
       timeSignature,
-      cursorPosition,
+      cursorPosition: currentPosition,
       selectedDuration,
       selectedNoteType,
       customMeasureLines,
@@ -172,7 +169,7 @@ function AppContent() {
       tabData,
       tempo,
       timeSignature,
-      cursorPosition,
+      cursorPosition: currentPosition,
       selectedDuration,
       selectedNoteType,
       customMeasureLines,
@@ -237,7 +234,7 @@ function AppContent() {
       }
       
       // Reset cursor to beginning
-      setCursorPosition({ timeSlot: 0, stringIndex: 2 });
+      setCurrentPosition({ timeSlot: 0, stringIndex: 2 });
       
       // Update project metadata
       setCurrentProjectMetadata(result.data.metadata);
@@ -261,7 +258,7 @@ function AppContent() {
     
     // Reset to initial state
     setTabData(initialTabData);
-    setCursorPosition({ timeSlot: 0, stringIndex: 2 });
+    setCurrentPosition({ timeSlot: 0, stringIndex: 2 });
     setTempo(120);
     setTimeSignature('4/4');
     setSelectedDuration('quarter');
@@ -340,6 +337,17 @@ function AppContent() {
     }
   }, [videoSource, syncEngine]);
 
+  // Get playback starting position - use current position
+  const getPlaybackStartPosition = (): number => {
+    return currentPosition.timeSlot;
+  };
+
+  // Helper function to get note at current position (automatic selection)
+  const getNoteAtCurrentPosition = (): Note | null => {
+    const notesAtPosition = getNotesAtSlot(tabData, currentPosition.timeSlot, currentPosition.stringIndex);
+    return notesAtPosition.length > 0 ? notesAtPosition[0] : null;
+  };
+
   // Handle play/pause button press (space bar or transport controls)
   const handlePlayPause = () => {
     console.log(`🎮 handlePlayPause called - current isPlaying: ${isPlaying}`);
@@ -364,8 +372,8 @@ function AppContent() {
       console.log('▶️ Starting playback...');
       
       // Determine where to start playback
-      const startPosition = pausedAtTimeSlot >= 0 ? pausedAtTimeSlot : cursorPosition.timeSlot;
-      console.log(`📍 Starting playback from position: ${startPosition} (paused: ${pausedAtTimeSlot}, cursor: ${cursorPosition.timeSlot})`);
+      const startPosition = pausedAtTimeSlot >= 0 ? pausedAtTimeSlot : getPlaybackStartPosition();
+      console.log(`📍 Starting playback from position: ${startPosition} (paused: ${pausedAtTimeSlot}, current: ${currentPosition.timeSlot})`);
       
       // Play sync engine first 
       syncEngine.play();
@@ -378,8 +386,8 @@ function AppContent() {
           // Clear the paused position since we're now playing
           setPausedAtTimeSlot(-1);
         } else {
-          // Start from cursor position (fresh start)
-          controlsRef.current.playTab();
+          // Start from current position (fresh start)
+          controlsRef.current.playFromPosition(startPosition);
         }
       }
     }
@@ -403,7 +411,7 @@ function AppContent() {
 
   // Handle reset cursor to start (cmd+enter shortcut) 
   const handleResetCursor = () => {
-    setCursorPosition({ timeSlot: 0, stringIndex: 2 }); // Reset to start, Hi D string
+    setCurrentPosition({ timeSlot: 0, stringIndex: 2 }); // Reset to start, Hi D string
     setPausedAtTimeSlot(-1); // Clear any paused position
     setCurrentPlaybackTimeSlot(-1); // Clear playback indicator
     syncEngine.seekToSlot(0); // Reset sync engine time as well
@@ -551,39 +559,35 @@ function AppContent() {
     setTabData(newTabData);
     
     // Clear the selected note since we've made the change
-    setSelectedNoteForEditing(null);
+    setFirstSelectedNote(null);
   };
 
-  // Toggle dotted status of selected note
+  // Toggle dotted status of note at current position
   const toggleDottedNote = () => {
-    if (!selectedNoteForEditing) return;
+    const noteAtPosition = getNoteAtCurrentPosition();
+    if (!noteAtPosition) return;
     
-    // Find the note at the specified position
-    const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
-    if (notesAtPosition.length === 0) return;
-    
-    const noteToChange = notesAtPosition[0];
-    const newDottedStatus = !noteToChange.isDotted;
-    const oldSlots = getNoteDurationSlots(noteToChange.duration, noteToChange.isDotted);
-    const newSlots = getNoteDurationSlots(noteToChange.duration, newDottedStatus);
+    const newDottedStatus = !noteAtPosition.isDotted;
+    const oldSlots = getNoteDurationSlots(noteAtPosition.duration, noteAtPosition.isDotted);
+    const newSlots = getNoteDurationSlots(noteAtPosition.duration, newDottedStatus);
     const slotDifference = newSlots - oldSlots;
     
     // Create new tab data
     let newTabData = [...tabData];
     
     // Remove the old note
-    newTabData = removeNoteFromGrid(newTabData, noteToChange);
+    newTabData = removeNoteFromGrid(newTabData, noteAtPosition);
     
     // Create updated note with dotted status
     const updatedNote: Note = {
-      ...noteToChange,
+      ...noteAtPosition,
       isDotted: newDottedStatus
     };
     
     // If expanding the note (positive slotDifference), shift all subsequent notes forward
     if (slotDifference > 0) {
       // Collect all notes that start after this note's current end position
-      const noteEndSlot = selectedNoteForEditing.timeSlot + oldSlots;
+      const noteEndSlot = currentPosition.timeSlot + oldSlots;
       const notesToShift: Array<{ note: Note; oldSlot: number }> = [];
       
       // Find all notes that need to be shifted
@@ -615,7 +619,7 @@ function AppContent() {
     // If shrinking the note (negative slotDifference), shift all subsequent notes backward
     else if (slotDifference < 0) {
       // Collect all notes that start after this note's new end position
-      const newNoteEndSlot = selectedNoteForEditing.timeSlot + newSlots;
+      const newNoteEndSlot = currentPosition.timeSlot + newSlots;
       const notesToShift: Array<{ note: Note; oldSlot: number }> = [];
       
       // Find all notes that need to be shifted
@@ -654,16 +658,17 @@ function AppContent() {
 
   // Handle duration change from toolbar
   const handleDurationChange = (newDuration: NoteDuration) => {
-    // If we have a note selected for editing, change its duration
-    if (selectedNoteForEditing) {
-      changeNoteDuration(selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex, newDuration);
+    // If there's a note at current position, change its duration
+    const noteAtPosition = getNoteAtCurrentPosition();
+    if (noteAtPosition) {
+      changeNoteDuration(currentPosition.timeSlot, currentPosition.stringIndex, newDuration);
     } else {
       // Otherwise, just update the default duration for new notes
       setSelectedDuration(newDuration);
     }
   };
 
-  // Add a note at the current cursor position with selected duration
+  // Add a note at the current position with selected duration
   const addNote = (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => {
     const noteDuration = duration || selectedDuration;
     const noteType = type || selectedNoteType;
@@ -672,22 +677,18 @@ function AppContent() {
       type: noteType,
       fret,
       duration: noteDuration,
-      stringIndex: cursorPosition.stringIndex,
-      startSlot: cursorPosition.timeSlot,
+      stringIndex: currentPosition.stringIndex,
+      startSlot: currentPosition.timeSlot,
     };
 
     setTabData(prevData => addNoteToGrid(prevData, newNote));
     
-    // Automatically select the newly created note for editing
-    setSelectedNoteForEditing({
-      timeSlot: cursorPosition.timeSlot,
-      stringIndex: cursorPosition.stringIndex
-    });
+    // Note: no need to set selection - current position automatically means selected
   };
 
-  // Remove note at current cursor position
+  // Remove note at current position
   const removeNote = () => {
-    const notesToRemove = getNotesAtSlot(tabData, cursorPosition.timeSlot, cursorPosition.stringIndex);
+    const notesToRemove = getNotesAtSlot(tabData, currentPosition.timeSlot, currentPosition.stringIndex);
     
     if (notesToRemove.length > 0) {
       let newTabData = tabData;
@@ -698,9 +699,9 @@ function AppContent() {
     }
   };
 
-  // Move cursor
-  const moveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
-    setCursorPosition(prev => {
+  // Move position (unified cursor/selection movement)
+  const movePosition = (direction: 'left' | 'right' | 'up' | 'down') => {
+    setCurrentPosition(prev => {
       let newTimeSlot = prev.timeSlot;
       let newStringIndex = prev.stringIndex;
 
@@ -722,12 +723,11 @@ function AppContent() {
       return { timeSlot: newTimeSlot, stringIndex: newStringIndex };
     });
     
-    // Clear selected note for editing when moving cursor manually
-    setSelectedNoteForEditing(null);
+    // Note: selection is automatic based on position - no need to manually manage
   };
 
-  // Handle cursor click (for manual positioning)
-  const handleCursorClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => {
+  // Handle position click (unified cursor/selection positioning)
+  const handlePositionClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => {
     // Handle measure line placement or deletion
     if (currentToolMode === 'measureLine') {
       // If clicked on an existing measure line, delete it
@@ -753,7 +753,7 @@ function AppContent() {
     const inTieMode = selectedNotes.length > 0;
     
     if (inTieMode && shiftHeld) {
-      // Multi-select for tie creation
+      // Multi-select for tie creation (unchanged)
       const newSelection = { timeSlot, stringIndex };
       
       // Check if this position is already selected
@@ -783,22 +783,14 @@ function AppContent() {
         }
       }
     } else {
-      // Normal cursor movement - clear any tie selection and paused state
-      setCursorPosition({ timeSlot, stringIndex });
+      // Normal position movement - clear any tie selection and paused state
+      setCurrentPosition({ timeSlot, stringIndex });
       setSelectedNotes([]);
       setFirstSelectedNote(null);
       
-      // Check if we clicked on an existing note to select it for editing
-      const notesAtPosition = getNotesAtSlot(tabData, timeSlot, stringIndex);
-      if (notesAtPosition.length > 0) {
-        // Select this note for duration editing
-        setSelectedNoteForEditing({ timeSlot, stringIndex });
-      } else {
-        // Clear selection if clicking on empty space
-        setSelectedNoteForEditing(null);
-      }
+      // Note: selection is automatic based on position - no need to check for notes manually
       
-      // Clear paused state and playback indicator when manually moving cursor
+      // Clear paused state and playback indicator when manually moving position
       setPausedAtTimeSlot(-1);
       setCurrentPlaybackTimeSlot(-1);
       
@@ -848,16 +840,6 @@ function AppContent() {
   // Update the currently playing notes (visual feedback)
   const handleNotesPlaying = (notes: { fret: number; stringIndex: number }[]) => {
     setCurrentlyPlaying(notes);
-  };
-
-  // Handle when playback naturally completes
-  const handlePlaybackComplete = () => {
-    console.log('🏁 Playback completed naturally');
-    setPausedAtTimeSlot(-1); // Clear any paused position since playback ended
-    
-    // Pause the sync engine when tab completes to ensure button state is correct
-    // This allows the video to continue playing while showing the correct UI state
-    syncEngine.pause();
   };
 
   // Handle current time slot change (playback indicator)
@@ -923,9 +905,9 @@ function AppContent() {
             onSaveAs={handleSaveAs}
             isModified={isModified}
             // Dotted note support
-            selectedNoteForEditing={selectedNoteForEditing}
+            currentPosition={currentPosition}
+            noteAtCurrentPosition={getNoteAtCurrentPosition()}
             onToggleDotted={toggleDottedNote}
-            tabData={tabData}
           />
         }
         fretboard={
@@ -970,11 +952,11 @@ function AppContent() {
               <div className="tab-editor-pane">
                 <TabViewer
                   tabData={tabData}
-                  cursorPosition={cursorPosition}
+                  currentPosition={currentPosition}
                   onAddNote={addNote}
                   onRemoveNote={removeNote}
-                  onMoveCursor={moveCursor}
-                  onCursorClick={handleCursorClick}
+                  onMoveCursor={movePosition}
+                  onCursorClick={handlePositionClick}
                   onPlayPreviewNote={handlePlayPreviewNote}
                   selectedDuration={selectedDuration}
                   selectedNoteType={selectedNoteType}
@@ -990,18 +972,17 @@ function AppContent() {
                   onCreateTie={handleCreateTie}
                   isSynthMuted={isSynthMuted}
                   onSynthMuteToggle={handleSynthMuteToggle}
-                  selectedNoteForEditing={selectedNoteForEditing}
+                  noteAtCurrentPosition={getNoteAtCurrentPosition()}
                 />
                 
                 <Controls
                   ref={controlsRef}
                   tabData={tabData}
-                  cursorPosition={cursorPosition}
+                  currentPosition={currentPosition}
                   onNotesPlaying={handleNotesPlaying}
                   tempo={tempo}
                   onPlaybackStateChange={handlePlaybackStateChange}
                   onCurrentTimeSlotChange={handleCurrentTimeSlotChange}
-                  onPlaybackComplete={handlePlaybackComplete}
                   countInEnabled={countInEnabled}
                   timeSignature={timeSignature}
                   pickupBeats={getPickupBeats(customMeasureLines, timeSignature)}
