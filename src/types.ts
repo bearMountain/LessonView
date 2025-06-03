@@ -11,6 +11,7 @@ export type ToolMode = 'note' | 'measureLine';
 export interface CustomMeasureLine {
   slot: number; // The slot where the measure line appears
   measureNumber: number; // Which measure this starts (1, 2, 3...)
+  noteAtSlot?: { timeSlot: number; stringIndex: number }; // Note that was clicked to create this measure line
 }
 
 // Individual note/rest with duration and starting time slot

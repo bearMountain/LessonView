@@ -159,14 +159,19 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
             <span className="toolbar-button__text">Tie</span>
           </button>
           <button 
-            className={`toolbar-button ${selectedNoteForEditing ? 'active' : ''}`}
+            className={`toolbar-button ${(() => {
+              if (!selectedNoteForEditing || !tabData) return '';
+              const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
+              const isDotted = notesAtPosition.length > 0 && notesAtPosition[0].isDotted;
+              return isDotted ? 'active' : '';
+            })()}`}
             title="Toggle Dotted Note"
             onClick={onToggleDotted}
             disabled={!selectedNoteForEditing}
           >
             <span className="toolbar-button__icon">
               {(() => {
-                if (!selectedNoteForEditing || !tabData) return '•';
+                if (!selectedNoteForEditing || !tabData) return '♪';
                 const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
                 const isDotted = notesAtPosition.length > 0 && notesAtPosition[0].isDotted;
                 return isDotted ? '♪.' : '♪';

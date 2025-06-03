@@ -371,8 +371,15 @@ const TabViewer: React.FC<TabViewerProps> = ({
       if (notesAtSlot.length > 0) {
         const noteAtSlot = notesAtSlot[0];
         if (noteAtSlot.startSlot === slot) {
-          // Check if click is close to the note position
-          const noteX = getSlotX(slot, leftMargin, slotWidth);
+          // Check if this note has a visual offset
+          const hasMeasureLine = customMeasureLines.some(line => 
+            line.noteAtSlot?.timeSlot === noteAtSlot.startSlot && 
+            line.noteAtSlot?.stringIndex === noteAtSlot.stringIndex
+          );
+          const visualOffset = hasMeasureLine ? slotWidth * 0.5 : 0;
+          
+          // Check if click is close to the note position (including visual offset)
+          const noteX = getSlotX(slot, leftMargin, slotWidth) + visualOffset;
           const distance = Math.abs(x - noteX);
           if (distance < slotWidth * 0.8) { // Within 80% of slot width
             noteTimeSlot = slot;
@@ -555,6 +562,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
             const topY = getStringY(2) - 10; // Hi D
             const bottomY = getStringY(0) + 10; // Low D
             
+            // Check if this is a custom measure line
+            const isCustomMeasureLine = customMeasureLines.some(line => line.slot === slotPosition);
+            
             return (
               <line
                 key={`measure-${slotPosition}`}
@@ -562,9 +572,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
                 y1={topY}
                 x2={x}
                 y2={bottomY}
-                stroke="#666"
-                strokeWidth="2"
-                strokeDasharray="5,5"
+                stroke={isCustomMeasureLine ? "#ff6b35" : "#666"}
+                strokeWidth={isCustomMeasureLine ? "3" : "2"}
+                strokeDasharray={isCustomMeasureLine ? "3,2" : "5,5"}
               />
             );
           })}
@@ -572,7 +582,16 @@ const TabViewer: React.FC<TabViewerProps> = ({
           {/* Notes and rests - iterate through all slots */}
           {tabData.map((cell, slotIndex) => {
             return cell.notes.map((note, noteIndex) => {
-              const x = getSlotX(slotIndex, leftMargin, slotWidth);
+              // Check if this note has a measure line placed on it
+              const hasMeasureLine = customMeasureLines.some(line => 
+                line.noteAtSlot?.timeSlot === note.startSlot && 
+                line.noteAtSlot?.stringIndex === note.stringIndex
+              );
+              
+              // Apply visual offset if there's a measure line on this note
+              const visualOffset = hasMeasureLine ? slotWidth * 0.5 : 0; // Half a slot width offset
+              
+              const x = getSlotX(slotIndex, leftMargin, slotWidth) + visualOffset;
               const y = getStringY(note.stringIndex);
               const visual = DURATION_VISUALS[note.duration];
               

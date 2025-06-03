@@ -677,6 +677,12 @@ function AppContent() {
     };
 
     setTabData(prevData => addNoteToGrid(prevData, newNote));
+    
+    // Automatically select the newly created note for editing
+    setSelectedNoteForEditing({
+      timeSlot: cursorPosition.timeSlot,
+      stringIndex: cursorPosition.stringIndex
+    });
   };
 
   // Remove note at current cursor position
@@ -735,7 +741,7 @@ function AppContent() {
       if (notesAtPosition.length > 0) {
         const note = notesAtPosition[0];
         // Place measure line at the start of this note (making it the first note of the first full measure)
-        addMeasureLine(note.startSlot);
+        addMeasureLine(note.startSlot, { timeSlot: note.startSlot, stringIndex: note.stringIndex });
         return;
       }
       
@@ -860,7 +866,7 @@ function AppContent() {
   };
 
   // Add a measure line at the specified slot
-  const addMeasureLine = (slot: number) => {
+  const addMeasureLine = (slot: number, notePosition?: { timeSlot: number; stringIndex: number }) => {
     // Only allow one measure line
     if (customMeasureLines.length > 0) {
       console.log('Only one measure line is allowed');
@@ -870,7 +876,8 @@ function AppContent() {
     // Create new measure line at the specified slot (start of first full measure)
     const newMeasureLine: CustomMeasureLine = {
       slot,
-      measureNumber: 1
+      measureNumber: 1,
+      noteAtSlot: notePosition
     };
     
     setCustomMeasureLines([newMeasureLine]);
