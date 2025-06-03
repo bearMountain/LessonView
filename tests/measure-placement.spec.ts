@@ -78,8 +78,8 @@ test.describe('Intelligent Measure Placement', () => {
     // Wait for measure lines to be processed
     await page.waitForTimeout(3000);
 
-    // Skip screenshots for now to avoid hanging
-    // await page.screenshot({ path: 'tests/screenshots/before-checks.png', fullPage: true });
+    // Take a screenshot before checking
+    await page.screenshot({ path: 'tests/screenshots/before-checks.png', fullPage: true });
 
     // Check that measure lines exist in the DOM  
     const measureLines = page.locator('line.measure-line');
@@ -245,10 +245,10 @@ test.describe('Intelligent Measure Placement', () => {
       console.log('❌ Not enough notes found to trigger measure boundaries');
     }
 
-    // Skip final screenshot to avoid hanging
-    // await page.screenshot({ path: 'tests/screenshots/eighth-note-measure-placement.png', fullPage: true });
+    // Take a final screenshot
+    await page.screenshot({ path: 'tests/screenshots/eighth-note-measure-placement.png', fullPage: true });
     
-    console.log('✅ Test completed');
+    console.log('✅ Test completed - screenshots saved');
     
     // Basic assertions
     expect(noteCount).toBeGreaterThan(5); // Should have added some notes
@@ -346,7 +346,10 @@ test.describe('Intelligent Measure Placement', () => {
       console.log(`Note ${i}: slot=${slot}, string=${string}`);
     }
 
-    // Skip the screenshot for now to avoid hanging
-    // await page.screenshot({ path: 'tests/screenshots/debug-test.png', fullPage: true });
+    // Check console messages
+    console.log('\n=== All console messages ===');
+    consoleMessages.forEach((msg, i) => console.log(`${i}: ${msg}`));
+
+    await page.screenshot({ path: 'tests/screenshots/debug-test.png', fullPage: true });
   });
 }); 
