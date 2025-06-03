@@ -115,6 +115,91 @@ test.describe('Intelligent Measure Placement', () => {
     }
     console.log('Note positions (first 15):', notePositions);
 
+    // *** NEW: Check visual spacing by measuring actual X positions ***
+    console.log('\n=== Visual Spacing Analysis ===');
+    
+    // Get the X positions of notes and measure lines
+    const visualPositions: { slot: number; x: number; type: 'note' | 'measure' }[] = [];
+    
+    // Get note X positions
+    for (let i = 0; i < Math.min(noteCount, 15); i++) {
+      const note = notes.nth(i);
+      const slot = await note.getAttribute('data-slot');
+      // Notes use circle elements with cx/cy attributes, not transforms
+      const circle = note.locator('circle').first();
+      const cx = await circle.getAttribute('cx');
+      if (slot && cx) {
+        const x = parseFloat(cx);
+        visualPositions.push({ slot: parseInt(slot), x, type: 'note' });
+      }
+    }
+    
+    // Get measure line X positions
+    for (let i = 0; i < measureLineCount; i++) {
+      const line = measureLines.nth(i);
+      const slot = await line.getAttribute('data-slot');
+      const x1 = await line.getAttribute('x1');
+      if (slot && x1) {
+        visualPositions.push({ slot: parseInt(slot), x: parseFloat(x1), type: 'measure' });
+      }
+    }
+    
+    // Sort by slot for analysis
+    visualPositions.sort((a, b) => a.slot - b.slot);
+    
+    console.log('Visual positions by slot:');
+    visualPositions.forEach(pos => {
+      console.log(`  Slot ${pos.slot}: X=${pos.x.toFixed(1)} (${pos.type})`);
+    });
+    
+    // Analyze spacing around measure lines
+    const measureLineSlots = visualPositions.filter(p => p.type === 'measure').map(p => p.slot);
+    if (measureLineSlots.length > 0) {
+      const measureSlot = measureLineSlots[0];
+      const measureX = visualPositions.find(p => p.slot === measureSlot && p.type === 'measure')?.x;
+      
+      // Find notes before and after the measure line
+      const noteBefore = visualPositions.filter(p => p.type === 'note' && p.slot < measureSlot).pop();
+      const noteAfter = visualPositions.find(p => p.type === 'note' && p.slot > measureSlot);
+      
+      if (noteBefore && noteAfter && measureX !== undefined) {
+        const beforeSpacing = measureX - noteBefore.x;
+        const afterSpacing = noteAfter.x - measureX;
+        
+        console.log(`\nSpacing Analysis around measure line at slot ${measureSlot}:`);
+        console.log(`  Note before (slot ${noteBefore.slot}): X=${noteBefore.x.toFixed(1)}`);
+        console.log(`  Measure line: X=${measureX.toFixed(1)}`);
+        console.log(`  Note after (slot ${noteAfter.slot}): X=${noteAfter.x.toFixed(1)}`);
+        console.log(`  Space before measure: ${beforeSpacing.toFixed(1)}px`);
+        console.log(`  Space after measure: ${afterSpacing.toFixed(1)}px`);
+        
+        // Check if there's proper visual spacing after the measure line
+        if (afterSpacing > beforeSpacing * 1.5) {
+          console.log('✅ Visual spacing detected: [E-|-*-] pattern');
+        } else if (afterSpacing < beforeSpacing * 0.5) {
+          console.log('❌ No visual spacing: [E-|*-] pattern (notes too close to measure line)');
+        } else {
+          console.log('⚠️ Minimal visual spacing: between [E-|*-] and [E-|-*-]');
+        }
+        
+        // Calculate expected positions based on slot spacing
+        const expectedSlotSpacing = (noteAfter.x - noteBefore.x) / (noteAfter.slot - noteBefore.slot);
+        console.log(`  Expected slot spacing: ${expectedSlotSpacing.toFixed(1)}px per slot`);
+        
+        const expectedNoteAfterX = measureX + expectedSlotSpacing;
+        const actualOffset = noteAfter.x - expectedNoteAfterX;
+        console.log(`  Expected note after X: ${expectedNoteAfterX.toFixed(1)}`);
+        console.log(`  Actual note after X: ${noteAfter.x.toFixed(1)}`);
+        console.log(`  Visual offset applied: ${actualOffset.toFixed(1)}px`);
+        
+        if (Math.abs(actualOffset) > expectedSlotSpacing * 0.2) {
+          console.log('✅ Significant visual offset detected - intelligent spacing working');
+        } else {
+          console.log('❌ No significant visual offset - may need debugging');
+        }
+      }
+    }
+
     // Print console messages for debugging
     console.log('\n=== Console messages ===');
     consoleMessages.forEach(msg => console.log(msg));
