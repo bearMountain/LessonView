@@ -1,3 +1,6 @@
+import { VisualOffsetManager } from './services/VisualOffsetManager';
+import { IntelligentMeasurePlacement } from './services/IntelligentMeasurePlacement';
+
 // Note duration types
 export type NoteDuration = 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth';
 
@@ -132,10 +135,7 @@ export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasu
 
 // Calculate intelligent visual offset for a slot (for eighth and sixteenth note spacing)
 export const getIntelligentVisualOffset = (timeSlot: number): number => {
-  // Import here to avoid circular dependencies
   try {
-    // Dynamic import to get the visual offset manager
-    const { VisualOffsetManager } = require('./services/VisualOffsetManager');
     const manager = VisualOffsetManager.getInstance();
     const offset = manager.getOffset(timeSlot);
     if (offset > 0) {
@@ -280,8 +280,6 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   if (customMeasureLines.length === 0) {
     // Use intelligent measure placement for auto-generated boundaries
     try {
-      // Dynamic import to avoid circular dependencies
-      const { IntelligentMeasurePlacement } = require('./services/IntelligentMeasurePlacement');
       const placement = new IntelligentMeasurePlacement();
       return placement.calculateMeasureBoundaries(tabData, customMeasureLines);
     } catch (error) {

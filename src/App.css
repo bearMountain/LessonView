@@ -7,6 +7,14 @@
   overflow: hidden;
 }
 
+/* App wrapper - ensure it's visible and takes full size */
+.app {
+  width: 100%;
+  height: 100%;
+  display: block;
+  visibility: visible;
+}
+
 /* Remove old component styles that are no longer needed */
 .app-container {
   /* This class is no longer used with MainLayout */

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
@@ -123,11 +123,17 @@ function AppContent() {
   }, [tabData, tempo, timeSignature, selectedDuration, selectedNoteType, zoom, showFretboard, countInEnabled, isLooping, splitRatio]);
 
   // Update visual offsets when tab data or measure lines change
-  useEffect(() => {
-    console.log('🎵 Updating visual offsets for intelligent measure placement');
-    const visualOffsetManager = VisualOffsetManager.getInstance();
-    visualOffsetManager.updateOffsets(tabData, customMeasureLines);
-  }, [tabData, customMeasureLines]);
+  // TODO: Re-enable once infinite loop is identified
+  // useEffect(() => {
+  //   // Only update if there's actual data to process
+  //   if (tabData.length === 0 && customMeasureLines.length === 0) {
+  //     return;
+  //   }
+    
+  //   console.log('🎵 Updating visual offsets for intelligent measure placement');
+  //   const visualOffsetManager = VisualOffsetManager.getInstance();
+  //   visualOffsetManager.updateOffsets(tabData, customMeasureLines);
+  // }, [tabData.length, customMeasureLines.length]); // Only depend on lengths to avoid infinite loops
 
   // Save/Load handlers
   const handleSave = async () => {

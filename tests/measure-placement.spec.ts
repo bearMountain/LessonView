@@ -8,8 +8,11 @@ test.describe('Intelligent Measure Placement', () => {
     // Wait for the page to fully load
     await page.waitForLoadState('networkidle');
     
-    // Wait for React app to render
-    await page.waitForSelector('.app', { timeout: 30000 });
+    // Wait for React app to render - look for the main layout instead of .app
+    await page.waitForSelector('.main-layout', { timeout: 30000 });
+    
+    // Wait for the professional toolbar to be ready
+    await page.waitForSelector('.professional-toolbar', { timeout: 30000 });
     
     // Wait for the tab viewer SVG to be ready
     await page.waitForSelector('.tab-svg', { timeout: 30000 });
@@ -30,28 +33,33 @@ test.describe('Intelligent Measure Placement', () => {
     // Check that toolbar is visible
     await expect(page.locator('.professional-toolbar')).toBeVisible();
 
-    // Find and click the eighth note button
-    const eighthButton = page.locator('button:has-text("Eighth")');
-    if (await eighthButton.count() === 0) {
-      // Try alternative selectors
-      const altButton = page.locator('button').filter({ hasText: /8th|eighth/i });
-      if (await altButton.count() > 0) {
-        await altButton.first().click();
-      } else {
-        // Look for duration buttons and find the right one
-        const durationButtons = page.locator('button').filter({ hasText: /th$/ });
-        console.log(`Found ${await durationButtons.count()} duration buttons`);
-        for (let i = 0; i < await durationButtons.count(); i++) {
-          const text = await durationButtons.nth(i).textContent();
-          console.log(`Button ${i}: "${text}"`);
-          if (text?.includes('8') || text?.toLowerCase().includes('eighth')) {
-            await durationButtons.nth(i).click();
-            break;
-          }
-        }
-      }
+    // Find and click the eighth NOTE button (SVG image), not the rest button (𝄾 symbol)
+    // The note buttons use SVG images with the filename containing "Eigth Note"
+    const eighthNoteButton = page.locator('button img[src*="Eigth Note"]').first();
+    if (await eighthNoteButton.count() > 0) {
+      await eighthNoteButton.click();
+      console.log('✅ Clicked eighth note button (SVG image)');
     } else {
-      await eighthButton.click();
+      // Fallback: try to find the note button container
+      const noteButton = page.locator('.note-value-pair').nth(3).locator('button').first(); // 4th pair (eighth), first button (note)
+      if (await noteButton.count() > 0) {
+        await noteButton.click();
+        console.log('✅ Clicked eighth note button (by position)');
+      } else {
+        console.log('❌ Could not find eighth note button');
+        
+        // Debug: list all buttons with images
+        const imageButtons = page.locator('button img');
+        const imageCount = await imageButtons.count();
+        console.log(`Found ${imageCount} image buttons:`);
+        for (let i = 0; i < Math.min(imageCount, 10); i++) {
+          const src = await imageButtons.nth(i).getAttribute('src');
+          console.log(`  ${i}: ${src}`);
+        }
+        
+        // Take screenshot for debugging
+        await page.screenshot({ path: 'tests/screenshots/no-eighth-button.png', fullPage: true });
+      }
     }
     
     // Wait for selection to be processed
@@ -168,18 +176,26 @@ test.describe('Intelligent Measure Placement', () => {
       console.log(`Button ${i}: "${text}"`);
     }
 
-    // Try to find eighth note button
-    const eighthButton = page.locator('button:has-text("Eighth")');
-    if (await eighthButton.count() > 0) {
-      await eighthButton.click();
-      console.log('Clicked Eighth button');
+    // Try to find eighth note button (SVG image, not rest symbol)
+    const eighthNoteButton = page.locator('button img[src*="Eigth Note"]').first();
+    if (await eighthNoteButton.count() > 0) {
+      await eighthNoteButton.click();
+      console.log('✅ Clicked eighth note button (SVG image)');
     } else {
-      console.log('Eighth button not found, trying alternatives...');
-      // Try clicking the first button that might be a duration
-      const possibleDuration = page.locator('button').filter({ hasText: /th$/ }).first();
-      if (await possibleDuration.count() > 0) {
-        await possibleDuration.click();
-        console.log(`Clicked button: ${await possibleDuration.textContent()}`);
+      console.log('❌ Eighth note button not found, trying position-based selection...');
+      
+      // Try clicking a note button by position (4th pair, first button = eighth note)
+      const noteButton = page.locator('.note-value-pair').nth(3).locator('button').first();
+      if (await noteButton.count() > 0) {
+        await noteButton.click();
+        console.log('✅ Clicked eighth note button (by position)');
+      } else {
+        // Try clicking a quarter note as fallback
+        const quarterButton = page.locator('button img[src*="Quarter Note"]').first();
+        if (await quarterButton.count() > 0) {
+          await quarterButton.click();
+          console.log('✅ Clicked quarter note button as fallback');
+        }
       }
     }
     
