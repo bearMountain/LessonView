@@ -8,7 +8,6 @@ interface ControlsProps {
   cursorPosition: { timeSlot: number; stringIndex: number };
   onNotesPlaying: (notes: { fret: number; stringIndex: number }[]) => void;
   tempo: number;
-  onTempoChange: (tempo: number) => void;
   onPlaybackStateChange?: (isPlaying: boolean) => void;
   onCurrentTimeSlotChange?: (timeSlot: number) => void;
   onCountInStateChange?: (isCountingIn: boolean, beat?: number, totalBeats?: number) => void;
@@ -25,7 +24,7 @@ export interface ControlsRef {
   stopPlayback: (clearVisualFeedback?: boolean) => void;
 }
 
-const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onTempoChange, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, isMuted }, ref) => {
+const Controls = forwardRef<ControlsRef, ControlsProps>(({ tabData, cursorPosition, onNotesPlaying, tempo, onPlaybackStateChange, onCurrentTimeSlotChange, onCountInStateChange, onPlaybackComplete, countInEnabled, timeSignature, isMuted }, ref) => {
   const [, setIsPlaying] = useState(false);
   const [, setCurrentTimeSlot] = useState<number>(-1);
   const partRef = useRef<{ dispose: () => void } | null>(null);

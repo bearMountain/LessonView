@@ -25,7 +25,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onMuteToggle,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [duration, setDuration] = useState<number>(0);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string>('');
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
@@ -106,7 +105,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleDurationChange = () => {
     if (!videoRef.current) return;
     const dur = videoRef.current.duration;
-    setDuration(dur);
     onDurationChange?.(dur);
   };
 

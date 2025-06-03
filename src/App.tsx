@@ -10,7 +10,7 @@ import VideoPlayer from './components/video/VideoPlayer'
 import SplitPane from './components/layout/SplitPane'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
-import { FileManager, type AppState, type StrumstickProjectData, type ProjectMetadata } from './services/FileManager'
+import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
@@ -735,14 +735,6 @@ function AppContent() {
     }
   };
 
-  // Video ref for controlling playback
-  const videoRef = useRef<{ 
-    play: () => void; 
-    pause: () => void; 
-    seek: (time: number) => void;
-    getCurrentTime: () => number;
-  }>(null);
-
   return (
     <div className="app">
       <MainLayout 
@@ -835,7 +827,6 @@ function AppContent() {
                   cursorPosition={cursorPosition}
                   onNotesPlaying={handleNotesPlaying}
                   tempo={tempo}
-                  onTempoChange={setTempo}
                   onPlaybackStateChange={handlePlaybackStateChange}
                   onCurrentTimeSlotChange={handleCurrentTimeSlotChange}
                   onPlaybackComplete={handlePlaybackComplete}
