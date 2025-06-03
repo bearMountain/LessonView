@@ -92,7 +92,7 @@ export const getSlotX = (timeSlot: number, leftMargin: number, slotWidth: number
   return leftMargin + padding + (timeSlot * slotWidth);
 };
 
-// Calculate visual X position for notes, accounting for pickup measure offset
+// Calculate visual X position for notes, accounting for pickup measure offset and intelligent spacing
 export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine[], leftMargin: number, slotWidth: number): number => {
   let visualOffset = 0;
   
@@ -105,10 +105,13 @@ export const getVisualNoteX = (note: Note, customMeasureLines: CustomMeasureLine
     }
   }
   
+  // Apply additional visual spacing for intelligent measure placement
+  visualOffset += getIntelligentVisualOffset(note.startSlot);
+  
   return getSlotX(note.startSlot, leftMargin, slotWidth) + visualOffset;
 };
 
-// Calculate visual X position for any slot position, accounting for pickup measure offset
+// Calculate visual X position for any slot position, accounting for pickup measure offset and intelligent spacing
 export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasureLine[], leftMargin: number, slotWidth: number): number => {
   let visualOffset = 0;
   
@@ -121,7 +124,17 @@ export const getVisualSlotX = (timeSlot: number, customMeasureLines: CustomMeasu
     }
   }
   
+  // Apply additional visual spacing for intelligent measure placement
+  visualOffset += getIntelligentVisualOffset(timeSlot);
+  
   return getSlotX(timeSlot, leftMargin, slotWidth) + visualOffset;
+};
+
+// Calculate intelligent visual offset for a slot (for eighth and sixteenth note spacing)
+export const getIntelligentVisualOffset = (timeSlot: number): number => {
+  // This will be expanded later to track visual adjustments from intelligent placement
+  // For now, return 0 to maintain existing behavior
+  return 0;
 };
 
 // Calculate X position for measure lines - should stay at the original slot position
@@ -253,7 +266,8 @@ export const getMeasureBoundaries = (tabData: TabData): number[] => {
 // Get custom measure boundaries including pickup measure support
 export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines: CustomMeasureLine[]): number[] => {
   if (customMeasureLines.length === 0) {
-    return getMeasureBoundaries(tabData);
+    // Use intelligent measure placement for auto-generated boundaries
+    return getIntelligentMeasureBoundaries(tabData);
   }
   
   // Sort custom measure lines by slot position
@@ -266,7 +280,7 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
     boundaries.push(line.slot);
   });
   
-  // Add regular measure boundaries after the last custom line
+  // Add intelligent boundaries after the last custom line
   const lastCustomSlot = sortedLines[sortedLines.length - 1]?.slot || 0;
   const slotsPerMeasure = 16;
   
@@ -281,6 +295,57 @@ export const getCustomMeasureBoundaries = (tabData: TabData, customMeasureLines:
   }
   
   return boundaries.filter((boundary, index, arr) => arr.indexOf(boundary) === index).sort((a, b) => a - b);
+};
+
+// Basic intelligent measure boundaries implementation
+export const getIntelligentMeasureBoundaries = (tabData: TabData): number[] => {
+  const boundaries: number[] = [];
+  const slotsPerMeasure = 16; // 4 beats * 4 sixteenth notes per beat
+  
+  let currentSlot = slotsPerMeasure;
+  
+  while (currentSlot < tabData.length) {
+    // Find note at or before the current slot to determine placement
+    let placementSlot = currentSlot;
+    
+    // Look for notes around the current slot
+    for (let searchSlot = currentSlot - 4; searchSlot <= currentSlot + 4; searchSlot++) {
+      if (searchSlot >= 0 && searchSlot < tabData.length) {
+        const cell = tabData[searchSlot];
+        if (cell && cell.notes.length > 0) {
+          const note = cell.notes[0];
+          if (note.startSlot <= currentSlot) {
+            // Apply intelligent placement rules based on note type
+            const noteEndSlot = note.startSlot + DURATION_SLOTS[note.duration];
+            
+            switch (note.duration) {
+              case 'whole':
+                placementSlot = noteEndSlot;
+                break;
+              case 'half':
+                placementSlot = noteEndSlot - 1;
+                break;
+              case 'quarter':
+                placementSlot = noteEndSlot - 1;
+                break;
+              case 'eighth':
+              case 'sixteenth':
+                placementSlot = note.startSlot + 1;
+                break;
+              default:
+                placementSlot = currentSlot;
+            }
+            break;
+          }
+        }
+      }
+    }
+    
+    boundaries.push(placementSlot);
+    currentSlot = placementSlot + slotsPerMeasure;
+  }
+  
+  return boundaries;
 };
 
 // Calculate pickup measure beats for count-in
