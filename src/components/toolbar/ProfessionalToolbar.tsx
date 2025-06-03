@@ -4,6 +4,7 @@ import NoteValuePalette from './NoteValuePalette';
 import TimeSignatureSelector from './TimeSignatureSelector';
 import TempoControls from './TempoControls';
 import type { NoteDuration, NoteType } from '../../types';
+import { getNotesAtSlot } from '../../types';
 
 interface ProfessionalToolbarProps {
   selectedDuration: NoteDuration;
@@ -22,6 +23,10 @@ interface ProfessionalToolbarProps {
   onNew?: () => void;
   onSaveAs?: () => void;
   isModified?: boolean;
+  // Dotted note functionality
+  selectedNoteForEditing?: { timeSlot: number; stringIndex: number } | null;
+  onToggleDotted?: () => void;
+  tabData?: any[]; // For checking if the selected note is dotted
 }
 
 interface ToolbarSection {
@@ -46,6 +51,9 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   onNew,
   onSaveAs,
   isModified = false,
+  selectedNoteForEditing,
+  onToggleDotted,
+  tabData,
 }) => {
   const sections: ToolbarSection[] = [
     {
@@ -145,6 +153,22 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
               </svg>
             </span>
             <span className="toolbar-button__text">Tie</span>
+          </button>
+          <button 
+            className={`toolbar-button ${selectedNoteForEditing ? 'active' : ''}`}
+            title="Toggle Dotted Note"
+            onClick={onToggleDotted}
+            disabled={!selectedNoteForEditing}
+          >
+            <span className="toolbar-button__icon">
+              {(() => {
+                if (!selectedNoteForEditing || !tabData) return '•';
+                const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
+                const isDotted = notesAtPosition.length > 0 && notesAtPosition[0].isDotted;
+                return isDotted ? '♪.' : '♪';
+              })()}
+            </span>
+            <span className="toolbar-button__text">Dotted</span>
           </button>
         </div>
       ),

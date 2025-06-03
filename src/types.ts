@@ -13,6 +13,7 @@ export interface Note {
   startSlot: number; // which sixteenth-note slot this note starts on
   isTiedTo?: number; // time slot of the next note this is tied to (optional)
   isTiedFrom?: number; // time slot of the previous note this is tied from (optional)
+  isDotted?: boolean; // whether this note is dotted (adds 50% duration)
 }
 
 // Grid cell - can contain one note per string
@@ -46,6 +47,19 @@ export const DURATION_VALUES: Record<NoteDuration, number> = {
   quarter: 1,
   eighth: 0.5,
   sixteenth: 0.25,
+};
+
+// Calculate duration value including dotted notes
+export const getNoteDurationValue = (duration: NoteDuration, isDotted?: boolean): number => {
+  const baseDuration = DURATION_VALUES[duration];
+  return isDotted ? baseDuration * 1.5 : baseDuration;
+};
+
+// Calculate slots needed for a note (including dotted notes)
+export const getNoteDurationSlots = (duration: NoteDuration, isDotted?: boolean): number => {
+  const baseDuration = DURATION_VALUES[duration];
+  const actualDuration = isDotted ? baseDuration * 1.5 : baseDuration;
+  return Math.round(actualDuration * 4); // Convert to sixteenth note slots
 };
 
 // Visual properties for different note durations
@@ -120,7 +134,7 @@ export const getNotesAtSlot = (tabData: TabData, timeSlot: number, stringIndex: 
   return tabData[timeSlot].notes.filter(note => {
     if (note.stringIndex !== stringIndex) return false;
     
-    const noteEndSlot = note.startSlot + DURATION_SLOTS[note.duration];
+    const noteEndSlot = note.startSlot + getNoteDurationSlots(note.duration, note.isDotted);
     return timeSlot >= note.startSlot && timeSlot < noteEndSlot;
   });
 };
@@ -149,7 +163,7 @@ export const addNoteToGrid = (tabData: TabData, note: Note): TabData => {
   }
   
   // Remove any existing note on this string that would conflict
-  const slotsNeeded = DURATION_SLOTS[note.duration];
+  const slotsNeeded = getNoteDurationSlots(note.duration, note.isDotted);
   for (let i = 0; i < slotsNeeded; i++) {
     const slotIndex = note.startSlot + i;
     if (slotIndex < newTabData.length) {
@@ -295,30 +309,37 @@ export const getAllTies = (tabData: TabData): Tie[] => {
   return ties;
 };
 
-// Calculate total duration including tied notes
-export const getTotalNoteDuration = (tabData: TabData, startSlot: number, stringIndex: number): number => {
-  const notes = getNotesAtSlot(tabData, startSlot, stringIndex);
+// Get total duration of a note including ties (in quarter note beats)
+export const getTotalNoteDuration = (tabData: TabData, timeSlot: number, stringIndex: number): number => {
+  if (timeSlot >= tabData.length) return 0;
+  
+  // Find the note at this position
+  const notes = tabData[timeSlot].notes.filter(n => 
+    n.stringIndex === stringIndex && n.startSlot === timeSlot
+  );
+  
   if (notes.length === 0) return 0;
   
   const note = notes[0];
-  let totalDuration = DURATION_VALUES[note.duration];
+  let totalDuration = getNoteDurationValue(note.duration, note.isDotted);
   
-  // Follow the tie chain
-  let currentSlot = startSlot;
-  while (true) {
-    const currentNotes = getNotesAtSlot(tabData, currentSlot, stringIndex);
-    if (currentNotes.length === 0) break;
+  // Follow ties to add durations
+  let currentSlot = timeSlot;
+  while (note.isTiedTo !== undefined) {
+    currentSlot = note.isTiedTo;
+    if (currentSlot >= tabData.length) break;
     
-    const currentNote = currentNotes[0];
-    if (currentNote.isTiedTo === undefined) break;
+    const tiedNotes = tabData[currentSlot].notes.filter(n => 
+      n.stringIndex === stringIndex && n.startSlot === currentSlot
+    );
     
-    const nextSlot = currentNote.isTiedTo;
-    const nextNotes = getNotesAtSlot(tabData, nextSlot, stringIndex);
-    if (nextNotes.length === 0) break;
+    if (tiedNotes.length === 0) break;
     
-    const nextNote = nextNotes[0];
-    totalDuration += DURATION_VALUES[nextNote.duration];
-    currentSlot = nextSlot;
+    const tiedNote = tiedNotes[0];
+    totalDuration += getNoteDurationValue(tiedNote.duration, tiedNote.isDotted);
+    
+    // Update note reference for next iteration
+    Object.assign(note, tiedNote);
   }
   
   return totalDuration;

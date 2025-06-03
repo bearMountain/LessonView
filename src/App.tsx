@@ -14,7 +14,7 @@ import { FileManager, type AppState, type ProjectMetadata } from './services/Fil
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note, NoteDuration, NoteType, CursorPosition, TabData } from './types'
-import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, DURATION_SLOTS } from './types'
+import { addNoteToGrid, removeNoteFromGrid, getNotesAtSlot, createTie, getAllTies, removeTie, DURATION_SLOTS, getNoteDurationSlots } from './types'
 
 // Start with empty tab data
 const initialTabData: TabData = [];
@@ -455,8 +455,8 @@ function AppContent() {
     
     const noteToChange = notesAtPosition[0];
     const oldDuration = noteToChange.duration;
-    const oldSlots = DURATION_SLOTS[oldDuration];
-    const newSlots = DURATION_SLOTS[newDuration];
+    const oldSlots = getNoteDurationSlots(oldDuration, noteToChange.isDotted);
+    const newSlots = getNoteDurationSlots(newDuration, noteToChange.isDotted);
     const slotDifference = newSlots - oldSlots;
     
     // If no change needed, return
@@ -547,6 +547,104 @@ function AppContent() {
     
     // Clear the selected note since we've made the change
     setSelectedNoteForEditing(null);
+  };
+
+  // Toggle dotted status of selected note
+  const toggleDottedNote = () => {
+    if (!selectedNoteForEditing) return;
+    
+    // Find the note at the specified position
+    const notesAtPosition = getNotesAtSlot(tabData, selectedNoteForEditing.timeSlot, selectedNoteForEditing.stringIndex);
+    if (notesAtPosition.length === 0) return;
+    
+    const noteToChange = notesAtPosition[0];
+    const newDottedStatus = !noteToChange.isDotted;
+    const oldSlots = getNoteDurationSlots(noteToChange.duration, noteToChange.isDotted);
+    const newSlots = getNoteDurationSlots(noteToChange.duration, newDottedStatus);
+    const slotDifference = newSlots - oldSlots;
+    
+    // Create new tab data
+    let newTabData = [...tabData];
+    
+    // Remove the old note
+    newTabData = removeNoteFromGrid(newTabData, noteToChange);
+    
+    // Create updated note with dotted status
+    const updatedNote: Note = {
+      ...noteToChange,
+      isDotted: newDottedStatus
+    };
+    
+    // If expanding the note (positive slotDifference), shift all subsequent notes forward
+    if (slotDifference > 0) {
+      // Collect all notes that start after this note's current end position
+      const noteEndSlot = selectedNoteForEditing.timeSlot + oldSlots;
+      const notesToShift: Array<{ note: Note; oldSlot: number }> = [];
+      
+      // Find all notes that need to be shifted
+      for (let slot = noteEndSlot; slot < newTabData.length; slot++) {
+        if (newTabData[slot] && newTabData[slot].notes) {
+          for (const note of newTabData[slot].notes) {
+            if (note.startSlot === slot) { // Only shift notes that actually start at this slot
+              notesToShift.push({ note, oldSlot: slot });
+            }
+          }
+        }
+      }
+      
+      // Remove all notes that need to be shifted
+      for (const { note } of notesToShift) {
+        newTabData = removeNoteFromGrid(newTabData, note);
+      }
+      
+      // Add them back at their new positions
+      for (const { note } of notesToShift) {
+        const shiftedNote: Note = {
+          ...note,
+          startSlot: note.startSlot + slotDifference
+        };
+        newTabData = addNoteToGrid(newTabData, shiftedNote);
+      }
+    }
+    
+    // If shrinking the note (negative slotDifference), shift all subsequent notes backward
+    else if (slotDifference < 0) {
+      // Collect all notes that start after this note's new end position
+      const newNoteEndSlot = selectedNoteForEditing.timeSlot + newSlots;
+      const notesToShift: Array<{ note: Note; oldSlot: number }> = [];
+      
+      // Find all notes that need to be shifted
+      for (let slot = newNoteEndSlot; slot < newTabData.length; slot++) {
+        if (newTabData[slot] && newTabData[slot].notes) {
+          for (const note of newTabData[slot].notes) {
+            if (note.startSlot === slot) { // Only shift notes that actually start at this slot
+              notesToShift.push({ note, oldSlot: slot });
+            }
+          }
+        }
+      }
+      
+      // Remove all notes that need to be shifted
+      for (const { note } of notesToShift) {
+        newTabData = removeNoteFromGrid(newTabData, note);
+      }
+      
+      // Add them back at their new positions (shifted backward)
+      for (const { note } of notesToShift) {
+        const newSlot = Math.max(newNoteEndSlot, note.startSlot + slotDifference);
+        const shiftedNote: Note = {
+          ...note,
+          startSlot: newSlot
+        };
+        newTabData = addNoteToGrid(newTabData, shiftedNote);
+      }
+    }
+    
+    // Add the updated note
+    newTabData = addNoteToGrid(newTabData, updatedNote);
+    
+    // Update the tab data
+    setTabData(newTabData);
   };
 
   // Handle duration change from toolbar
@@ -756,6 +854,10 @@ function AppContent() {
             onNew={handleNew}
             onSaveAs={handleSaveAs}
             isModified={isModified}
+            // Dotted note support
+            selectedNoteForEditing={selectedNoteForEditing}
+            onToggleDotted={toggleDottedNote}
+            tabData={tabData}
           />
         }
         fretboard={

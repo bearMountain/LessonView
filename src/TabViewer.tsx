@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TabViewer.css';
 import type { Note, NoteDuration, CursorPosition, TabData, NoteType } from './types';
-import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies } from './types';
+import { DURATION_VISUALS, DURATION_SLOTS, getSlotX, getMeasureLineX, getMeasureBoundaries, getNotesAtSlot, getAllTies, getNoteDurationSlots } from './types';
 
 interface TabViewerProps {
   tabData: TabData;
@@ -416,7 +416,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
       // If we found a recent note and clicked to the right of it, 
       // position cursor where the next note should go
       if (mostRecentNote && clickedTimeSlot > mostRecentNoteSlot) {
-        const noteDurationSlots = DURATION_SLOTS[mostRecentNote.duration];
+        const noteDurationSlots = getNoteDurationSlots(mostRecentNote.duration, mostRecentNote.isDotted);
         finalTimeSlot = mostRecentNoteSlot + noteDurationSlots;
       }
       
@@ -592,6 +592,16 @@ const TabViewer: React.FC<TabViewerProps> = ({
                       >
                         {note.fret}
                       </text>
+                    )}
+                    
+                    {/* Dotted note indicator */}
+                    {note.isDotted && (
+                      <circle
+                        cx={x + 20}
+                        cy={y}
+                        r="3"
+                        fill="#000"
+                      />
                     )}
                   </g>
                 );
