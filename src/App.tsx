@@ -534,10 +534,17 @@ function AppContent() {
         }
       }
     } else {
-      // Normal cursor movement - clear any tie selection
+      // Normal cursor movement - clear any tie selection and paused state
       setCursorPosition({ timeSlot, stringIndex });
       setSelectedNotes([]);
       setFirstSelectedNote(null);
+      
+      // Clear paused state and playback indicator when manually moving cursor
+      setPausedAtTimeSlot(-1);
+      setCurrentPlaybackTimeSlot(-1);
+      
+      // Update sync engine to new position
+      syncEngine.seekToSlot(timeSlot);
     }
   };
 
