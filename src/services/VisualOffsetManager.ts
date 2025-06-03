@@ -44,8 +44,9 @@ export class VisualOffsetManager {
       // Apply any visual adjustments
       placement.visualAdjustments.forEach(adjustment => {
         console.log(`🎵 VisualOffsetManager: Applying adjustment:`, adjustment);
-        // Apply visual offset to all slots at or after the adjustment point
-        for (let slot = adjustment.fromSlot; slot < tabData.length; slot++) {
+        // Apply visual offset to all slots AFTER the adjustment point (not including the adjustment point itself)
+        // This ensures notes after the measure line are shifted, but the measure line position stays fixed
+        for (let slot = adjustment.fromSlot + 1; slot < tabData.length; slot++) {
           const currentOffset = this.visualOffsets.get(slot) || 0;
           this.visualOffsets.set(slot, currentOffset + adjustment.visualOffset);
         }
