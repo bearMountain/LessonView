@@ -28,6 +28,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string>('');
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
 
   // Handle video source changes
   useEffect(() => {
@@ -55,13 +56,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (!videoRef.current) return;
 
+    setIsTransitioning(true);
+    
     if (isPlaying) {
       videoRef.current.play().catch(err => {
         console.error('Error playing video:', err);
         onPlayStateChange?.(false);
+      }).finally(() => {
+        // Allow seeks after a brief transition period
+        setTimeout(() => setIsTransitioning(false), 200);
       });
     } else {
       videoRef.current.pause();
+      setTimeout(() => setIsTransitioning(false), 100);
     }
   }, [isPlaying, onPlayStateChange]);
 
@@ -71,13 +78,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     videoRef.current.playbackRate = playbackRate;
   }, [playbackRate]);
 
-  // Handle external time updates
+  // Handle external time updates with improved seeking logic
   useEffect(() => {
-    if (!videoRef.current) return;
-    if (Math.abs(videoRef.current.currentTime - currentTime) > 0.1) {
+    if (!videoRef.current || isTransitioning) return;
+    
+    const timeDiff = Math.abs(videoRef.current.currentTime - currentTime);
+    
+    // Only seek if the difference is significant (more than 0.2 seconds)
+    // and we're not in the middle of a play/pause transition
+    if (timeDiff > 0.2) {
       videoRef.current.currentTime = currentTime;
     }
-  }, [currentTime]);
+  }, [currentTime, isTransitioning]);
 
   // Handle mute state
   useEffect(() => {

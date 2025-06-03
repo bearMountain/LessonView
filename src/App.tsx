@@ -397,6 +397,7 @@ function AppContent() {
   const handleResetCursor = () => {
     setCursorPosition({ timeSlot: 0, stringIndex: 2 }); // Reset to start, Hi D string
     setPausedAtTimeSlot(-1); // Clear any paused position
+    setCurrentPlaybackTimeSlot(-1); // Clear playback indicator
     syncEngine.seekToSlot(0); // Reset sync engine time as well
   };
 
