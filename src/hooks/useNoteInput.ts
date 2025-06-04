@@ -79,22 +79,55 @@ export const useNoteInput = (
 
   /**
    * Handle numeric key input for fret numbers
+   * Modified to create notes immediately (like original behavior)
    */
   const handleNumericKey = useCallback((key: string) => {
     if (!enabled) return false
 
     if (key >= '0' && key <= '9') {
-      const newInput = state.currentFretInput + key
+      const fret = parseInt(key)
       
-      // Limit fret input to reasonable values (0-24)
-      const fretValue = parseInt(newInput)
-      if (fretValue <= 24) {
-        updateFretInput(newInput)
+      // Validate fret number
+      if (fret >= 0 && fret <= 24) {
+        // Create note immediately and advance cursor
+        createNoteAtCursor(fret, undefined, 'note')
+        moveCursor('right')
+        return true
       }
-      return true
     }
     return false
-  }, [enabled, state.currentFretInput, updateFretInput])
+  }, [enabled, createNoteAtCursor, moveCursor])
+
+  /**
+   * Handle multi-digit fret input (for frets 10-24)
+   * Press 1, then 0-4 for frets 10-14, etc.
+   */
+  const handleMultiDigitFret = useCallback((key: string) => {
+    if (!enabled) return false
+
+    if (key >= '0' && key <= '9') {
+      const newInput = state.currentFretInput + key
+      const fretValue = parseInt(newInput)
+      
+      if (fretValue <= 24) {
+        if (newInput.length === 1) {
+          // First digit: store for potential multi-digit fret
+          updateFretInput(newInput)
+          return true
+        } else if (newInput.length === 2) {
+          // Second digit: create the note with two-digit fret
+          createNoteAtCursor(fretValue, undefined, 'note')
+          moveCursor('right')
+          clearFretInput()
+          return true
+        }
+      } else {
+        // Invalid fret, clear input
+        clearFretInput()
+      }
+    }
+    return false
+  }, [enabled, state.currentFretInput, updateFretInput, createNoteAtCursor, moveCursor, clearFretInput])
 
   /**
    * Handle special key inputs
@@ -108,7 +141,13 @@ export const useNoteInput = (
       case 'Enter':
         if (state.currentFretInput) {
           event.preventDefault()
-          commitFretInput()
+          // Complete multi-digit fret input
+          const fret = parseInt(state.currentFretInput)
+          if (!isNaN(fret) && fret >= 0 && fret <= 24) {
+            createNoteAtCursor(fret, undefined, 'note')
+            moveCursor('right')
+          }
+          clearFretInput()
           return true
         }
         break
@@ -144,7 +183,7 @@ export const useNoteInput = (
         return false
     }
     return false
-  }, [enabled, state.currentFretInput, commitFretInput, clearFretInput, updateFretInput, addRest])
+  }, [enabled, state.currentFretInput, createNoteAtCursor, moveCursor, clearFretInput, updateFretInput, addRest])
 
   /**
    * Handle arrow key navigation
@@ -182,13 +221,29 @@ export const useNoteInput = (
 
   /**
    * Main keyboard event handler
+   * Modified for immediate note creation
    */
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // Try handlers in order of priority
+    // Check for special keys first
     if (handleSpecialKey(event)) return
     if (handleNavigationKey(event)) return
-    if (handleNumericKey(event.key)) return
-  }, [handleSpecialKey, handleNavigationKey, handleNumericKey])
+    
+    // For immediate note creation: single digit = immediate note
+    // For multi-digit frets: Hold Shift while typing for input mode
+    if (event.shiftKey && event.key >= '1' && event.key <= '2') {
+      // Shift+1 or Shift+2 starts multi-digit input for 10-24 range
+      if (handleMultiDigitFret(event.key)) {
+        event.preventDefault()
+        return
+      }
+    } else if (event.key >= '0' && event.key <= '9') {
+      // Regular number keys create notes immediately
+      if (handleNumericKey(event.key)) {
+        event.preventDefault()
+        return
+      }
+    }
+  }, [handleSpecialKey, handleNavigationKey, handleNumericKey, handleMultiDigitFret])
 
   /**
    * Handle key press events (for character input)

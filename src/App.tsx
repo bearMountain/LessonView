@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
@@ -8,6 +8,7 @@ import PlaybackBar from './components/transport/PlaybackBar'
 import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import VideoPlayer from './components/video/VideoPlayer'
 import SplitPane from './components/layout/SplitPane'
+import NoteStackDemo from './components/NoteStackDemo'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
 import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
@@ -21,12 +22,19 @@ import {
   useTabEditor, 
   useNoteInput, 
   useNavigation, 
-  usePlayback,
-  type TabEditorAPI 
+  usePlayback
 } from './hooks'
 
 // Main App Content Component (needs to be inside SyncEngineProvider)
 function AppContent() {
+  // Check for demo mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const isDemoMode = urlParams.get('demo') === 'notestack';
+  
+  if (isDemoMode) {
+    return <NoteStackDemo />;
+  }
+
   // === Core State Management Hook ===
   // This single hook replaces 20+ useState calls and manages all state through our unified reducer
   const tabEditor = useTabEditor()
