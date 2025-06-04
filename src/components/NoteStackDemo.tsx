@@ -72,7 +72,7 @@ const NoteStackDemo: React.FC = () => {
   const durations: Duration[] = ['whole', 'half', 'quarter', 'eighth', 'sixteenth'];
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '20px', minHeight: '100vh' }}>
       <h1>🎸 NoteStack Architecture Demo</h1>
       
       <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
@@ -256,6 +256,117 @@ const NoteStackDemo: React.FC = () => {
               <strong>Stack {index + 1}:</strong> Musical Position {item.musicalPosition} → Display X {Math.round(item.displayX)}px
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Visual Tablature Display */}
+      <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#ffffff', border: '2px solid #333', borderRadius: '8px' }}>
+        <h3>Visual Tablature (Tab Lines)</h3>
+        <div style={{ position: 'relative', height: '120px', overflowX: 'auto', backgroundColor: '#fafafa', border: '1px solid #ddd' }}>
+          {/* String lines */}
+          {[0, 1, 2].map(stringIndex => {
+            const y = 30 + (stringIndex * 30);
+            return (
+              <div
+                key={`string-${stringIndex}`}
+                style={{
+                  position: 'absolute',
+                  left: '0',
+                  right: '0',
+                  top: `${y}px`,
+                  height: '1px',
+                  backgroundColor: '#333',
+                  zIndex: 1
+                }}
+              />
+            );
+          })}
+          
+          {/* String labels */}
+          {['Hi D', 'A', 'Low D'].map((label, index) => (
+            <div
+              key={`label-${index}`}
+              style={{
+                position: 'absolute',
+                left: '5px',
+                top: `${25 + (index * 30)}px`,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                backgroundColor: '#fafafa',
+                padding: '0 4px',
+                zIndex: 2
+              }}
+            >
+              {label}
+            </div>
+          ))}
+          
+          {/* Cursor position indicator */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${60 + (editor.state.currentPosition / 960) * 40}px`,
+              top: '15px',
+              bottom: '15px',
+              width: '2px',
+              backgroundColor: '#ff0000',
+              zIndex: 3
+            }}
+          />
+          
+          {/* Notes on the tab */}
+          {editor.layoutItems.map((stack, stackIndex) => {
+            const x = 60 + (stack.musicalPosition / 960) * 40; // Simple position calculation for demo
+            
+            return stack.notes.map((note, noteIndex) => {
+              const y = 25 + (note.string * 30); // String position
+              
+              return (
+                <div
+                  key={`${stack.id}-${noteIndex}`}
+                  style={{
+                    position: 'absolute',
+                    left: `${x - 8}px`,
+                    top: `${y - 8}px`,
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: stack.musicalPosition === editor.state.currentPosition ? '#ff4444' : '#0066cc',
+                    color: 'white',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    zIndex: 4,
+                    border: '1px solid #333'
+                  }}
+                >
+                  {note.fret}
+                </div>
+              );
+            });
+          })}
+          
+          {/* Position markers */}
+          {[0, 1, 2, 3, 4].map(beat => (
+            <div
+              key={`marker-${beat}`}
+              style={{
+                position: 'absolute',
+                left: `${60 + (beat * 40)}px`,
+                top: '5px',
+                fontSize: '10px',
+                color: '#666'
+              }}
+            >
+              {beat}
+            </div>
+          ))}
+        </div>
+        
+        <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+          <strong>Legend:</strong> Numbers on circles = fret numbers, Red cursor shows current position, Blue circles = notes at other positions
         </div>
       </div>
 
