@@ -15,15 +15,13 @@ import { FileManager, type AppState, type ProjectMetadata } from './services/Fil
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note } from './types'
-import { convertNotesToTabData, convertTabDataToNotes } from './state/stateHelpers'
+import { convertNoteStackToTabData, convertTabDataToNoteStack } from './services/ArchitectureBridge'
+import { getStrumstickPlayer } from './services/StrumstickPlayer'
 
-// Import our custom hooks - this is where the magic happens!
+// Import NoteStack architecture hooks
 import { 
-  useTabEditor, 
-  useNoteInput, 
-  useNavigation, 
-  usePlayback
-} from './hooks'
+  useNoteStackEditor
+} from './hooks/useNoteStackEditor'
 
 // Main App Content Component (needs to be inside SyncEngineProvider)
 function AppContent() {
@@ -35,29 +33,10 @@ function AppContent() {
     return <NoteStackDemo />;
   }
 
-  // === Core State Management Hook ===
-  // This single hook replaces 20+ useState calls and manages all state through our unified reducer
-  const tabEditor = useTabEditor()
-  
-  // === Feature Hooks ===
-  // Input handling with keyboard events and fret validation
-  const noteInput = useNoteInput(tabEditor, { 
-    enabled: !tabEditor.state.isPlaying 
-  })
-  
-  // Navigation and mouse interactions
-  const navigation = useNavigation(tabEditor, { 
-    enabled: true 
-  })
-  
-  // Audio playback with effects chain
-  const playback = usePlayback(tabEditor, { 
-    enabled: true, 
-    enableEffects: true 
-  })
+  // === Core State Management Hook (NoteStack Architecture) ===
+  const tabEditor = useNoteStackEditor()
   
   // === Integration with Legacy Services ===
-  // File management services (to be migrated to hooks in later phases)
   const fileManagerRef = useRef<FileManager>(new FileManager())
   const autoSaveRef = useRef<AutoSave>(new AutoSave(fileManagerRef.current))
   const controlsRef = useRef<ControlsRef>(null)
@@ -66,16 +45,41 @@ function AppContent() {
   const syncEngine = useSyncEngine()
   
   // === Derived State for Legacy Components ===
-  // Convert our flat notes array back to TabData format for components that haven't been refactored yet
-  const legacyTabData = convertNotesToTabData(tabEditor.state.notes)
+  // Convert NoteStack format to legacy TabData format for components that haven't been refactored yet
+  const legacyTabData = convertNoteStackToTabData(tabEditor.state.tab)
   
   // Get note at current position for legacy components
   const getNoteAtCurrentPosition = (): Note | null => {
-    return tabEditor.state.notes.find(note => 
-      note.startSlot === tabEditor.state.cursor.timeSlot && 
-      note.stringIndex === tabEditor.state.cursor.stringIndex
-    ) || null
+    const currentStack = tabEditor.state.tab.find(stack => 
+      stack.musicalPosition === tabEditor.state.currentPosition
+    )
+    if (!currentStack || currentStack.notes.length === 0) return null
+    
+    // Convert first note in stack to legacy format
+    const firstNote = currentStack.notes[0]
+    return {
+      startSlot: Math.floor(tabEditor.state.currentPosition / 960),
+      stringIndex: firstNote.string,
+      fret: firstNote.fret,
+      duration: tabEditor.state.selectedDuration,
+      isDotted: false,
+      type: 'note'
+    }
   }
+  
+  // === Initialize Player ===
+  useEffect(() => {
+    const player = getStrumstickPlayer()
+    player.setBPM(tabEditor.state.bpm)
+    player.loadTab(tabEditor.state.tab)
+    player.setPositionChangeCallback((position) => {
+      tabEditor.setCursorPosition(position)
+    })
+    
+    return () => {
+      player.dispose()
+    }
+  }, [tabEditor.state.tab, tabEditor.state.bpm])
   
   // === Auto-Save Integration ===
   useEffect(() => {
@@ -99,31 +103,30 @@ function AppContent() {
   // Auto-save on state changes
   useEffect(() => {
     // Skip auto-save on initial load when everything is default
-    if (tabEditor.state.notes.length === 0 && tabEditor.state.tempo === 120 && !tabEditor.state.currentProjectMetadata.title) {
+    if (tabEditor.state.tab.length === 0 && tabEditor.state.bpm === 120) {
       return
     }
     
-    // Mark as modified and perform auto-save
-    tabEditor.setModified(true)
-    autoSaveRef.current.markDirty()
-    
-    // Convert our unified state to legacy AppState format for file manager
+    // Convert NoteStack state to legacy AppState format for file manager
     const currentAppState: AppState = {
       tabData: legacyTabData,
-      tempo: tabEditor.state.tempo,
-      timeSignature: `${tabEditor.state.timeSignature[0]}/${tabEditor.state.timeSignature[1]}`,
-      cursorPosition: tabEditor.state.cursor,
+      tempo: tabEditor.state.bpm,
+      timeSignature: `4/4`, // TODO: Add to NoteStack state
+      cursorPosition: {
+        timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
+        stringIndex: 0
+      },
       selectedDuration: tabEditor.state.selectedDuration,
-      selectedNoteType: tabEditor.state.selectedNoteType,
-      customMeasureLines: tabEditor.state.customMeasureLines,
-      zoom: tabEditor.state.zoom,
-      showFretboard: tabEditor.state.showFretboard,
-      countInEnabled: tabEditor.state.countIn,
-      isLooping: tabEditor.state.isLooping,
-      splitRatio: tabEditor.state.splitRatio,
-      videoSource: tabEditor.state.videoSource,
-      isSynthMuted: tabEditor.state.isSynthMuted,
-      isVideoMuted: tabEditor.state.isVideoMuted
+      selectedNoteType: 'note',
+      customMeasureLines: [],
+      zoom: 1,
+      showFretboard: true,
+      countInEnabled: false,
+      isLooping: false,
+      splitRatio: 0.5,
+      videoSource: '',
+      isSynthMuted: false,
+      isVideoMuted: false
     }
     
     autoSaveRef.current.performAutoSave(currentAppState)
@@ -135,27 +138,29 @@ function AppContent() {
     
     const currentAppState: AppState = {
       tabData: legacyTabData,
-      tempo: tabEditor.state.tempo,
-      timeSignature: `${tabEditor.state.timeSignature[0]}/${tabEditor.state.timeSignature[1]}`,
-      cursorPosition: tabEditor.state.cursor,
+      tempo: tabEditor.state.bpm,
+      timeSignature: `4/4`,
+      cursorPosition: {
+        timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
+        stringIndex: 0
+      },
       selectedDuration: tabEditor.state.selectedDuration,
-      selectedNoteType: tabEditor.state.selectedNoteType,
-      customMeasureLines: tabEditor.state.customMeasureLines,
-      zoom: tabEditor.state.zoom,
-      showFretboard: tabEditor.state.showFretboard,
-      countInEnabled: tabEditor.state.countIn,
-      isLooping: tabEditor.state.isLooping,
-      splitRatio: tabEditor.state.splitRatio,
-      videoSource: tabEditor.state.videoSource,
-      isSynthMuted: tabEditor.state.isSynthMuted,
-      isVideoMuted: tabEditor.state.isVideoMuted
+      selectedNoteType: 'note',
+      customMeasureLines: [],
+      zoom: 1,
+      showFretboard: true,
+      countInEnabled: false,
+      isLooping: false,
+      splitRatio: 0.5,
+      videoSource: '',
+      isSynthMuted: false,
+      isVideoMuted: false
     }
 
-    const result = await fileManagerRef.current.saveProject(currentAppState, undefined, tabEditor.state.currentProjectMetadata)
+    const result = await fileManagerRef.current.saveProject(currentAppState, undefined, { title: '', artist: '' })
     
     if (result.success) {
       console.log('✅ Project saved successfully')
-      tabEditor.setModified(false)
       autoSaveRef.current.markClean()
     } else {
       console.error('❌ Save failed:', result.error)
@@ -165,7 +170,7 @@ function AppContent() {
 
   const handleSaveAs = () => {
     console.log('💾 Save As clicked')
-    tabEditor.toggleSaveDialog()
+    // TODO: Implement save dialog for NoteStack
   }
 
   const handleSaveDialog = async (filename: string, metadata: Partial<ProjectMetadata>) => {
@@ -173,30 +178,30 @@ function AppContent() {
     
     const currentAppState: AppState = {
       tabData: legacyTabData,
-      tempo: tabEditor.state.tempo,
-      timeSignature: `${tabEditor.state.timeSignature[0]}/${tabEditor.state.timeSignature[1]}`,
-      cursorPosition: tabEditor.state.cursor,
+      tempo: tabEditor.state.bpm,
+      timeSignature: `4/4`,
+      cursorPosition: {
+        timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
+        stringIndex: 0
+      },
       selectedDuration: tabEditor.state.selectedDuration,
-      selectedNoteType: tabEditor.state.selectedNoteType,
-      customMeasureLines: tabEditor.state.customMeasureLines,
-      zoom: tabEditor.state.zoom,
-      showFretboard: tabEditor.state.showFretboard,
-      countInEnabled: tabEditor.state.countIn,
-      isLooping: tabEditor.state.isLooping,
-      splitRatio: tabEditor.state.splitRatio,
-      videoSource: tabEditor.state.videoSource,
-      isSynthMuted: tabEditor.state.isSynthMuted,
-      isVideoMuted: tabEditor.state.isVideoMuted
+      selectedNoteType: 'note',
+      customMeasureLines: [],
+      zoom: 1,
+      showFretboard: true,
+      countInEnabled: false,
+      isLooping: false,
+      splitRatio: 0.5,
+      videoSource: '',
+      isSynthMuted: false,
+      isVideoMuted: false
     }
 
     const result = await fileManagerRef.current.saveProject(currentAppState, filename, metadata)
     
     if (result.success) {
       console.log('✅ Project saved successfully')
-      tabEditor.setModified(false)
-      tabEditor.setProjectMetadata(metadata)
       autoSaveRef.current.markClean()
-      tabEditor.toggleSaveDialog()
     } else {
       console.error('❌ Save failed:', result.error)
       alert(`Failed to save project: ${result.error}`)
@@ -204,127 +209,110 @@ function AppContent() {
   }
 
   const handleLoad = () => {
-    console.log('📂 Load button clicked')
-    tabEditor.toggleLoadDialog()
+    console.log('📁 Load button clicked')
+    // TODO: Implement load dialog for NoteStack
   }
 
   const handleLoadFile = async (file: File) => {
-    console.log('📂 Loading file:', file.name)
+    console.log('📁 Loading file:', file.name)
     
-    const result = await fileManagerRef.current.loadProject(file)
-    
-    if (result.success && result.data) {
-      console.log('✅ Project loaded successfully')
+    try {
+      const result = await fileManagerRef.current.loadProject(file)
       
-      // Convert legacy TabData to our new notes format using the FileManager's deserialize method
-      const legacyAppState = fileManagerRef.current.deserializeState(result.data)
-      const notes = convertTabDataToNotes(legacyAppState.tabData || [])
-      
-      // Parse time signature string back to tuple
-      const timeSignatureParts = (legacyAppState.timeSignature || '4/4').split('/')
-      const timeSignature: [number, number] = [
-        parseInt(timeSignatureParts[0]) || 4,
-        parseInt(timeSignatureParts[1]) || 4
-      ]
-      
-      // Load the project state using our unified state management
-      tabEditor.loadProjectState({
-        notes,
-        tempo: legacyAppState.tempo || 120,
-        timeSignature,
-        cursor: legacyAppState.cursorPosition || { timeSlot: 0, stringIndex: 2 },
-        selectedDuration: legacyAppState.selectedDuration || 'quarter',
-        selectedNoteType: legacyAppState.selectedNoteType || 'note',
-        customMeasureLines: legacyAppState.customMeasureLines || [],
-        zoom: legacyAppState.zoom || 1.0,
-        showFretboard: legacyAppState.showFretboard ?? true,
-        countIn: legacyAppState.countInEnabled ?? false,
-        isLooping: legacyAppState.isLooping ?? false,
-        splitRatio: legacyAppState.splitRatio || 0.4,
-        videoSource: legacyAppState.videoSource || '/videos/test-vid-1.mp4',
-        isSynthMuted: legacyAppState.isSynthMuted ?? false,
-        isVideoMuted: legacyAppState.isVideoMuted ?? false,
-        currentProjectMetadata: result.data.metadata
-      })
-      
-      tabEditor.toggleLoadDialog()
-      autoSaveRef.current.markClean()
-    } else {
-      console.error('❌ Load failed:', result.error)
-      alert(`Failed to load project: ${result.error}`)
+      if (result.success && result.data) {
+        console.log('✅ Project loaded successfully:', result.data)
+        
+        // Access the tabData directly from the loaded data structure
+        const tabData = (result.data as any).tabData || result.data
+        const noteStackTab = convertTabDataToNoteStack(tabData)
+        tabEditor.loadTab(noteStackTab)
+        tabEditor.setBpm((result.data as any).tempo || 120)
+        tabEditor.setCursorPosition(0) // Reset cursor
+        
+        autoSaveRef.current.markClean()
+      } else {
+        console.error('❌ Load failed:', result.error)
+        alert(`Failed to load project: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('❌ Load error:', error)
+      alert(`Failed to load project: ${error}`)
     }
   }
 
   const handleNew = () => {
-    console.log('📄 New project button clicked')
-    tabEditor.toggleNewProjectDialog()
+    console.log('📄 New button clicked')
+    // TODO: Implement new project dialog for NoteStack
   }
 
   const handleNewProject = () => {
     console.log('📄 Creating new project')
-    tabEditor.resetToInitialState()
-    tabEditor.toggleNewProjectDialog()
+    tabEditor.loadTab([]) // Clear tab
+    tabEditor.setBpm(120)
+    tabEditor.setCursorPosition(0)
     autoSaveRef.current.markClean()
   }
 
-  // === Sync Engine Integration Handlers ===
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
+    const player = getStrumstickPlayer()
     if (tabEditor.state.isPlaying) {
+      player.pause()
+      tabEditor.setPlaying(false)
       syncEngine.pause()
-      playback.stop()
     } else {
+      await player.play()
+      tabEditor.setPlaying(true)
       syncEngine.play()
-      playback.play()
     }
   }
 
   const handlePlaybackStateChange = (playing: boolean) => {
-    if (playing !== tabEditor.state.isPlaying) {
-      if (playing) {
-        tabEditor.startPlayback()
-      } else {
-        tabEditor.stopPlayback()
-      }
+    console.log('🎵 Playback state changed:', playing)
+    if (playing) {
+      syncEngine.play()
+    } else {
+      syncEngine.pause()
     }
   }
 
-  // === Legacy Component Bridge Functions ===
-  // These adapters allow legacy components to work with our new state management
   const handlePositionClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => {
-    if (clickedOnMeasureLine && tabEditor.state.currentToolMode === 'measureLine') {
-      tabEditor.addMeasureLine(timeSlot)
-    } else {
-      navigation.setCursorPosition({ timeSlot, stringIndex })
-      
-      if (shiftHeld) {
-        // Handle selection logic
-        const noteIndex = tabEditor.state.notes.findIndex(note => 
-          note.startSlot === timeSlot && note.stringIndex === stringIndex
-        )
-        if (noteIndex >= 0) {
-          tabEditor.toggleNoteSelection(noteIndex, true)
-        }
-      }
+    const position = timeSlot * 960 // Convert slots to ticks
+    tabEditor.setCursorPosition(position)
+    
+    if (shiftHeld) {
+      // TODO: Add selection support to NoteStack editor
+      console.log('Selection not yet implemented in NoteStack editor')
     }
   }
 
   const movePosition = (direction: 'left' | 'right' | 'up' | 'down') => {
-    tabEditor.moveCursor(direction)
+    if (direction === 'left') tabEditor.moveCursorLeft()
+    if (direction === 'right') tabEditor.moveCursorRight()
+    // TODO: Handle up/down for string selection
   }
 
   const addNote = (fret: number | null, duration?: string, type?: 'note' | 'rest') => {
-    noteInput.createNoteAtCursor(fret, duration as any, type)
-    tabEditor.moveCursor('right')
+    if (fret !== null) {
+      const position = tabEditor.state.currentPosition
+      
+      // Add note to first string for now (TODO: add string selection)
+      tabEditor.addNote(position, 0, fret)
+      
+      // Move cursor right
+      tabEditor.moveCursorRight()
+    }
   }
 
   const removeNote = () => {
-    const noteIndex = tabEditor.state.notes.findIndex(note => 
-      note.startSlot === tabEditor.state.cursor.timeSlot && 
-      note.stringIndex === tabEditor.state.cursor.stringIndex
-    )
-    if (noteIndex >= 0) {
-      tabEditor.removeNote(noteIndex)
-    }
+    const position = tabEditor.state.currentPosition
+    // Remove note from first string for now (TODO: add string selection) 
+    tabEditor.removeNote(position, 0)
+  }
+
+  // Stub for preview note functionality
+  const previewNote = (fret: number, stringIndex: number) => {
+    console.log(`🎵 Preview note: fret ${fret}, string ${stringIndex}`)
+    // TODO: Implement note preview with NoteStack player
   }
 
   return (
@@ -334,128 +322,115 @@ function AppContent() {
           <ProfessionalToolbar
             selectedDuration={tabEditor.state.selectedDuration}
             onDurationChange={tabEditor.setSelectedDuration}
-            selectedNoteType={tabEditor.state.selectedNoteType}
-            onNoteTypeChange={tabEditor.setSelectedNoteType}
-            currentToolMode={tabEditor.state.currentToolMode}
-            onToolModeChange={tabEditor.setToolMode}
-            tempo={tabEditor.state.tempo}
-            onTempoChange={tabEditor.setTempo}
-            timeSignature={`${tabEditor.state.timeSignature[0]}/${tabEditor.state.timeSignature[1]}`}
-            onTimeSignatureChange={(sig) => {
-              const parts = sig.split('/')
-              tabEditor.dispatch({ 
-                type: 'SET_TIME_SIGNATURE', 
-                payload: [parseInt(parts[0]) || 4, parseInt(parts[1]) || 4] 
-              })
-            }}
-            tieMode={tabEditor.state.selection.length > 0}
-            onTieModeChange={() => {/* TODO: Implement tie mode */}}
+            selectedNoteType={'note'}
+            onNoteTypeChange={() => {}} // TODO: Add note type to NoteStack
+            currentToolMode={'note'}
+            onToolModeChange={() => {}} // TODO: Add tool mode to NoteStack
+            tempo={tabEditor.state.bpm}
+            onTempoChange={tabEditor.setBpm}
+            timeSignature={'4/4'}
+            onTimeSignatureChange={() => {}} // TODO: Add time signature to NoteStack
+            tieMode={false}
+            onTieModeChange={() => {}} // TODO: Add tie mode to NoteStack
             onSave={handleSave}
             onLoad={handleLoad}
             onNew={handleNew}
             onSaveAs={handleSaveAs}
-            isModified={tabEditor.state.isModified}
-            currentPosition={tabEditor.state.cursor}
-            noteAtCurrentPosition={getNoteAtCurrentPosition()}
-            onToggleDotted={() => {
-              const noteIndex = tabEditor.state.notes.findIndex(note => 
-                note.startSlot === tabEditor.state.cursor.timeSlot && 
-                note.stringIndex === tabEditor.state.cursor.stringIndex
-              )
-              if (noteIndex >= 0) {
-                tabEditor.toggleDottedNote(noteIndex)
-              }
+            isModified={false} // TODO: Add modified state to NoteStack
+            currentPosition={{
+              timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
+              stringIndex: 0
             }}
+            noteAtCurrentPosition={getNoteAtCurrentPosition()}
+            onToggleDotted={() => {}} // TODO: Add dotted notes to NoteStack
           />
         }
         fretboard={
-          tabEditor.state.showFretboard ? (
-            <Fretboard
-              currentlyPlaying={[]} // TODO: Connect to playback state
-            />
-          ) : undefined
+          <Fretboard
+            currentlyPlaying={[]} // TODO: Connect to NoteStack playback state
+          />
         }
         bottomPanel={
           <PlaybackBar
             isPlaying={tabEditor.state.isPlaying}
             onPlayPause={handlePlayPause}
-            currentTime={tabEditor.state.videoCurrentTime.toString()}
-            totalTime={tabEditor.playbackDuration.toString()}
-            tempo={tabEditor.state.tempo}
-            trackTitle={tabEditor.state.currentProjectMetadata.title || 'Untitled Song'}
-            onTempoChange={tabEditor.setTempo}
-            onLoopToggle={tabEditor.toggleLooping}
-            onFretboardToggle={tabEditor.toggleFretboard}
-            onCountInToggle={tabEditor.toggleCountIn}
-            isLooping={tabEditor.state.isLooping}
-            showFretboard={tabEditor.state.showFretboard}
-            countInEnabled={tabEditor.state.countIn}
+            currentTime={tabEditor.state.currentPosition.toString()}
+            totalTime={tabEditor.layoutItems.length.toString()} // Use layout items count as approximation
+            tempo={tabEditor.state.bpm}
+            trackTitle={'Untitled Song'} // TODO: Add title to NoteStack state
+            onTempoChange={tabEditor.setBpm}
+            onLoopToggle={() => {}} // TODO: Add looping to NoteStack
+            onFretboardToggle={() => {}} // TODO: Add fretboard toggle to NoteStack
+            onCountInToggle={() => {}} // TODO: Add count-in to NoteStack
+            isLooping={false} // TODO: Add looping to NoteStack
+            showFretboard={true} // TODO: Add fretboard state to NoteStack
+            countInEnabled={false} // TODO: Add count-in to NoteStack
           />
         }
         centerWorkspace={
           <SplitPane
-            defaultSplitRatio={tabEditor.state.splitRatio}
-            onSplitChange={tabEditor.setSplitRatio}
+            defaultSplitRatio={0.5} // TODO: Add split ratio to NoteStack state
+            onSplitChange={() => {}} // TODO: Add split ratio to NoteStack
             orientation="horizontal"
           >
             {[
               <VideoPlayer
-                source={tabEditor.state.videoSource}
+                source={''} // TODO: Add video source to NoteStack state
                 isPlaying={tabEditor.state.isPlaying}
-                currentTime={tabEditor.state.videoCurrentTime}
-                playbackRate={tabEditor.state.videoPlaybackRate}
-                onMuteToggle={tabEditor.toggleVideoMute}
-                isMuted={tabEditor.state.isVideoMuted}
+                currentTime={0} // TODO: Add video time to NoteStack state
+                playbackRate={1} // TODO: Add playback rate to NoteStack state
+                onMuteToggle={() => {}} // TODO: Add video mute to NoteStack
+                isMuted={false} // TODO: Add video mute to NoteStack state
               />,
               <div className="tab-editor-pane">
                 <TabViewer
                   tabData={legacyTabData}
-                  currentPosition={tabEditor.state.cursor}
+                  currentPosition={{
+                    timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
+                    stringIndex: 0
+                  }}
                   onAddNote={addNote}
                   onRemoveNote={removeNote}
                   onMoveCursor={movePosition}
                   onCursorClick={handlePositionClick}
-                  onPlayPreviewNote={playback.previewNote}
+                  onPlayPreviewNote={previewNote}
                   selectedDuration={tabEditor.state.selectedDuration}
-                  selectedNoteType={tabEditor.state.selectedNoteType}
-                  currentToolMode={tabEditor.state.currentToolMode}
-                  customMeasureLines={tabEditor.state.customMeasureLines}
+                  selectedNoteType={'note'}
+                  currentToolMode={'note'}
+                  customMeasureLines={[]}
                   onTogglePlayback={handlePlayPause}
-                  onResetCursor={() => tabEditor.setCursorPosition({ timeSlot: 0, stringIndex: 2 })}
-                  zoom={tabEditor.state.zoom}
-                  onZoomChange={tabEditor.setZoom}
+                  onResetCursor={() => tabEditor.setCursorPosition(0)}
+                  zoom={1}
+                  onZoomChange={() => {}} // TODO: Add zoom to NoteStack
                   isPlaying={tabEditor.state.isPlaying}
-                  currentPlaybackTimeSlot={tabEditor.state.playbackPosition}
-                  selectedNotes={tabEditor.state.selection
-                    .map(index => {
-                      const note = tabEditor.state.notes[index]
-                      return note ? { timeSlot: note.startSlot, stringIndex: note.stringIndex } : null
-                    })
-                    .filter((note): note is { timeSlot: number; stringIndex: number } => note !== null)
-                  }
-                  onCreateTie={() => {/* TODO: Implement tie creation */}}
-                  isSynthMuted={tabEditor.state.isSynthMuted}
-                  onSynthMuteToggle={tabEditor.toggleSynthMute}
+                  currentPlaybackTimeSlot={Math.floor(tabEditor.state.currentPosition / 960)}
+                  selectedNotes={[]} // TODO: Add selection to NoteStack
+                  onCreateTie={() => {}} // TODO: Add ties to NoteStack
+                  isSynthMuted={false} // TODO: Add synth mute to NoteStack
+                  onSynthMuteToggle={() => {}} // TODO: Add synth mute to NoteStack
                   noteAtCurrentPosition={getNoteAtCurrentPosition()}
                 />
                 
                 <Controls
                   ref={controlsRef}
                   tabData={legacyTabData}
-                  currentPosition={tabEditor.state.cursor}
-                  onNotesPlaying={() => {}} // TODO: Connect to playback state
-                  tempo={tabEditor.state.tempo}
+                  currentPosition={{
+                    timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
+                    stringIndex: 0
+                  }}
+                  onNotesPlaying={() => {}} // TODO: Connect to NoteStack playback state
+                  tempo={tabEditor.state.bpm}
                   onPlaybackStateChange={handlePlaybackStateChange}
-                  onCurrentTimeSlotChange={tabEditor.setPlaybackPosition}
+                  onCurrentTimeSlotChange={(pos) => tabEditor.setCursorPosition(pos * 960)}
                   onPlaybackComplete={() => {
                     console.log('🏁 Tab playback completed')
                     syncEngine.pause()
-                    tabEditor.stopPlayback()
+                    tabEditor.setPlaying(false)
                   }}
-                  countInEnabled={tabEditor.state.countIn}
-                  timeSignature={`${tabEditor.state.timeSignature[0]}/${tabEditor.state.timeSignature[1]}`}
-                  pickupBeats={tabEditor.pickupBeats}
-                  isMuted={tabEditor.state.isSynthMuted}
+                  countInEnabled={false}
+                  timeSignature={'4/4'}
+                  pickupBeats={0} // TODO: Add pickup beats to NoteStack
+                  isMuted={false}
                 />
               </div>
             ]}
@@ -463,26 +438,26 @@ function AppContent() {
         }
       />
 
-      {/* Save/Load Dialogs */}
+      {/* Save/Load Dialogs - TODO: Update for NoteStack */}
       <SaveDialog
-        isOpen={tabEditor.state.saveDialogOpen}
-        onClose={tabEditor.toggleSaveDialog}
+        isOpen={false} // TODO: Add dialog state to NoteStack
+        onClose={() => {}} // TODO: Add dialog actions to NoteStack
         onSave={handleSaveDialog}
-        currentMetadata={tabEditor.state.currentProjectMetadata}
+        currentMetadata={{ title: '', artist: '' }}
       />
       
       <LoadDialog
-        isOpen={tabEditor.state.loadDialogOpen}
-        onClose={tabEditor.toggleLoadDialog}
+        isOpen={false} // TODO: Add dialog state to NoteStack
+        onClose={() => {}} // TODO: Add dialog actions to NoteStack
         onLoad={handleLoadFile}
         recentFiles={fileManagerRef.current.getRecentFiles()}
       />
       
       <NewProjectDialog
-        isOpen={tabEditor.state.newProjectDialogOpen}
-        onClose={tabEditor.toggleNewProjectDialog}
+        isOpen={false} // TODO: Add dialog state to NoteStack
+        onClose={() => {}} // TODO: Add dialog actions to NoteStack
         onConfirm={handleNewProject}
-        hasUnsavedChanges={tabEditor.state.isModified}
+        hasUnsavedChanges={false} // TODO: Add modified state to NoteStack
       />
     </div>
   )
