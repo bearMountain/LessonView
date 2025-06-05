@@ -292,7 +292,7 @@ function AppContent() {
     // TODO: Handle up/down for string selection
   }
 
-  // Find current string index from cursor position (for compatibility)
+  // Find current string index from cursor position (for compatibility with legacy components)
   const getCurrentStringIndex = () => {
     if (tabEditor.state.selectedStacks.length > 0) {
       // Try to find a note at current position to determine string
@@ -304,56 +304,6 @@ function AppContent() {
       }
     }
     return 1; // Default to middle string (A)
-  };
-
-  // Event handlers - updated for NoteStack interface
-  const handleAddNote = (fret: number | null, duration?: string, type?: 'note' | 'rest') => {
-    if (fret !== null && duration) {
-      tabEditor.addNote(
-        tabEditor.state.currentPosition,
-        getCurrentStringIndex(),
-        fret,
-        duration as Duration
-      );
-    }
-  };
-
-  const handleRemoveNote = () => {
-    tabEditor.removeNote(
-      tabEditor.state.currentPosition,
-      getCurrentStringIndex()
-    );
-  };
-
-  const handleMoveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
-    const quarterNote = 960; // 960 ticks per quarter note
-    const currentPos = tabEditor.state.currentPosition;
-    
-    switch (direction) {
-      case 'left':
-        tabEditor.setCursorPosition(Math.max(0, currentPos - quarterNote));
-        break;
-      case 'right':
-        tabEditor.setCursorPosition(currentPos + quarterNote);
-        break;
-      case 'up':
-      case 'down':
-        // String navigation handled by click events
-        break;
-    }
-  };
-
-  const handleCursorClick = (position: number, stringIndex: number, shiftHeld?: boolean) => {
-    tabEditor.setCursorPosition(position);
-    
-    if (shiftHeld) {
-      // Add to selection
-      const stack = tabEditor.state.tab.find(s => s.musicalPosition === position);
-      if (stack && !tabEditor.state.selectedStacks.includes(stack.id)) {
-        // Use the updateSelectedStacks method if available, otherwise skip selection
-        console.log('Would select stack:', stack.id);
-      }
-    }
   };
 
   return (
@@ -425,26 +375,7 @@ function AppContent() {
               />,
               <div className="tab-editor-pane">
                 <TabViewer
-                  tab={tabEditor.state.tab}
-                  currentPosition={tabEditor.state.currentPosition}
-                  onAddNote={handleAddNote}
-                  onRemoveNote={handleRemoveNote}
-                  onMoveCursor={handleMoveCursor}
-                  onCursorClick={handleCursorClick}
-                  selectedDuration={tabEditor.state.selectedDuration}
-                  selectedNoteType={'note'} // Fallback
-                  currentToolMode={'note'} // Fallback
-                  onTogglePlayback={handlePlayPause}
-                  onResetCursor={() => tabEditor.setCursorPosition(0)}
-                  zoom={tabEditor.state.zoom || 1} // Fallback
-                  onZoomChange={(newZoom) => tabEditor.setZoom && tabEditor.setZoom(newZoom)}
-                  isPlaying={tabEditor.state.isPlaying}
-                  currentPlaybackPosition={tabEditor.state.currentPosition} // Use current position as fallback
-                  selectedStacks={tabEditor.state.selectedStacks}
-                  onCreateTie={() => {}} // TODO: Add ties to NoteStack
-                  isSynthMuted={false} // Fallback
-                  onSynthMuteToggle={() => {}} // TODO: Add synth mute to NoteStack
-                  bpm={tabEditor.state.bpm}
+                  editor={tabEditor}
                 />
                 
                 <Controls

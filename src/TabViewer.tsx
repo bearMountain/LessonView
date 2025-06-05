@@ -1,30 +1,11 @@
 import React, { useRef, useMemo } from 'react';
 import './TabViewer.css';
-import type { Tab, Duration, NoteStack } from '../types/notestack';
-import { DURATION_VISUALS } from './types';
+import type { Tab, Duration, NoteStack } from './types/notestack';
+import { DURATION_VISUALS } from './components/types';
+import type { useNoteStackEditor } from './hooks/useNoteStackEditor';
 
 interface TabViewerProps {
-  tab: Tab; // Direct NoteStack data
-  currentPosition: number; // Position in ticks
-  onAddNote: (fret: number | null, duration?: string, type?: 'note' | 'rest') => void;
-  onRemoveNote: () => void;
-  onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
-  onCursorClick: (position: number, stringIndex: number, shiftHeld?: boolean) => void;
-  onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
-  selectedDuration: Duration;
-  selectedNoteType: 'note' | 'rest';
-  currentToolMode: 'note' | 'measureLine' | 'select';
-  onTogglePlayback?: () => void;
-  onResetCursor?: () => void;
-  zoom: number;
-  onZoomChange: (zoom: number) => void;
-  isPlaying?: boolean;
-  currentPlaybackPosition?: number; // Position in ticks
-  selectedStacks?: string[]; // Selected stack IDs
-  onCreateTie?: () => void;
-  isSynthMuted?: boolean;
-  onSynthMuteToggle?: () => void;
-  bpm: number;
+  editor: ReturnType<typeof useNoteStackEditor>;
 }
 
 // String configuration for 3-string strumstick
@@ -35,33 +16,23 @@ const stringIndices = [2, 1, 0]; // Data indices: Hi D=2, A=1, Low D=0
 const PIXELS_PER_TICK = 0.05;
 
 /**
- * TabViewer Component - NoteStack-native rendering component
- * Works directly with NoteStack data structure
+ * TabViewer Component - Pure functional component
+ * Receives single state object and dispatch mechanism
  */
-const TabViewer: React.FC<TabViewerProps> = ({ 
-  tab,
-  currentPosition,
-  onAddNote, 
-  onRemoveNote,
-  onMoveCursor,
-  onCursorClick,
-  onPlayPreviewNote,
-  selectedDuration,
-  onTogglePlayback,
-  onResetCursor,
-  selectedNoteType,
-  zoom,
-  onZoomChange,
-  isPlaying,
-  currentPlaybackPosition,
-  selectedStacks,
-  onCreateTie,
-  isSynthMuted,
-  onSynthMuteToggle,
-  currentToolMode,
-  bpm
-}) => {
+const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  
+  // Destructure what we need from the editor state
+  const { state, layoutItems, totalWidth } = editor;
+  const { 
+    tab, 
+    currentPosition, 
+    selectedDuration, 
+    zoom = 1, 
+    isPlaying, 
+    selectedStacks,
+    bpm 
+  } = state;
   
   // === Layout Constants ===
   const layout = useMemo(() => {
@@ -71,13 +42,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
     const topMargin = 40 * zoom;
     const bottomMargin = 40 * zoom;
     
-    // Calculate total width based on musical positions
-    const maxPosition = Math.max(
-      ...tab.map(stack => stack.musicalPosition),
-      currentPosition + 3840 // Add extra space (1 measure)
-    );
-    const totalWidth = leftMargin + (maxPosition * PIXELS_PER_TICK * zoom) + rightMargin;
-    const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing)) * zoom;
+    // Use totalWidth from editor's layout calculations
+    const calculatedTotalWidth = totalWidth * zoom;
+    const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing));
     
     return {
       stringSpacing,
@@ -85,11 +52,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
       rightMargin,
       topMargin,
       bottomMargin,
-      totalWidth,
+      totalWidth: calculatedTotalWidth,
       totalHeight,
       pixelsPerTick: PIXELS_PER_TICK * zoom
     };
-  }, [zoom, tab, currentPosition]);
+  }, [zoom, totalWidth]);
 
   // === Helper Functions ===
   const getStringY = (stringIndex: number) => {
@@ -112,7 +79,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
     const ticksPerMeasure = 3840; // 4/4 time, 960 ticks per quarter note
     
     const maxPosition = Math.max(
-      ...tab.map(stack => stack.musicalPosition),
+      ...tab.map((stack: NoteStack) => stack.musicalPosition),
       currentPosition + ticksPerMeasure
     );
     
@@ -129,7 +96,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
       e.preventDefault();
       const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
       const newZoom = Math.max(0.25, Math.min(4.0, zoom + zoomDelta));
-      onZoomChange(newZoom);
+      editor.setZoom(newZoom);
     }
   };
 
@@ -157,7 +124,41 @@ const TabViewer: React.FC<TabViewerProps> = ({
     // Snap to nearest quarter note (960 ticks)
     const snappedPosition = Math.round(clickPosition / 960) * 960;
     
-    onCursorClick(snappedPosition, closestStringIndex, e.shiftKey);
+    // Set cursor position
+    editor.setCursorPosition(snappedPosition);
+    
+    if (e.shiftKey) {
+      // Handle selection
+      const stack = tab.find((s: NoteStack) => s.musicalPosition === snappedPosition);
+      if (stack && !selectedStacks.includes(stack.id)) {
+        console.log('Would select stack:', stack.id);
+        // TODO: Add selection action to editor
+      }
+    }
+  };
+
+  // Handle keyboard input for adding notes
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Number keys 0-9 for frets
+    if (e.key >= '0' && e.key <= '9') {
+      const fret = parseInt(e.key);
+      const defaultString = 1; // Middle string (A)
+      editor.addNote(currentPosition, defaultString, fret, selectedDuration);
+    }
+    
+    // Delete key to remove notes
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const defaultString = 1;
+      editor.removeNote(currentPosition, defaultString);
+    }
+    
+    // Arrow keys for navigation
+    if (e.key === 'ArrowLeft') {
+      editor.moveCursorLeft();
+    }
+    if (e.key === 'ArrowRight') {
+      editor.moveCursorRight();
+    }
   };
 
   // === Note Stem Rendering ===
@@ -193,12 +194,12 @@ const TabViewer: React.FC<TabViewerProps> = ({
 
   // === Main Render ===
   return (
-    <div className="tab-viewer">
+    <div className="tab-viewer" tabIndex={0} onKeyDown={handleKeyDown}>
       {/* Zoom Controls */}
       <div className="zoom-controls">
-        <button onClick={() => onZoomChange(Math.max(0.25, zoom - 0.25))}>−</button>
+        <button onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.25))}>−</button>
         <span>{Math.round(zoom * 100)}%</span>
-        <button onClick={() => onZoomChange(Math.min(4.0, zoom + 0.25))}>+</button>
+        <button onClick={() => editor.setZoom(Math.min(4.0, zoom + 0.25))}>+</button>
         <span style={{ marginLeft: '20px', fontSize: '12px', color: '#666' }}>
           BPM: {bpm} | Position: {currentPosition} ticks
         </span>
@@ -276,7 +277,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
           })}
 
           {/* NoteStacks - Render vertical stacks of notes */}
-          {tab.map((stack) => {
+          {tab.map((stack: NoteStack) => {
             const stackX = getPositionX(stack.musicalPosition);
             const isSelected = selectedStacks?.includes(stack.id);
             const visual = DURATION_VISUALS[stack.duration];
@@ -299,7 +300,7 @@ const TabViewer: React.FC<TabViewerProps> = ({
                 )}
                 
                 {/* Notes in the stack */}
-                {stack.notes.map((note, noteIndex) => {
+                {stack.notes.map((note: any, noteIndex: number) => {
                   const y = getStringY(note.string);
                   
                   return (
@@ -353,11 +354,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
           </g>
 
           {/* Playback Position */}
-          {isPlaying && currentPlaybackPosition !== undefined && (
+          {isPlaying && currentPosition !== undefined && (
             <line
-              x1={getPositionX(currentPlaybackPosition)}
+              x1={getPositionX(currentPosition)}
               y1={getStringY(2) - 15}
-              x2={getPositionX(currentPlaybackPosition)}
+              x2={getPositionX(currentPosition)}
               y2={getStringY(0) + 15}
               stroke="#4caf50"
               strokeWidth="2"
@@ -378,8 +379,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
         Stacks: {tab.length} | 
         Selected: {selectedStacks?.length || 0} | 
         Duration: {selectedDuration} |
-        {isPlaying ? ' ▶️ Playing' : ' ⏸️ Stopped'}
-        {isSynthMuted && ' 🔇 Muted'}
+        {isPlaying ? ' ▶️ Playing' : ' ⏸️ Stopped'} |
+        Layout Items: {layoutItems.length}
       </div>
     </div>
   );
