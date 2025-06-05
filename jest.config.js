@@ -1,7 +1,7 @@
 /** @type {import('jest').Config} */
 export default {
   preset: 'ts-jest',
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   transform: {
     '^.+\\.(ts|tsx)$': 'ts-jest',
@@ -18,4 +18,5 @@ export default {
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
   ],
+  setupFilesAfterEnv: ['@testing-library/jest-dom'],
 }; 
