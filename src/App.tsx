@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import Fretboard from './Fretboard'
@@ -15,6 +15,7 @@ import { FileManager, type AppState, type ProjectMetadata } from './services/Fil
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note } from './types'
+import type { Duration } from './types/notestack'
 import { convertNoteStackToTabData, convertTabDataToNoteStack } from './services/ArchitectureBridge'
 import { getStrumstickPlayer } from './services/StrumstickPlayer'
 
@@ -291,29 +292,69 @@ function AppContent() {
     // TODO: Handle up/down for string selection
   }
 
-  const addNote = (fret: number | null, duration?: string, type?: 'note' | 'rest') => {
-    if (fret !== null) {
-      const position = tabEditor.state.currentPosition
-      
-      // Add note to first string for now (TODO: add string selection)
-      tabEditor.addNote(position, 0, fret)
-      
-      // Move cursor right
-      tabEditor.moveCursorRight()
+  // Find current string index from cursor position (for compatibility)
+  const getCurrentStringIndex = () => {
+    if (tabEditor.state.selectedStacks.length > 0) {
+      // Try to find a note at current position to determine string
+      const stackAtPosition = tabEditor.state.tab.find(
+        stack => stack.musicalPosition === tabEditor.state.currentPosition
+      );
+      if (stackAtPosition && stackAtPosition.notes.length > 0) {
+        return stackAtPosition.notes[0].string; // Use first note's string
+      }
     }
-  }
+    return 1; // Default to middle string (A)
+  };
 
-  const removeNote = () => {
-    const position = tabEditor.state.currentPosition
-    // Remove note from first string for now (TODO: add string selection) 
-    tabEditor.removeNote(position, 0)
-  }
+  // Event handlers - updated for NoteStack interface
+  const handleAddNote = (fret: number | null, duration?: string, type?: 'note' | 'rest') => {
+    if (fret !== null && duration) {
+      tabEditor.addNote(
+        tabEditor.state.currentPosition,
+        getCurrentStringIndex(),
+        fret,
+        duration as Duration
+      );
+    }
+  };
 
-  // Stub for preview note functionality
-  const previewNote = (fret: number, stringIndex: number) => {
-    console.log(`🎵 Preview note: fret ${fret}, string ${stringIndex}`)
-    // TODO: Implement note preview with NoteStack player
-  }
+  const handleRemoveNote = () => {
+    tabEditor.removeNote(
+      tabEditor.state.currentPosition,
+      getCurrentStringIndex()
+    );
+  };
+
+  const handleMoveCursor = (direction: 'left' | 'right' | 'up' | 'down') => {
+    const quarterNote = 960; // 960 ticks per quarter note
+    const currentPos = tabEditor.state.currentPosition;
+    
+    switch (direction) {
+      case 'left':
+        tabEditor.setCursorPosition(Math.max(0, currentPos - quarterNote));
+        break;
+      case 'right':
+        tabEditor.setCursorPosition(currentPos + quarterNote);
+        break;
+      case 'up':
+      case 'down':
+        // String navigation handled by click events
+        break;
+    }
+  };
+
+  const handleCursorClick = (position: number, stringIndex: number, shiftHeld?: boolean) => {
+    tabEditor.setCursorPosition(position);
+    
+    if (shiftHeld) {
+      // Add to selection
+      const stack = tabEditor.state.tab.find(s => s.musicalPosition === position);
+      if (stack && !tabEditor.state.selectedStacks.includes(stack.id)) {
+        // Use the updateSelectedStacks method if available, otherwise skip selection
+        console.log('Would select stack:', stack.id);
+      }
+    }
+  };
 
   return (
     <div className="app">
@@ -384,31 +425,26 @@ function AppContent() {
               />,
               <div className="tab-editor-pane">
                 <TabViewer
-                  tabData={legacyTabData}
-                  currentPosition={{
-                    timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
-                    stringIndex: 0
-                  }}
-                  onAddNote={addNote}
-                  onRemoveNote={removeNote}
-                  onMoveCursor={movePosition}
-                  onCursorClick={handlePositionClick}
-                  onPlayPreviewNote={previewNote}
+                  tab={tabEditor.state.tab}
+                  currentPosition={tabEditor.state.currentPosition}
+                  onAddNote={handleAddNote}
+                  onRemoveNote={handleRemoveNote}
+                  onMoveCursor={handleMoveCursor}
+                  onCursorClick={handleCursorClick}
                   selectedDuration={tabEditor.state.selectedDuration}
-                  selectedNoteType={'note'}
-                  currentToolMode={'note'}
-                  customMeasureLines={[]}
+                  selectedNoteType={'note'} // Fallback
+                  currentToolMode={'note'} // Fallback
                   onTogglePlayback={handlePlayPause}
                   onResetCursor={() => tabEditor.setCursorPosition(0)}
-                  zoom={1}
-                  onZoomChange={() => {}} // TODO: Add zoom to NoteStack
+                  zoom={tabEditor.state.zoom || 1} // Fallback
+                  onZoomChange={(newZoom) => tabEditor.setZoom && tabEditor.setZoom(newZoom)}
                   isPlaying={tabEditor.state.isPlaying}
-                  currentPlaybackTimeSlot={Math.floor(tabEditor.state.currentPosition / 960)}
-                  selectedNotes={[]} // TODO: Add selection to NoteStack
+                  currentPlaybackPosition={tabEditor.state.currentPosition} // Use current position as fallback
+                  selectedStacks={tabEditor.state.selectedStacks}
                   onCreateTie={() => {}} // TODO: Add ties to NoteStack
-                  isSynthMuted={false} // TODO: Add synth mute to NoteStack
+                  isSynthMuted={false} // Fallback
                   onSynthMuteToggle={() => {}} // TODO: Add synth mute to NoteStack
-                  noteAtCurrentPosition={getNoteAtCurrentPosition()}
+                  bpm={tabEditor.state.bpm}
                 />
                 
                 <Controls

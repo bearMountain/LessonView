@@ -1,47 +1,46 @@
 import React, { useRef, useMemo } from 'react';
 import './TabViewer.css';
-import type { Note, NoteDuration, CursorPosition, TabData, NoteType, ToolMode, CustomMeasureLine } from './types';
-import { DURATION_VISUALS, getSlotX, getMeasureLineX, getNotesAtSlot, getAllTies, getVisualNoteX, getVisualSlotX } from './types';
-
-// Import our hooks for clean functionality
-import { useTabEditor, useNoteInput, useNavigation, usePlayback } from './hooks';
+import type { Tab, Duration, NoteStack } from '../types/notestack';
+import { DURATION_VISUALS } from './types';
 
 interface TabViewerProps {
-  tabData: TabData;
-  currentPosition: CursorPosition;
-  onAddNote: (fret: number | null, duration?: NoteDuration, type?: 'note' | 'rest') => void;
+  tab: Tab; // Direct NoteStack data
+  currentPosition: number; // Position in ticks
+  onAddNote: (fret: number | null, duration?: string, type?: 'note' | 'rest') => void;
   onRemoveNote: () => void;
   onMoveCursor: (direction: 'left' | 'right' | 'up' | 'down') => void;
-  onCursorClick: (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => void;
+  onCursorClick: (position: number, stringIndex: number, shiftHeld?: boolean) => void;
   onPlayPreviewNote?: (fret: number, stringIndex: number) => void;
-  selectedDuration: NoteDuration;
-  selectedNoteType: NoteType;
-  currentToolMode: ToolMode;
-  customMeasureLines: CustomMeasureLine[];
+  selectedDuration: Duration;
+  selectedNoteType: 'note' | 'rest';
+  currentToolMode: 'note' | 'measureLine' | 'select';
   onTogglePlayback?: () => void;
   onResetCursor?: () => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   isPlaying?: boolean;
-  currentPlaybackTimeSlot?: number;
-  selectedNotes?: Array<{ timeSlot: number; stringIndex: number }>;
+  currentPlaybackPosition?: number; // Position in ticks
+  selectedStacks?: string[]; // Selected stack IDs
   onCreateTie?: () => void;
   isSynthMuted?: boolean;
   onSynthMuteToggle?: () => void;
-  noteAtCurrentPosition?: Note | null;
+  bpm: number;
 }
 
 // String configuration for 3-string strumstick
-const stringLabels = ['d', 'A', 'D']; // Display order: Hi D, A, Low D
+const stringLabels = ['D', 'A', 'd']; // Display order: Hi D, A, Low D
 const stringIndices = [2, 1, 0]; // Data indices: Hi D=2, A=1, Low D=0
 
+// Convert ticks to display position
+const PIXELS_PER_TICK = 0.05;
+
 /**
- * TabViewer Component - Pure rendering component for tablature display
- * Uses functional architecture with hooks for all state management and interactions
+ * TabViewer Component - NoteStack-native rendering component
+ * Works directly with NoteStack data structure
  */
 const TabViewer: React.FC<TabViewerProps> = ({ 
-  tabData, 
-  currentPosition, 
+  tab,
+  currentPosition,
   onAddNote, 
   onRemoveNote,
   onMoveCursor,
@@ -54,14 +53,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
   zoom,
   onZoomChange,
   isPlaying,
-  currentPlaybackTimeSlot,
-  selectedNotes,
+  currentPlaybackPosition,
+  selectedStacks,
   onCreateTie,
   isSynthMuted,
   onSynthMuteToggle,
-  noteAtCurrentPosition,
   currentToolMode,
-  customMeasureLines
+  bpm
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   
@@ -72,11 +70,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
     const rightMargin = 80 * zoom;
     const topMargin = 40 * zoom;
     const bottomMargin = 40 * zoom;
-    const slotWidth = 20 * zoom;
     
-    // Calculate total dimensions
-    const minSlots = Math.max(tabData.length, currentPosition.timeSlot + 8);
-    const totalWidth = leftMargin + (minSlots * slotWidth) + rightMargin;
+    // Calculate total width based on musical positions
+    const maxPosition = Math.max(
+      ...tab.map(stack => stack.musicalPosition),
+      currentPosition + 3840 // Add extra space (1 measure)
+    );
+    const totalWidth = leftMargin + (maxPosition * PIXELS_PER_TICK * zoom) + rightMargin;
     const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing)) * zoom;
     
     return {
@@ -85,11 +85,11 @@ const TabViewer: React.FC<TabViewerProps> = ({
       rightMargin,
       topMargin,
       bottomMargin,
-      slotWidth,
       totalWidth,
-      totalHeight
+      totalHeight,
+      pixelsPerTick: PIXELS_PER_TICK * zoom
     };
-  }, [zoom, tabData.length, currentPosition.timeSlot]);
+  }, [zoom, tab, currentPosition]);
 
   // === Helper Functions ===
   const getStringY = (stringIndex: number) => {
@@ -97,10 +97,31 @@ const TabViewer: React.FC<TabViewerProps> = ({
     return layout.topMargin + (displayIndex * layout.stringSpacing);
   };
 
+  const getPositionX = (musicalPosition: number) => {
+    return layout.leftMargin + (musicalPosition * layout.pixelsPerTick);
+  };
+
   const getCursorPosition = () => ({
-    x: getVisualSlotX(currentPosition.timeSlot, customMeasureLines, layout.leftMargin, layout.slotWidth),
-    y: getStringY(currentPosition.stringIndex)
+    x: getPositionX(currentPosition),
+    y: getStringY(1) // Default to middle string (A)
   });
+
+  // === Measure Lines Calculation ===
+  const measureLines = useMemo(() => {
+    const lines: number[] = [];
+    const ticksPerMeasure = 3840; // 4/4 time, 960 ticks per quarter note
+    
+    const maxPosition = Math.max(
+      ...tab.map(stack => stack.musicalPosition),
+      currentPosition + ticksPerMeasure
+    );
+    
+    for (let pos = ticksPerMeasure; pos <= maxPosition; pos += ticksPerMeasure) {
+      lines.push(pos);
+    }
+    
+    return lines;
+  }, [tab, currentPosition]);
 
   // === Event Handlers ===
   const handleZoom = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -130,55 +151,25 @@ const TabViewer: React.FC<TabViewerProps> = ({
       }
     }
     
-    // Find closest time slot
-    const adjustedX = x - layout.leftMargin;
-    let closestSlot = Math.round(adjustedX / layout.slotWidth);
+    // Convert click position to musical position (ticks)
+    const clickPosition = Math.max(0, (x - layout.leftMargin) / layout.pixelsPerTick);
     
-    // Check for measure line click
-    const measureLine = customMeasureLines.find(ml => {
-      const measureX = getMeasureLineX(ml.slot, layout.leftMargin, layout.slotWidth, customMeasureLines);
-      return Math.abs(x - measureX) < 10;
-    });
+    // Snap to nearest quarter note (960 ticks)
+    const snappedPosition = Math.round(clickPosition / 960) * 960;
     
-    const clickedOnMeasureLine = !!measureLine;
-    if (clickedOnMeasureLine && measureLine) {
-      closestSlot = measureLine.slot;
-    }
-    
-    closestSlot = Math.max(0, closestSlot);
-    onCursorClick(closestSlot, closestStringIndex, e.shiftKey, clickedOnMeasureLine);
+    onCursorClick(snappedPosition, closestStringIndex, e.shiftKey);
   };
 
-  // === Measure Boundaries Calculation ===
-  const measureBoundaries = useMemo(() => {
-    const boundaries: number[] = [];
-    
-    // Add custom measure lines
-    customMeasureLines.forEach(ml => {
-      boundaries.push(ml.slot);
-    });
-    
-    // Add calculated measure boundaries if no custom lines
-    if (customMeasureLines.length === 0) {
-      // Calculate based on 4/4 time signature (16 slots per measure)
-      for (let slot = 16; slot < Math.max(tabData.length, currentPosition.timeSlot + 32); slot += 16) {
-        boundaries.push(slot);
-      }
-    }
-    
-    return boundaries.sort((a, b) => a - b);
-  }, [customMeasureLines, tabData.length, currentPosition.timeSlot]);
-
   // === Note Stem Rendering ===
-  const renderNoteStem = (note: Note, x: number, y: number) => {
-    const visual = DURATION_VISUALS[note.duration]
-    if (visual.stemHeight === 0) return null
+  const renderNoteStem = (duration: Duration, x: number, y: number, stringIndex: number) => {
+    const visual = DURATION_VISUALS[duration];
+    if (visual.stemHeight === 0) return null;
     
-    const stemHeight = 30
-    const stemDirection = note.stringIndex <= 1 ? 1 : -1 // Up for low strings, down for high
-    const stemX = x + (visual.isOpen ? 0 : 0)
-    const stemY1 = y
-    const stemY2 = y + (stemDirection * stemHeight)
+    const stemHeight = 30;
+    const stemDirection = stringIndex <= 1 ? 1 : -1; // Up for low strings, down for high
+    const stemX = x;
+    const stemY1 = y;
+    const stemY2 = y + (stemDirection * stemHeight);
     
     return (
       <g>
@@ -197,8 +188,8 @@ const TabViewer: React.FC<TabViewerProps> = ({
           />
         )}
       </g>
-    )
-  }
+    );
+  };
 
   // === Main Render ===
   return (
@@ -208,6 +199,9 @@ const TabViewer: React.FC<TabViewerProps> = ({
         <button onClick={() => onZoomChange(Math.max(0.25, zoom - 0.25))}>−</button>
         <span>{Math.round(zoom * 100)}%</span>
         <button onClick={() => onZoomChange(Math.min(4.0, zoom + 0.25))}>+</button>
+        <span style={{ marginLeft: '20px', fontSize: '12px', color: '#666' }}>
+          BPM: {bpm} | Position: {currentPosition} ticks
+        </span>
       </div>
 
       {/* Tab Display */}
@@ -226,14 +220,13 @@ const TabViewer: React.FC<TabViewerProps> = ({
           {/* String Lines */}
           {stringIndices.map((stringIndex) => {
             const y = getStringY(stringIndex);
-            const endX = layout.leftMargin + (Math.max(tabData.length, currentPosition.timeSlot + 8) * layout.slotWidth);
             
             return (
               <line
                 key={`string-${stringIndex}`}
                 x1={layout.leftMargin}
                 y1={y}
-                x2={endX}
+                x2={layout.totalWidth - layout.rightMargin}
                 y2={y}
                 stroke="#333"
                 strokeWidth="2"
@@ -262,16 +255,15 @@ const TabViewer: React.FC<TabViewerProps> = ({
           })}
 
           {/* Measure Lines */}
-          {measureBoundaries.map((slotPosition) => {
-            const x = getMeasureLineX(slotPosition, layout.leftMargin, layout.slotWidth, customMeasureLines);
+          {measureLines.map((position) => {
+            const x = getPositionX(position);
             const topY = getStringY(2) - 10;
             const bottomY = getStringY(0) + 10;
             
             return (
               <line
-                key={`measure-${slotPosition}`}
+                key={`measure-${position}`}
                 className="measure-line"
-                data-slot={slotPosition}
                 x1={x}
                 y1={topY}
                 x2={x}
@@ -283,44 +275,48 @@ const TabViewer: React.FC<TabViewerProps> = ({
             );
           })}
 
-          {/* Notes and Rests */}
-          {tabData.map((cell, slotIndex) => {
-            return cell.notes.map((note, noteIndex) => {
-              const x = getVisualNoteX(note, customMeasureLines, layout.leftMargin, layout.slotWidth);
-              const y = getStringY(note.stringIndex);
-              const visual = DURATION_VISUALS[note.duration];
-              
-              if (note.type === 'rest') {
-                return (
-                  <g key={`rest-${slotIndex}-${noteIndex}`}>
-                    <text
-                      x={x}
-                      y={y + 5}
-                      textAnchor="middle"
-                      fontSize="16"
-                      fill="#666"
-                    >
-                      𝄽
-                    </text>
-                  </g>
-                );
-              } else {
-                return (
-                  <g key={`note-${slotIndex}-${noteIndex}`} className="note-symbol" data-slot={note.startSlot} data-string={note.stringIndex}>
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r="12"
-                      fill={visual.isOpen ? "white" : "#000"}
-                      stroke="#000"
-                      strokeWidth="2"
-                    />
-                    
-                    {renderNoteStem(note, x, y)}
-                    
-                    {note.fret !== null && (
+          {/* NoteStacks - Render vertical stacks of notes */}
+          {tab.map((stack) => {
+            const stackX = getPositionX(stack.musicalPosition);
+            const isSelected = selectedStacks?.includes(stack.id);
+            const visual = DURATION_VISUALS[stack.duration];
+            
+            return (
+              <g key={stack.id} className="note-stack">
+                {/* Stack selection highlight */}
+                {isSelected && (
+                  <rect
+                    x={stackX - 20}
+                    y={getStringY(2) - 20}
+                    width={40}
+                    height={getStringY(0) - getStringY(2) + 40}
+                    fill="none"
+                    stroke="#007acc"
+                    strokeWidth="2"
+                    strokeDasharray="4,2"
+                    opacity="0.6"
+                  />
+                )}
+                
+                {/* Notes in the stack */}
+                {stack.notes.map((note, noteIndex) => {
+                  const y = getStringY(note.string);
+                  
+                  return (
+                    <g key={`${stack.id}-note-${noteIndex}`} className="note-symbol">
+                      <circle
+                        cx={stackX}
+                        cy={y}
+                        r="12"
+                        fill={visual.isOpen ? "white" : "#000"}
+                        stroke="#000"
+                        strokeWidth="2"
+                      />
+                      
+                      {renderNoteStem(stack.duration, stackX, y, note.string)}
+                      
                       <text
-                        x={x}
+                        x={stackX}
                         y={y + 4}
                         textAnchor="middle"
                         fontSize="12"
@@ -329,111 +325,61 @@ const TabViewer: React.FC<TabViewerProps> = ({
                       >
                         {note.fret}
                       </text>
-                    )}
-                    
-                    {note.isDotted && (
-                      <circle
-                        cx={x + 20}
-                        cy={y}
-                        r="3"
-                        fill="#000"
-                      />
-                    )}
-                  </g>
-                );
-              }
-            });
-          })}
-
-          {/* Ties */}
-          {getAllTies(tabData).map((tie, index) => {
-            const fromX = getSlotX(tie.fromSlot, layout.leftMargin, layout.slotWidth);
-            const toX = getSlotX(tie.toSlot, layout.leftMargin, layout.slotWidth);
-            const y = getStringY(tie.stringIndex);
-            
-            const midX = (fromX + toX) / 2;
-            const curveHeight = 20;
-            const path = `M ${fromX} ${y} Q ${midX} ${y - curveHeight} ${toX} ${y}`;
-            
-            return (
-              <path
-                key={`tie-${index}`}
-                d={path}
-                stroke="#000"
-                strokeWidth="2"
-                fill="none"
-                opacity="0.7"
-              />
-            );
-          })}
-
-          {/* Selected Notes Highlighting */}
-          {selectedNotes && selectedNotes.map((selectedNote, index) => {
-            const x = getVisualSlotX(selectedNote.timeSlot, customMeasureLines, layout.leftMargin, layout.slotWidth);
-            const y = getStringY(selectedNote.stringIndex);
-            
-            return (
-              <circle
-                key={`selected-${index}`}
-                cx={x}
-                cy={y}
-                r="18"
-                fill="none"
-                stroke="#007acc"
-                strokeWidth="3"
-                strokeDasharray="4,2"
-                opacity="0.8"
-              />
+                    </g>
+                  );
+                })}
+              </g>
             );
           })}
 
           {/* Cursor Position */}
           <g className="current-position">
+            <line
+              x1={getCursorPosition().x}
+              y1={getStringY(2) - 15}
+              x2={getCursorPosition().x}
+              y2={getStringY(0) + 15}
+              stroke="#ff6b35"
+              strokeWidth="3"
+              opacity="0.8"
+            />
             <circle
               cx={getCursorPosition().x}
               cy={getCursorPosition().y}
-              r="16"
-              fill="none"
-              stroke="#ff6b35"
-              strokeWidth="3"
-              opacity={noteAtCurrentPosition ? "0.9" : "0.6"}
+              r="8"
+              fill="#ff6b35"
+              opacity="0.8"
             />
-            {noteAtCurrentPosition && (
-              <circle
-                cx={getCursorPosition().x}
-                cy={getCursorPosition().y}
-                r="12"
-                fill="none"
-                stroke="#ff6b35"
-                strokeWidth="2"
-                opacity="0.5"
-              />
-            )}
           </g>
 
-          {/* Playback Indicator */}
-          {currentPlaybackTimeSlot !== undefined && currentPlaybackTimeSlot >= 0 && (
-            <g className="playback-indicator">
-              <line
-                x1={getSlotX(currentPlaybackTimeSlot, layout.leftMargin, layout.slotWidth)}
-                y1={getStringY(2) - 30}
-                x2={getSlotX(currentPlaybackTimeSlot, layout.leftMargin, layout.slotWidth)}
-                y2={getStringY(0) + 30}
-                stroke={isPlaying ? "rgba(0, 255, 0, 0.7)" : "rgba(255, 165, 0, 0.8)"}
-                strokeWidth="2"
-                opacity="0.8"
-                strokeDasharray={isPlaying ? "none" : "5,3"}
-              />
-              <circle
-                cx={getSlotX(currentPlaybackTimeSlot, layout.leftMargin, layout.slotWidth)}
-                cy={getStringY(1)}
-                r="3"
-                fill={isPlaying ? "rgba(0, 255, 0, 0.7)" : "rgba(255, 165, 0, 0.8)"}
-                opacity="0.8"
-              />
-            </g>
+          {/* Playback Position */}
+          {isPlaying && currentPlaybackPosition !== undefined && (
+            <line
+              x1={getPositionX(currentPlaybackPosition)}
+              y1={getStringY(2) - 15}
+              x2={getPositionX(currentPlaybackPosition)}
+              y2={getStringY(0) + 15}
+              stroke="#4caf50"
+              strokeWidth="2"
+              opacity="0.7"
+            />
           )}
         </svg>
+      </div>
+
+      {/* Status Bar */}
+      <div style={{ 
+        padding: '8px', 
+        backgroundColor: '#f5f5f5', 
+        borderTop: '1px solid #ddd',
+        fontSize: '12px',
+        color: '#666'
+      }}>
+        Stacks: {tab.length} | 
+        Selected: {selectedStacks?.length || 0} | 
+        Duration: {selectedDuration} |
+        {isPlaying ? ' ▶️ Playing' : ' ⏸️ Stopped'}
+        {isSynthMuted && ' 🔇 Muted'}
       </div>
     </div>
   );
