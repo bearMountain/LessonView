@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import './TabViewer.css';
 import type { Tab, Duration, NoteStack } from './types/notestack';
 import { DURATION_VISUALS } from './components/types';
@@ -21,6 +21,7 @@ const PIXELS_PER_TICK = 0.05;
  */
 const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const tabDisplayRef = useRef<HTMLDivElement>(null);
   
   // Destructure what we need from the editor state
   const { state, layoutItems, totalWidth } = editor;
@@ -104,14 +105,25 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
   }, [tab, currentPosition]);
 
   // === Event Handlers ===
-  const handleZoom = (e: React.WheelEvent<HTMLDivElement>) => {
+  const handleZoom = useCallback((e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
       const newZoom = Math.max(0.25, Math.min(4.0, zoom + zoomDelta));
       editor.setZoom(newZoom);
     }
-  };
+  }, [zoom, editor]);
+
+  // Add non-passive wheel event listener
+  useEffect(() => {
+    const tabDisplay = tabDisplayRef.current;
+    if (tabDisplay) {
+      tabDisplay.addEventListener('wheel', handleZoom, { passive: false });
+      return () => {
+        tabDisplay.removeEventListener('wheel', handleZoom);
+      };
+    }
+  }, [handleZoom]);
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -236,8 +248,8 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
 
       {/* Tab Display */}
       <div 
+        ref={tabDisplayRef}
         className="tab-display"
-        onWheel={handleZoom}
         style={{ overflow: 'auto', maxHeight: '500px' }}
       >
         <svg
