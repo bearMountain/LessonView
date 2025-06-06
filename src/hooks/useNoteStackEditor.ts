@@ -150,6 +150,10 @@ const noteStackReducer = (state: ExtendedAppState, action: NoteStackAction): Ext
     }
     
     case 'SET_CURSOR_POSITION':
+      console.log('Reducer SET_CURSOR_POSITION:', { 
+        oldPosition: state.currentPosition, 
+        newPosition: action.payload 
+      });
       return {
         ...state,
         currentPosition: action.payload
@@ -330,19 +334,22 @@ export const useNoteStackEditor = () => {
   // === Cursor and navigation ===
   
   const setCursorPosition = useCallback((position: number) => {
+    console.log('setCursorPosition called:', { from: state.currentPosition, to: position });
     dispatch({
       type: 'SET_CURSOR_POSITION',
       payload: position
     });
-  }, []);
+  }, [state.currentPosition]);
   
   const moveCursorLeft = useCallback(() => {
     const newPosition = Math.max(0, state.currentPosition - 960); // Move by quarter note
+    console.log('moveCursorLeft:', { from: state.currentPosition, to: newPosition });
     setCursorPosition(newPosition);
   }, [state.currentPosition, setCursorPosition]);
   
   const moveCursorRight = useCallback(() => {
     const newPosition = getNextAvailablePosition(state.tab, state.currentPosition + 960);
+    console.log('moveCursorRight:', { from: state.currentPosition, to: newPosition });
     setCursorPosition(newPosition);
   }, [state.tab, state.currentPosition, setCursorPosition]);
   

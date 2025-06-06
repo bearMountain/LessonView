@@ -68,10 +68,23 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
     return layout.leftMargin + (musicalPosition * layout.pixelsPerTick);
   };
 
-  const getCursorPosition = () => ({
-    x: getPositionX(currentPosition),
-    y: getStringY(1) // Default to middle string (A)
-  });
+  const getCursorPosition = () => {
+    const position = {
+      x: getPositionX(currentPosition),
+      y: getStringY(1) // Default to middle string (A)
+    };
+    
+    // Debug logging
+    console.log('getCursorPosition:', {
+      currentPosition,
+      x: position.x,
+      y: position.y,
+      stringIndex: 1,
+      stringY: getStringY(1)
+    });
+    
+    return position;
+  };
 
   // === Measure Lines Calculation ===
   const measureLines = useMemo(() => {
@@ -105,6 +118,8 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    console.log('SVG Click:', { x, y, leftMargin: layout.leftMargin });
+    
     // Find closest string
     let closestStringIndex = 0;
     let minDistance = Infinity;
@@ -118,11 +133,19 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
       }
     }
     
+    console.log('Closest String:', { closestStringIndex, minDistance });
+    
     // Convert click position to musical position (ticks)
     const clickPosition = Math.max(0, (x - layout.leftMargin) / layout.pixelsPerTick);
     
     // Snap to nearest quarter note (960 ticks)
     const snappedPosition = Math.round(clickPosition / 960) * 960;
+    
+    console.log('Position Calculation:', { 
+      clickPosition, 
+      snappedPosition,
+      pixelsPerTick: layout.pixelsPerTick 
+    });
     
     // Set cursor position
     editor.setCursorPosition(snappedPosition);
@@ -139,24 +162,30 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
 
   // Handle keyboard input for adding notes
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    console.log('handleKeyDown:', { key: e.key, currentPosition });
+    
     // Number keys 0-9 for frets
     if (e.key >= '0' && e.key <= '9') {
       const fret = parseInt(e.key);
       const defaultString = 1; // Middle string (A)
+      console.log('Adding note:', { currentPosition, defaultString, fret, selectedDuration });
       editor.addNote(currentPosition, defaultString, fret, selectedDuration);
     }
     
     // Delete key to remove notes
     if (e.key === 'Delete' || e.key === 'Backspace') {
       const defaultString = 1;
+      console.log('Removing note:', { currentPosition, defaultString });
       editor.removeNote(currentPosition, defaultString);
     }
     
     // Arrow keys for navigation
     if (e.key === 'ArrowLeft') {
+      console.log('Moving cursor left from:', currentPosition);
       editor.moveCursorLeft();
     }
     if (e.key === 'ArrowRight') {
+      console.log('Moving cursor right from:', currentPosition);
       editor.moveCursorRight();
     }
   };
