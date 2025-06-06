@@ -369,16 +369,18 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
               y1={getStringY(2) - 15}
               x2={getCursorPosition().x}
               y2={getStringY(0) + 15}
-              stroke="#ff6b35"
-              strokeWidth="3"
-              opacity="0.8"
+              stroke="#ccc"
+              strokeWidth="2"
+              opacity="0.6"
             />
             <circle
               cx={getCursorPosition().x}
               cy={getCursorPosition().y}
-              r="8"
-              fill="#ff6b35"
-              opacity="0.8"
+              r="15"
+              fill="none"
+              stroke="#ccc"
+              strokeWidth="2"
+              opacity="0.6"
             />
           </g>
 
