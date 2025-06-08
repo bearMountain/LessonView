@@ -24,7 +24,7 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
   const tabDisplayRef = useRef<HTMLDivElement>(null);
   
   // Destructure what we need from the editor state
-  const { state, layoutItems, totalWidth } = editor;
+  const { state, layoutItems, totalWidth: baseWidth } = editor;
   const { 
     tab, 
     currentPosition, 
@@ -43,8 +43,8 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
     const topMargin = 40 * zoom;
     const bottomMargin = 40 * zoom;
     
-    // Use totalWidth from editor's layout calculations
-    const calculatedTotalWidth = totalWidth * zoom;
+    // Scale the base width by zoom level
+    const zoomedWidth = baseWidth * zoom;
     const totalHeight = (topMargin + bottomMargin + (2 * stringSpacing));
     
     return {
@@ -53,11 +53,11 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
       rightMargin,
       topMargin,
       bottomMargin,
-      totalWidth: calculatedTotalWidth,
+      totalWidth: zoomedWidth,
       totalHeight,
       pixelsPerTick: PIXELS_PER_TICK * zoom
     };
-  }, [zoom, totalWidth]);
+  }, [zoom, baseWidth]);
 
   // === Helper Functions ===
   const getStringY = (stringIndex: number) => {
