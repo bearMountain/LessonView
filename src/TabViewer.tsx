@@ -3,6 +3,8 @@ import './TabViewer.css';
 import type { Tab, Duration, NoteStack } from './types/notestack';
 import { DURATION_VISUALS } from './components/types';
 import type { useNoteStackEditor } from './hooks/useNoteStackEditor';
+import { useThemeObject } from './contexts/ThemeContext';
+import { useAppLayout } from './hooks/useAppLayout';
 
 interface TabViewerProps {
   editor: ReturnType<typeof useNoteStackEditor>;
@@ -41,11 +43,15 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     tab, 
     currentPosition, 
     selectedDuration, 
-    zoom = 1, 
-    isPlaying, 
     selectedStacks,
-    bpm 
+    bpm
   } = state;
+  
+  // Apply theme
+  const theme = useThemeObject();
+  
+  // Get layout state (zoom, isPlaying, etc.)
+  const { zoom, setZoom, isPlaying } = useAppLayout();
   
   // === Layout Constants ===
   const layout = useMemo(() => {
@@ -122,9 +128,9 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
       e.preventDefault();
       const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
       const newZoom = Math.max(0.25, Math.min(4.0, zoom + zoomDelta));
-      editor.setZoom(newZoom);
+      setZoom(newZoom);
     }
-  }, [zoom, editor]);
+  }, [zoom, setZoom]);
 
   // Add non-passive wheel event listener
   useEffect(() => {
@@ -266,13 +272,13 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
           y1={stemY1}
           x2={stemX}
           y2={stemY2}
-          stroke="#000"
+          stroke={theme.text.primary}
           strokeWidth="2"
         />
         {visual.hasFlag && (
           <path
             d={`M ${stemX} ${stemY2} Q ${stemX + 15} ${stemY2 - 10} ${stemX + 12} ${stemY2 + 5}`}
-            fill="#000"
+            fill={theme.text.primary}
           />
         )}
       </g>
@@ -297,9 +303,9 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     >
       {/* Zoom Controls */}
       <div className="zoom-controls">
-        <button onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.25))}>−</button>
+        <button onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}>−</button>
         <span>{Math.round(zoom * 100)}%</span>
-        <button onClick={() => editor.setZoom(Math.min(4.0, zoom + 0.25))}>+</button>
+        <button onClick={() => setZoom(Math.min(4.0, zoom + 0.25))}>+</button>
         <span style={{ marginLeft: '20px', fontSize: '12px', color: '#666' }}>
           BPM: {bpm} | Position: {currentPosition} ticks
         </span>
@@ -329,7 +335,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                 y1={y}
                 x2={layout.totalWidth - layout.rightMargin}
                 y2={y}
-                stroke="#333"
+                stroke={theme.tab.stringLine}
                 strokeWidth="2"
               />
             );
@@ -348,7 +354,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                 textAnchor="middle"
                 fontSize="16"
                 fontWeight="bold"
-                fill="#333"
+                fill={theme.tab.stringLabel}
               >
                 {stringLabels[displayIndex]}
               </text>
@@ -369,7 +375,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                 y1={topY}
                 x2={x}
                 y2={bottomY}
-                stroke="#666"
+                stroke={theme.tab.measureLine}
                 strokeWidth="2"
                 strokeDasharray="5,5"
               />
@@ -392,7 +398,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                     width={40}
                     height={getStringY(0) - getStringY(2) + 40}
                     fill="none"
-                    stroke="#007acc"
+                    stroke={theme.tab.selection}
                     strokeWidth="2"
                     strokeDasharray="4,2"
                     opacity="0.6"
@@ -402,6 +408,11 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                 {/* Notes in the stack */}
                 {stack.notes.map((note: any, noteIndex: number) => {
                   const y = getStringY(note.string);
+                  const noteStyle = isSelected 
+                    ? theme.notes.selected 
+                    : visual.isOpen 
+                      ? theme.notes.open 
+                      : theme.notes.filled;
                   
                   return (
                     <g key={`${stack.id}-note-${noteIndex}`} className="note-symbol">
@@ -409,8 +420,8 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                         cx={stackX}
                         cy={y}
                         r="12"
-                        fill={visual.isOpen ? "white" : "#000"}
-                        stroke="#000"
+                        fill={noteStyle.fill}
+                        stroke={noteStyle.stroke}
                         strokeWidth="2"
                       />
                       
@@ -422,7 +433,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                         textAnchor="middle"
                         fontSize="12"
                         fontWeight="bold"
-                        fill={visual.isOpen ? "#000" : "#fff"}
+                        fill={noteStyle.text}
                       >
                         {note.fret}
                       </text>
@@ -440,7 +451,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
               y1={getStringY(2) - 15}
               x2={getCursorPosition().x}
               y2={getStringY(0) + 15}
-              stroke="#ccc"
+              stroke={theme.tab.cursor}
               strokeWidth="2"
               opacity="0.6"
             />
@@ -449,7 +460,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
               cy={getCursorPosition().y}
               r="15"
               fill="none"
-              stroke="#ccc"
+              stroke={theme.tab.cursor}
               strokeWidth="2"
               opacity="0.6"
             />
@@ -462,7 +473,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
               y1={getStringY(2) - 15}
               x2={getPositionX(currentPosition)}
               y2={getStringY(0) + 15}
-              stroke="#4caf50"
+              stroke={theme.tab.playhead}
               strokeWidth="2"
               opacity="0.7"
             />

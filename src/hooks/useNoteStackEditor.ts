@@ -27,13 +27,8 @@ import {
 } from '../services/NoteStackSelection';
 import { calculateDisplayPositions, getTotalTabWidth } from '../services/NoteStackLayout';
 
-// Extended app state for UI concerns
+// Extended musical state - pure note/tab editing concerns
 interface ExtendedAppState extends NoteStackAppState {
-  // UI state
-  showFretboard: boolean;
-  zoom: number;
-  isPlaying: boolean;
-  
   // Current input state
   selectedDuration: Duration;
   currentFretInput: string;
@@ -66,9 +61,7 @@ type NoteStackAction =
   | { type: 'COPY_SELECTION' }
   | { type: 'PASTE_CLIPBOARD'; payload: { position: number; string?: number } }
   | { type: 'DELETE_SELECTION' }
-  | { type: 'SET_ZOOM'; payload: number }
-  | { type: 'TOGGLE_FRETBOARD' }
-  | { type: 'SET_PLAYING'; payload: boolean }
+
   | { type: 'SET_MODIFIED'; payload: boolean }
   | { type: 'LOAD_TAB'; payload: Tab }
   | { type: 'RESET_TAB' };
@@ -81,11 +74,6 @@ const initialState: ExtendedAppState = {
   currentPosition: 0,
   selectedStacks: [],
   clipboardStacks: [],
-  
-  // UI state
-  showFretboard: true,
-  zoom: 1,
-  isPlaying: false,
   
   // Input state
   selectedDuration: 'quarter',
@@ -252,23 +240,7 @@ const noteStackReducer = (state: ExtendedAppState, action: NoteStackAction): Ext
       };
     }
     
-    case 'SET_ZOOM':
-      return {
-        ...state,
-        zoom: action.payload
-      };
-    
-    case 'TOGGLE_FRETBOARD':
-      return {
-        ...state,
-        showFretboard: !state.showFretboard
-      };
-    
-    case 'SET_PLAYING':
-      return {
-        ...state,
-        isPlaying: action.payload
-      };
+
     
     case 'SET_MODIFIED':
       return {
@@ -477,25 +449,7 @@ export const useNoteStackEditor = () => {
     });
   }, []);
   
-  // === UI controls ===
-  
-  const setZoom = useCallback((zoom: number) => {
-    dispatch({
-      type: 'SET_ZOOM',
-      payload: zoom
-    });
-  }, []);
-  
-  const toggleFretboard = useCallback(() => {
-    dispatch({ type: 'TOGGLE_FRETBOARD' });
-  }, []);
-  
-  const setPlaying = useCallback((playing: boolean) => {
-    dispatch({
-      type: 'SET_PLAYING',
-      payload: playing
-    });
-  }, []);
+
   
   return {
     // State
@@ -542,10 +496,7 @@ export const useNoteStackEditor = () => {
     resetTab,
     setModified,
     
-    // UI
-    setZoom,
-    toggleFretboard,
-    setPlaying
+
   };
 };
 

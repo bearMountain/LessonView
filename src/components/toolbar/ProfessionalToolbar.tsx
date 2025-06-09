@@ -4,6 +4,7 @@ import NoteValuePalette from './NoteValuePalette';
 import TimeSignatureSelector from './TimeSignatureSelector';
 import TempoControls from './TempoControls';
 import type { NoteDuration, NoteType, ToolMode, CursorPosition, Note } from '../../types';
+import { availableThemes } from '../../themes';
 
 interface ProfessionalToolbarProps {
   selectedDuration: NoteDuration;
@@ -30,6 +31,9 @@ interface ProfessionalToolbarProps {
   onToggleDotted?: () => void;
   // Focus management
   onAfterSelection?: () => void;
+  // Theme management
+  currentTheme?: string;
+  onThemeChange?: (theme: string) => void;
 }
 
 interface ToolbarSection {
@@ -59,6 +63,8 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   noteAtCurrentPosition,
   onToggleDotted,
   onAfterSelection,
+  currentTheme = 'dark',
+  onThemeChange,
 }) => {
   const sections: ToolbarSection[] = [
     {
@@ -225,6 +231,26 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
             <span className="toolbar-button__icon">↔️</span>
             <span className="toolbar-button__text">Fit Width</span>
           </button>
+        </div>
+      ),
+    },
+    {
+      id: 'theme',
+      title: 'Theme',
+      component: (
+        <div className="toolbar-section__content">
+          <select 
+            className="theme-selector"
+            value={currentTheme}
+            onChange={(e) => onThemeChange?.(e.target.value)}
+            title="Select Theme"
+          >
+            {availableThemes.map((theme) => (
+              <option key={theme.name} value={theme.name}>
+                {theme.displayName}
+              </option>
+            ))}
+          </select>
         </div>
       ),
     },

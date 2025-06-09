@@ -11,6 +11,7 @@ import VideoPlayer from './components/video/VideoPlayer'
 import SplitPane from './components/layout/SplitPane'
 import NoteStackDemo from './components/NoteStackDemo'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
 import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
 import { AutoSave } from './services/AutoSave'
@@ -24,6 +25,8 @@ import { getStrumstickPlayer } from './services/StrumstickPlayer'
 import { 
   useNoteStackEditor
 } from './hooks/useNoteStackEditor'
+import { useTheme } from './contexts/ThemeContext'
+import { useAppLayout } from './hooks/useAppLayout'
 
 // Main App Content Component (needs to be inside SyncEngineProvider)
 function AppContent() {
@@ -37,6 +40,12 @@ function AppContent() {
 
   // === Core State Management Hook (NoteStack Architecture) ===
   const tabEditor = useNoteStackEditor()
+  
+  // === App Layout and UI State ===
+  const layout = useAppLayout()
+  
+  // === Theme Management ===
+  const { currentTheme, setTheme } = useTheme()
   
   // === Integration with Legacy Services ===
   const fileManagerRef = useRef<FileManager>(new FileManager())
@@ -122,11 +131,11 @@ function AppContent() {
       selectedDuration: tabEditor.state.selectedDuration,
       selectedNoteType: 'note',
       customMeasureLines: [],
-      zoom: 1,
-      showFretboard: tabEditor.state.showFretboard,
+      zoom: layout.zoom,
+      showFretboard: layout.showFretboard,
       countInEnabled: false,
       isLooping: false,
-      splitRatio: 0.5,
+      splitRatio: layout.splitRatio,
       videoSource: '',
       isSynthMuted: false,
       isVideoMuted: false
@@ -150,11 +159,11 @@ function AppContent() {
       selectedDuration: tabEditor.state.selectedDuration,
       selectedNoteType: 'note',
       customMeasureLines: [],
-      zoom: 1,
-      showFretboard: tabEditor.state.showFretboard,
+      zoom: layout.zoom,
+      showFretboard: layout.showFretboard,
       countInEnabled: false,
       isLooping: false,
-      splitRatio: 0.5,
+      splitRatio: layout.splitRatio,
       videoSource: '',
       isSynthMuted: false,
       isVideoMuted: false
@@ -191,7 +200,7 @@ function AppContent() {
       selectedNoteType: 'note',
       customMeasureLines: [],
       zoom: 1,
-      showFretboard: tabEditor.state.showFretboard,
+      showFretboard: layout.showFretboard,
       countInEnabled: false,
       isLooping: false,
       splitRatio: 0.5,
@@ -258,24 +267,19 @@ function AppContent() {
 
   const handlePlayPause = async () => {
     const player = getStrumstickPlayer()
-    if (tabEditor.state.isPlaying) {
+    if (layout.isPlaying) {
+      console.log('⏸️ Pausing playback...')
+      layout.setPlaying(false)
       player.pause()
-      tabEditor.setPlaying(false)
-      syncEngine.pause()
     } else {
-      await player.play()
-      tabEditor.setPlaying(true)
-      syncEngine.play()
+      console.log('▶️ Starting playback...')
+      layout.setPlaying(true)
+      player.play()
     }
   }
 
   const handlePlaybackStateChange = (playing: boolean) => {
-    console.log('🎵 Playback state changed:', playing)
-    if (playing) {
-      syncEngine.play()
-    } else {
-      syncEngine.pause()
-    }
+    layout.setPlaying(playing)
   }
 
   const handlePositionClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => {
@@ -314,9 +318,9 @@ function AppContent() {
   }, []);
 
   // Fretboard toggle handler
-  const handleFretboardToggle = useCallback(() => {
-    tabEditor.toggleFretboard();
-  }, [tabEditor]);
+  const handleToggleFretboard = () => {
+    layout.toggleFretboard();
+  }
 
   return (
     <div className="app">
@@ -325,38 +329,49 @@ function AppContent() {
           <ProfessionalToolbar
             selectedDuration={tabEditor.state.selectedDuration}
             onDurationChange={tabEditor.setSelectedDuration}
-            selectedNoteType={'note'}
-            onNoteTypeChange={() => {}} // TODO: Add note type to NoteStack
-            currentToolMode={'note'}
-            onToolModeChange={() => {}} // TODO: Add tool mode to NoteStack
+            selectedNoteType="note"
+            onNoteTypeChange={() => {}}
+            currentToolMode="note"
+            onToolModeChange={() => {}}
             tempo={tabEditor.state.bpm}
             onTempoChange={tabEditor.setBpm}
-            timeSignature={'4/4'}
-            onTimeSignatureChange={() => {}} // TODO: Add time signature to NoteStack
+            timeSignature="4/4"
+            onTimeSignatureChange={() => {}}
             tieMode={false}
-            onTieModeChange={() => {}} // TODO: Add tie mode to NoteStack
+            onTieModeChange={() => {}}
             onSave={handleSave}
             onLoad={handleLoad}
             onNew={handleNew}
             onSaveAs={handleSaveAs}
-            isModified={false} // TODO: Add modified state to NoteStack
+            isModified={false}
             currentPosition={{
               timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
-              stringIndex: 0
+              stringIndex: getCurrentStringIndex()
             }}
             noteAtCurrentPosition={getNoteAtCurrentPosition()}
-            onToggleDotted={() => {}} // TODO: Add dotted notes to NoteStack
+            onToggleDotted={() => {}}
             onAfterSelection={handleAfterToolbarAction}
+            currentTheme={currentTheme}
+            onThemeChange={setTheme}
           />
         }
-        fretboard={tabEditor.state.showFretboard ? (
-          <Fretboard
-            currentlyPlaying={[]} // TODO: Connect to NoteStack playback state
-          />
-        ) : undefined}
+        fretboard={layout.showFretboard ? (
+          <div style={{ 
+            height: '200px', 
+            backgroundColor: '#f5f5f5', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            border: '1px solid #ddd'
+          }}>
+                         <Fretboard
+               currentlyPlaying={[]} // TODO: Connect to NoteStack playback state
+             />
+          </div>
+        ) : null}
         bottomPanel={
           <PlaybackBar
-            isPlaying={tabEditor.state.isPlaying}
+            isPlaying={layout.isPlaying}
             onPlayPause={handlePlayPause}
             currentTime={tabEditor.state.currentPosition.toString()}
             totalTime={tabEditor.layoutItems.length.toString()} // Use layout items count as approximation
@@ -364,10 +379,10 @@ function AppContent() {
             trackTitle={'Untitled Song'} // TODO: Add title to NoteStack state
             onTempoChange={tabEditor.setBpm}
             onLoopToggle={() => {}} // TODO: Add looping to NoteStack
-            onFretboardToggle={handleFretboardToggle}
+            onFretboardToggle={handleToggleFretboard}
             onCountInToggle={() => {}} // TODO: Add count-in to NoteStack
             isLooping={false} // TODO: Add looping to NoteStack
-            showFretboard={tabEditor.state.showFretboard}
+            showFretboard={layout.showFretboard}
             countInEnabled={false} // TODO: Add count-in to NoteStack
           />
         }
@@ -380,24 +395,24 @@ function AppContent() {
             {[
               <VideoPlayer
                 source={''} // TODO: Add video source to NoteStack state
-                isPlaying={tabEditor.state.isPlaying}
+                isPlaying={layout.isPlaying}
                 currentTime={0} // TODO: Add video time to NoteStack state
                 playbackRate={1} // TODO: Add playback rate to NoteStack state
                 onMuteToggle={() => {}} // TODO: Add video mute to NoteStack
                 isMuted={false} // TODO: Add video mute to NoteStack state
               />,
               <div className="tab-editor-pane">
-                <TabViewer
-                  ref={tabViewerRef}
-                  editor={tabEditor}
-                />
+                                  <TabViewer 
+                    ref={tabViewerRef}
+                    editor={tabEditor}
+                  />
                 
                 <Controls
                   ref={controlsRef}
                   tabData={legacyTabData}
                   currentPosition={{
                     timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
-                    stringIndex: 0
+                    stringIndex: getCurrentStringIndex()
                   }}
                   onNotesPlaying={() => {}} // TODO: Connect to NoteStack playback state
                   tempo={tabEditor.state.bpm}
@@ -405,12 +420,11 @@ function AppContent() {
                   onCurrentTimeSlotChange={(pos: number) => tabEditor.setCursorPosition(pos * 960)}
                   onPlaybackComplete={() => {
                     console.log('🏁 Tab playback completed')
-                    syncEngine.pause()
-                    tabEditor.setPlaying(false)
+                    layout.setPlaying(false)
                   }}
                   countInEnabled={false}
-                  timeSignature={'4/4'}
-                  pickupBeats={0} // TODO: Add pickup beats to NoteStack
+                  timeSignature="4/4"
+                  pickupBeats={0}
                   isMuted={false}
                 />
               </div>
@@ -446,9 +460,11 @@ function AppContent() {
 
 function App() {
   return (
-    <SyncEngineProvider>
-      <AppContent />
-    </SyncEngineProvider>
+    <ThemeProvider defaultTheme="dark">
+      <SyncEngineProvider>
+        <AppContent />
+      </SyncEngineProvider>
+    </ThemeProvider>
   )
 }
 
