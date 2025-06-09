@@ -9,7 +9,6 @@ import PlaybackBar from './components/transport/PlaybackBar'
 import ProfessionalToolbar from './components/toolbar/ProfessionalToolbar'
 import VideoPlayer from './components/video/VideoPlayer'
 import SplitPane from './components/layout/SplitPane'
-import NoteStackDemo from './components/NoteStackDemo'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
@@ -30,14 +29,6 @@ import { useAppLayout } from './hooks/useAppLayout'
 
 // Main App Content Component (needs to be inside SyncEngineProvider)
 function AppContent() {
-  // Check for demo mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const isDemoMode = urlParams.get('demo') === 'notestack';
-  
-  if (isDemoMode) {
-    return <NoteStackDemo />;
-  }
-
   // === Core State Management Hook (NoteStack Architecture) ===
   const tabEditor = useNoteStackEditor()
   
