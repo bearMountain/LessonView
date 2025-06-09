@@ -21,6 +21,9 @@ const stringIndices = [2, 1, 0]; // Data indices: Hi D=2, A=1, Low D=0
 // Convert ticks to display position
 const PIXELS_PER_TICK = 0.05;
 
+// Tab layout configuration
+const FIRST_NOTE_STACK_INDENT = 20; // 20px indent for all notes from tab line start
+
 /**
  * TabViewer Component - Pure functional component
  * Receives single state object and dispatch mechanism
@@ -84,7 +87,16 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
   };
 
   const getPositionX = (musicalPosition: number) => {
-    return layout.leftMargin + (musicalPosition * layout.pixelsPerTick);
+    const basePosition = layout.leftMargin + (musicalPosition * layout.pixelsPerTick);
+    const noteStackIndent = FIRST_NOTE_STACK_INDENT * zoom; // All notes get the indent
+    return basePosition + noteStackIndent;
+  };
+
+  // Pure function to convert click X position to musical position (accounting for note stack indent)
+  const getMusicalPositionFromX = (clickX: number): number => {
+    const noteStackIndentPixels = FIRST_NOTE_STACK_INDENT * zoom;
+    const adjustedClickX = clickX - noteStackIndentPixels;
+    return Math.max(0, (adjustedClickX - layout.leftMargin) / layout.pixelsPerTick);
   };
 
   const getCursorPosition = () => {
@@ -183,8 +195,8 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     
     console.log('Closest String:', { closestStringIndex, minDistance });
     
-    // Convert click position to musical position (ticks)
-    const clickPosition = Math.max(0, (x - layout.leftMargin) / layout.pixelsPerTick);
+    // Convert click position to musical position (ticks) - accounts for note stack indent
+    const clickPosition = getMusicalPositionFromX(x);
     
     // Snap to nearest quarter note (960 ticks)
     const snappedPosition = Math.round(clickPosition / 960) * 960;

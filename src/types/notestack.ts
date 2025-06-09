@@ -56,7 +56,7 @@ export const STRING_COUNT = 3;
 export const MAX_FRET = 24;
 
 // Layout constants
-export const INITIAL_INDENT = 40;           // Initial left margin
+export const INITIAL_INDENT = 140;           // Initial left margin
 export const MEASURE_LINE_WIDTH = 2;        // Width of measure line
 export const MEASURE_LINE_SPACING = 20;     // Padding before/after measure lines
 export const PIXELS_PER_TICK = 0.05;        // Base spacing conversion
