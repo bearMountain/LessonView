@@ -380,7 +380,7 @@ function AppContent() {
         }
         centerWorkspace={
           <SplitPane
-            defaultSplitRatio={0.5} // TODO: Add split ratio to NoteStack state
+            defaultSplitRatio={0.25} // Video player gets 1/4 width, tab gets 3/4 width
             onSplitChange={() => {}} // TODO: Add split ratio to NoteStack
             orientation="horizontal"
           >
@@ -452,7 +452,7 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="dark">
+    <ThemeProvider defaultTheme="light">
       <SyncEngineProvider>
         <AppContent />
       </SyncEngineProvider>

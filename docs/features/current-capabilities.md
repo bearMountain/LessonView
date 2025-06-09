@@ -44,25 +44,19 @@ This document provides a comprehensive overview of all features and abilities cu
 
 ## Playback System
 
-### Audio Playback
-- **Tone.js Integration**: High-quality audio synthesis
-- **Real-time Playback**: Play notes as entered in tab
-- **Tempo Control**: Adjustable BPM (beats per minute)
-- **Note Duration Accuracy**: Proper timing for all note durations
-- **Tied Note Handling**: Correct playback of tied notes
+⚠️ **Note: Playback system is currently undergoing major refactoring** - See [TONEJS_TRANSITION_PLAN.md](../architecture/TONEJS_TRANSITION_PLAN.md) for details.
 
-### Playback Controls
-- **Play/Pause**: Space bar or button control
-- **Position-based Start**: Start playback from cursor position
-- **Visual Playback Indicator**: Green line showing current playback position
-- **Playback Completion**: Automatic stop at end of tab
-- **Count-in Support**: Optional metronome count-in before playback
+### Current Status
+- **Multiple Implementations**: Currently has 3 disconnected playback systems (being consolidated)
+- **Basic Audio Playback**: Works but with timing inconsistencies
+- **Tempo Control**: Available but not synchronized properly across systems
+- **Note Preview**: Functional but could be more responsive
 
-### Audio Features
-- **Synth Mute Toggle**: Mute/unmute synthesizer
-- **Preview Sounds**: Hear notes as you type them
-- **Multiple Note Playback**: Play chords (multiple notes simultaneously)
-- **Audio Context Management**: Proper audio initialization and cleanup
+### Planned Improvements (In Progress)
+- **Unified Tone.js Architecture**: Single Transport-based system
+- **Professional Timing**: Sub-millisecond accuracy using proper scheduling
+- **Musical Time Support**: Native support for bars:beats:sixteenths notation
+- **Advanced Features**: Swing, groove, tempo ramping, loop regions
 
 ## User Interface
 
@@ -172,9 +166,11 @@ This document provides a comprehensive overview of all features and abilities cu
 - **Measure Placement Bug**: 10th note shifted instead of 9th note in eighth note patterns
 - **Coordinate System Conflicts**: Multiple positioning systems causing inconsistencies
 
-### Architecture Complexity
-- **Multiple Dependencies**: Complex interactions between positioning systems
-- **Singleton Patterns**: Some components difficult to test independently
+### Architecture Issues (Being Addressed)
+- **Multiple Playback Systems**: 3 disconnected audio implementations causing timing issues
+- **State Management Fragmentation**: Audio state scattered across multiple components
+- **Legacy Architecture**: Some patterns from early development need modernization
+- **Documentation Lag**: Implementation has evolved faster than documentation
 
 ## Planned Features (Based on Roadmap)
 
