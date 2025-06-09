@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
 import type { TabViewerRef } from './TabViewer'
@@ -16,7 +16,7 @@ import { FileManager, type AppState, type ProjectMetadata } from './services/Fil
 import { AutoSave } from './services/AutoSave'
 import type { ControlsRef } from './Controls'
 import type { Note } from './types'
-import type { Duration } from './types/notestack'
+
 import { convertNoteStackToTabData, convertTabDataToNoteStack } from './services/ArchitectureBridge'
 import { getStrumstickPlayer } from './services/StrumstickPlayer'
 
@@ -123,7 +123,7 @@ function AppContent() {
       selectedNoteType: 'note',
       customMeasureLines: [],
       zoom: 1,
-      showFretboard: true,
+      showFretboard: tabEditor.state.showFretboard,
       countInEnabled: false,
       isLooping: false,
       splitRatio: 0.5,
@@ -151,7 +151,7 @@ function AppContent() {
       selectedNoteType: 'note',
       customMeasureLines: [],
       zoom: 1,
-      showFretboard: true,
+      showFretboard: tabEditor.state.showFretboard,
       countInEnabled: false,
       isLooping: false,
       splitRatio: 0.5,
@@ -191,7 +191,7 @@ function AppContent() {
       selectedNoteType: 'note',
       customMeasureLines: [],
       zoom: 1,
-      showFretboard: true,
+      showFretboard: tabEditor.state.showFretboard,
       countInEnabled: false,
       isLooping: false,
       splitRatio: 0.5,
@@ -313,6 +313,11 @@ function AppContent() {
     tabViewerRef.current?.focus();
   }, []);
 
+  // Fretboard toggle handler
+  const handleFretboardToggle = useCallback(() => {
+    tabEditor.toggleFretboard();
+  }, [tabEditor]);
+
   return (
     <div className="app">
       <MainLayout 
@@ -344,11 +349,11 @@ function AppContent() {
             onAfterSelection={handleAfterToolbarAction}
           />
         }
-        fretboard={
+        fretboard={tabEditor.state.showFretboard ? (
           <Fretboard
             currentlyPlaying={[]} // TODO: Connect to NoteStack playback state
           />
-        }
+        ) : undefined}
         bottomPanel={
           <PlaybackBar
             isPlaying={tabEditor.state.isPlaying}
@@ -359,10 +364,10 @@ function AppContent() {
             trackTitle={'Untitled Song'} // TODO: Add title to NoteStack state
             onTempoChange={tabEditor.setBpm}
             onLoopToggle={() => {}} // TODO: Add looping to NoteStack
-            onFretboardToggle={() => {}} // TODO: Add fretboard toggle to NoteStack
+            onFretboardToggle={handleFretboardToggle}
             onCountInToggle={() => {}} // TODO: Add count-in to NoteStack
             isLooping={false} // TODO: Add looping to NoteStack
-            showFretboard={true} // TODO: Add fretboard state to NoteStack
+            showFretboard={tabEditor.state.showFretboard}
             countInEnabled={false} // TODO: Add count-in to NoteStack
           />
         }

@@ -83,7 +83,7 @@ const initialState: ExtendedAppState = {
   clipboardStacks: [],
   
   // UI state
-  showFretboard: false,
+  showFretboard: true,
   zoom: 1,
   isPlaying: false,
   
