@@ -194,6 +194,22 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     console.log('handleKeyDown:', { key: e.key, currentPosition });
     
+    // Tab key to move to next available position
+    if (e.key === 'Tab') {
+      e.preventDefault(); // Prevent default tab behavior
+      console.log('Tab pressed - moving cursor right from:', currentPosition);
+      editor.moveCursorRight();
+      return;
+    }
+    
+    // Shift+Tab to move to previous position
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault(); // Prevent default tab behavior
+      console.log('Shift+Tab pressed - moving cursor left from:', currentPosition);
+      editor.moveCursorLeft();
+      return;
+    }
+    
     // Number keys 0-9 for frets
     if (e.key >= '0' && e.key <= '9') {
       const fret = parseInt(e.key);
