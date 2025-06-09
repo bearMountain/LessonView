@@ -225,14 +225,14 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
       editor.removeNote(currentPosition, defaultString);
     }
     
-    // Arrow keys for navigation
+    // Arrow keys for navigation (by selected duration)
     if (e.key === 'ArrowLeft') {
-      console.log('Moving cursor left from:', currentPosition);
-      editor.moveCursorLeft();
+      console.log('Moving cursor left by duration from:', currentPosition);
+      editor.moveCursorLeftByDuration();
     }
     if (e.key === 'ArrowRight') {
-      console.log('Moving cursor right from:', currentPosition);
-      editor.moveCursorRight();
+      console.log('Moving cursor right by duration from:', currentPosition);
+      editor.moveCursorRightByDuration();
     }
   };
 

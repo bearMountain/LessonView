@@ -2,7 +2,7 @@
 // Based on Strumstick Tab Viewer Architecture Specification v2.0
 
 import type { NoteStack, Tab, Duration } from '../types/notestack';
-import { TICKS_PER_QUARTER } from '../types/notestack';
+import { TICKS_PER_QUARTER, DURATION_TO_TICKS } from '../types/notestack';
 
 // Utility function to generate unique IDs
 const generateUniqueId = (): string => {
@@ -123,30 +123,42 @@ export const removeStack = (tab: Tab, stackId: string): Tab => {
 };
 
 /**
- * Get the next available position for a new note
- * Considers existing notes and their durations
+ * Get the next available position for Tab key navigation
+ * If cursor is on existing note stack, jump forward by that stack's duration
+ * If cursor is not on a note stack, don't move (return current position)
  */
 export const getNextAvailablePosition = (tab: Tab, fromPosition: number = 0): number => {
-  const stacksAfterPosition = tab
-    .filter(stack => stack.musicalPosition >= fromPosition)
-    .sort((a, b) => a.musicalPosition - b.musicalPosition);
+  // Check if there's a stack at the current cursor position
+  const stackAtPosition = findStackAtPosition(tab, fromPosition);
   
-  if (stacksAfterPosition.length === 0) {
+  if (stackAtPosition) {
+    // Cursor is on an existing note stack - jump forward by its duration
+    const stackDurationTicks = DURATION_TO_TICKS[stackAtPosition.duration];
+    return fromPosition + stackDurationTicks;
+  } else {
+    // Cursor is not on a note stack - don't move
+    return fromPosition;
+  }
+};
+
+/**
+ * Get the previous note stack position for Shift+Tab navigation
+ * Finds the closest note stack before the current position
+ * If no previous stack exists, returns current position (don't move)
+ */
+export const getPreviousStackPosition = (tab: Tab, fromPosition: number): number => {
+  // Find all stacks before the current position
+  const stacksBeforePosition = tab
+    .filter(stack => stack.musicalPosition < fromPosition)
+    .sort((a, b) => b.musicalPosition - a.musicalPosition); // Sort descending (closest first)
+  
+  if (stacksBeforePosition.length === 0) {
+    // No previous stacks - don't move
     return fromPosition;
   }
   
-  // Find the first gap that's large enough for a new note
-  let currentPos = fromPosition;
-  
-  for (const stack of stacksAfterPosition) {
-    if (stack.musicalPosition > currentPos) {
-      return currentPos;
-    }
-    // Move past this stack
-    currentPos = Math.max(currentPos, stack.musicalPosition + TICKS_PER_QUARTER);
-  }
-  
-  return currentPos;
+  // Return the position of the closest previous stack
+  return stacksBeforePosition[0].musicalPosition;
 };
 
 /**

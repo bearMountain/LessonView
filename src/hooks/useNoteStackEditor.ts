@@ -3,8 +3,9 @@
 
 import { useReducer, useCallback, useMemo } from 'react';
 import type { Tab, Duration, AppState as NoteStackAppState } from '../types/notestack';
+import { DURATION_TO_TICKS } from '../types/notestack';
 import type { NoteSelection } from '../services/NoteStackSelection';
-import { 
+import {
   addNoteToStack, 
   removeNoteFromString, 
   findStackAtPosition,
@@ -12,7 +13,8 @@ import {
   updateStackDuration,
   moveStack,
   removeStack,
-  getNextAvailablePosition
+  getNextAvailablePosition,
+  getPreviousStackPosition
 } from '../services/NoteStackOperations';
 import {
   selectNotesOnString,
@@ -342,16 +344,42 @@ export const useNoteStackEditor = () => {
   }, [state.currentPosition]);
   
   const moveCursorLeft = useCallback(() => {
-    const newPosition = Math.max(0, state.currentPosition - 960); // Move by quarter note
-    console.log('moveCursorLeft:', { from: state.currentPosition, to: newPosition });
-    setCursorPosition(newPosition);
-  }, [state.currentPosition, setCursorPosition]);
-  
-  const moveCursorRight = useCallback(() => {
-    const newPosition = getNextAvailablePosition(state.tab, state.currentPosition + 960);
-    console.log('moveCursorRight:', { from: state.currentPosition, to: newPosition });
+    const newPosition = getPreviousStackPosition(state.tab, state.currentPosition);
+    console.log('moveCursorLeft (Shift+Tab):', { from: state.currentPosition, to: newPosition });
     setCursorPosition(newPosition);
   }, [state.tab, state.currentPosition, setCursorPosition]);
+  
+  const moveCursorRight = useCallback(() => {
+    const newPosition = getNextAvailablePosition(state.tab, state.currentPosition);
+    console.log('moveCursorRight (Tab):', { from: state.currentPosition, to: newPosition });
+    setCursorPosition(newPosition);
+  }, [state.tab, state.currentPosition, setCursorPosition]);
+  
+  // === Arrow key navigation (by selected duration) ===
+  
+  const moveCursorLeftByDuration = useCallback(() => {
+    const durationTicks = DURATION_TO_TICKS[state.selectedDuration];
+    const newPosition = Math.max(0, state.currentPosition - durationTicks);
+    console.log('moveCursorLeftByDuration (Arrow Left):', { 
+      from: state.currentPosition, 
+      to: newPosition, 
+      duration: state.selectedDuration,
+      ticks: durationTicks 
+    });
+    setCursorPosition(newPosition);
+  }, [state.currentPosition, state.selectedDuration, setCursorPosition]);
+
+  const moveCursorRightByDuration = useCallback(() => {
+    const durationTicks = DURATION_TO_TICKS[state.selectedDuration];
+    const newPosition = state.currentPosition + durationTicks;
+    console.log('moveCursorRightByDuration (Arrow Right):', { 
+      from: state.currentPosition, 
+      to: newPosition, 
+      duration: state.selectedDuration,
+      ticks: durationTicks 
+    });
+    setCursorPosition(newPosition);
+  }, [state.currentPosition, state.selectedDuration, setCursorPosition]);
   
   // === Selection operations ===
   
@@ -484,6 +512,10 @@ export const useNoteStackEditor = () => {
     setCursorPosition,
     moveCursorLeft,
     moveCursorRight,
+    
+    // Arrow key navigation (by selected duration)
+    moveCursorLeftByDuration,
+    moveCursorRightByDuration,
     
     // Selection
     selectNotesInString,
