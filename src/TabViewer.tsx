@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useRef, useMemo, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import './TabViewer.css';
 import type { Tab, Duration, NoteStack } from './types/notestack';
 import { DURATION_VISUALS } from './components/types';
@@ -6,6 +6,10 @@ import type { useNoteStackEditor } from './hooks/useNoteStackEditor';
 
 interface TabViewerProps {
   editor: ReturnType<typeof useNoteStackEditor>;
+}
+
+export interface TabViewerRef {
+  focus: () => void;
 }
 
 // String configuration for 3-string strumstick
@@ -19,9 +23,17 @@ const PIXELS_PER_TICK = 0.05;
  * TabViewer Component - Pure functional component
  * Receives single state object and dispatch mechanism
  */
-const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
+const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tabDisplayRef = useRef<HTMLDivElement>(null);
+  const tabViewerRef = useRef<HTMLDivElement>(null);
+  
+  // Expose focus method via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      tabViewerRef.current?.focus();
+    }
+  }), []);
   
   // Destructure what we need from the editor state
   const { state, layoutItems, totalWidth: baseWidth } = editor;
@@ -270,6 +282,7 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
   // === Main Render ===
   return (
     <div 
+      ref={tabViewerRef}
       className="tab-viewer" 
       tabIndex={0} 
       autoFocus
@@ -473,6 +486,8 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
       </div>
     </div>
   );
-};
+});
+
+TabViewer.displayName = 'TabViewer';
 
 export default TabViewer; 

@@ -6,6 +6,7 @@ interface NoteValuePaletteProps {
   onDurationChange: (duration: NoteDuration) => void;
   selectedNoteType?: NoteType;
   onNoteTypeChange?: (type: NoteType) => void;
+  onAfterSelection?: () => void; // Callback for post-selection actions
 }
 
 interface NoteValue {
@@ -20,6 +21,7 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
   onDurationChange,
   selectedNoteType = 'note',
   onNoteTypeChange,
+  onAfterSelection,
 }) => {
   const noteValues: NoteValue[] = [
     {
@@ -69,6 +71,7 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
               onClick={() => {
                 onDurationChange(noteValue.duration);
                 if (onNoteTypeChange) onNoteTypeChange('note');
+                onAfterSelection?.(); // Proper callback pattern
               }}
               title={`${noteValue.name} Note`}
               aria-label={`${noteValue.name} Note`}
@@ -89,6 +92,7 @@ const NoteValuePalette: React.FC<NoteValuePaletteProps> = ({
               onClick={() => {
                 onDurationChange(noteValue.duration);
                 if (onNoteTypeChange) onNoteTypeChange('rest');
+                onAfterSelection?.(); // Proper callback pattern
               }}
               title={`${noteValue.name} Rest`}
               aria-label={`${noteValue.name} Rest`}

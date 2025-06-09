@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import TabViewer from './TabViewer'
+import type { TabViewerRef } from './TabViewer'
 import Fretboard from './Fretboard'
 import Controls from './Controls'
 import MainLayout from './components/layout/MainLayout'
@@ -41,6 +42,7 @@ function AppContent() {
   const fileManagerRef = useRef<FileManager>(new FileManager())
   const autoSaveRef = useRef<AutoSave>(new AutoSave(fileManagerRef.current))
   const controlsRef = useRef<ControlsRef>(null)
+  const tabViewerRef = useRef<TabViewerRef>(null)
   
   // === Sync Engine Integration ===
   const syncEngine = useSyncEngine()
@@ -306,6 +308,11 @@ function AppContent() {
     return 1; // Default to middle string (A)
   };
 
+  // Focus management callback for toolbar actions
+  const handleAfterToolbarAction = useCallback(() => {
+    tabViewerRef.current?.focus();
+  }, []);
+
   return (
     <div className="app">
       <MainLayout 
@@ -334,6 +341,7 @@ function AppContent() {
             }}
             noteAtCurrentPosition={getNoteAtCurrentPosition()}
             onToggleDotted={() => {}} // TODO: Add dotted notes to NoteStack
+            onAfterSelection={handleAfterToolbarAction}
           />
         }
         fretboard={
@@ -375,6 +383,7 @@ function AppContent() {
               />,
               <div className="tab-editor-pane">
                 <TabViewer
+                  ref={tabViewerRef}
                   editor={tabEditor}
                 />
                 
@@ -388,7 +397,7 @@ function AppContent() {
                   onNotesPlaying={() => {}} // TODO: Connect to NoteStack playback state
                   tempo={tabEditor.state.bpm}
                   onPlaybackStateChange={handlePlaybackStateChange}
-                  onCurrentTimeSlotChange={(pos) => tabEditor.setCursorPosition(pos * 960)}
+                  onCurrentTimeSlotChange={(pos: number) => tabEditor.setCursorPosition(pos * 960)}
                   onPlaybackComplete={() => {
                     console.log('🏁 Tab playback completed')
                     syncEngine.pause()

@@ -28,6 +28,8 @@ interface ProfessionalToolbarProps {
   currentPosition: CursorPosition;
   noteAtCurrentPosition?: Note | null;
   onToggleDotted?: () => void;
+  // Focus management
+  onAfterSelection?: () => void;
 }
 
 interface ToolbarSection {
@@ -56,6 +58,7 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   isModified = false,
   noteAtCurrentPosition,
   onToggleDotted,
+  onAfterSelection,
 }) => {
   const sections: ToolbarSection[] = [
     {
@@ -139,6 +142,7 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
             onDurationChange={onDurationChange}
             selectedNoteType={selectedNoteType}
             onNoteTypeChange={onNoteTypeChange}
+            onAfterSelection={onAfterSelection}
           />
           <div className="toolbar-separator" />
           <button 

@@ -117,6 +117,14 @@ const NoteStackDemo: React.FC = () => {
     console.log(`🎵 Selected duration: ${duration}`);
     // Ensure scrolling after interaction
     setTimeout(ensureScrolling, 50);
+    
+    // Return focus to TabViewer to maintain keyboard input
+    setTimeout(() => {
+      const tabViewer = document.querySelector('.tab-viewer') as HTMLElement;
+      if (tabViewer) {
+        tabViewer.focus();
+      }
+    }, 0);
   };
 
   const handleScrollToBottom = () => {
