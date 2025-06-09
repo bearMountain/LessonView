@@ -357,16 +357,17 @@ function AppContent() {
         }
         fretboard={layout.showFretboard ? (
           <div style={{ 
-            height: '200px', 
+            height: '100px', 
             backgroundColor: '#f5f5f5', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            border: '1px solid #ddd'
+            border: '1px solid #ddd',
+            padding: '10px'
           }}>
-                         <Fretboard
-               currentlyPlaying={[]} // TODO: Connect to NoteStack playback state
-             />
+            <Fretboard
+              currentlyPlaying={[]} // TODO: Connect to NoteStack playback state
+            />
           </div>
         ) : null}
         bottomPanel={
