@@ -152,14 +152,20 @@ export const calculateMeasureLineDisplayX = (musicalPosition: number, tab: Tab):
  * Get the total visual width of the tab
  */
 export const getTotalTabWidth = (tab: Tab): number => {
-  if (tab.length === 0) return INITIAL_INDENT;
+  // Ensure minimum width for cursor display even when tab is empty
+  const minimumWidth = 400; // Enough space for cursor and some tab area
+  
+  if (tab.length === 0) return minimumWidth;
   
   const layoutItems = calculateDisplayPositions(tab);
   const lastItem = layoutItems[layoutItems.length - 1];
   
-  if (!lastItem) return INITIAL_INDENT;
+  if (!lastItem) return minimumWidth;
   
-  return lastItem.displayX + durationToPixels(lastItem.duration) + 40; // Add some padding at the end
+  const calculatedWidth = lastItem.displayX + durationToPixels(lastItem.duration) + 40; // Add some padding at the end
+  
+  // Return the larger of calculated width or minimum width
+  return Math.max(calculatedWidth, minimumWidth);
 };
 
 /**
