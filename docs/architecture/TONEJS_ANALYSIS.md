@@ -50,7 +50,7 @@ const scheduleNextNote = () => {
 }
 ```
 
-**Problem:** According to [A Tale of Two Clocks](https://web.dev/articles/audio-scheduling), using `setTimeout` for audio creates:
+**Problem:** Using `setTimeout` for audio creates:
 - Timing jitter (10-50ms+)
 - Drift over time
 - Sensitivity to UI thread blocking
@@ -100,20 +100,18 @@ Tone.Transport.on('start', () => setIsPlaying(true))
 Tone.Transport.on('stop', () => setIsPlaying(false))
 ```
 
-### 2. Proper Scheduling Patterns
+### 2. Use Tone.js Consistently
 ```typescript
-// ✅ SHOULD DO: Chris Wilson's lookahead pattern
-const scheduleAheadTime = 0.1 // 100ms lookahead
-const scheduleFrequency = 25 // Check every 25ms
+// ✅ SHOULD DO: Let Tone.js handle all timing
+Tone.Transport.schedule((time) => {
+  synth.triggerAttackRelease(note, duration, time)
+}, "1:0:0") // Musical time notation
 
-function scheduler() {
-  while (nextNoteTime < Tone.context.currentTime + scheduleAheadTime) {
-    scheduleNote(nextNoteTime)
-    advanceNote()
-  }
-}
-
-setInterval(scheduler, scheduleFrequency)
+// ✅ SHOULD DO: Use Parts for sequences
+const part = new Tone.Part((time, event) => {
+  synth.triggerAttackRelease(event.note, event.duration, time)
+}, events)
+part.start(0)
 ```
 
 ### 3. Visual Sync with Tone.Draw
@@ -146,14 +144,14 @@ Tone.Transport.bpm.rampTo(140, "2m") // Ramp to 140 BPM over 2 measures
 ### 1. Consolidate to Single System
 - **Remove** `Controls.tsx` setTimeout-based playback
 - **Remove** `usePlayback.ts` complex hook
-- **Enhance** `StrumstickPlayer.ts` as single audio engine
+- **Create** functional audio architecture as single audio system
 - **Use** Transport for all timing operations
 
-### 2. Implement Proper Scheduling
-- Follow Chris Wilson's lookahead pattern
-- Use `Tone.Transport.schedule()` for all events
+### 2. Simplify to Pure Tone.js
+- Use `Tone.Transport.schedule()` for all events (Tone.js handles timing internally)
 - Implement proper visual sync with `Tone.Draw`
-- Add scheduling advance time for resilience
+- Remove setTimeout-based timing entirely
+- Trust Tone.js's built-in precision and resilience
 
 ### 3. Leverage Musical Features
 ```typescript
@@ -211,7 +209,6 @@ class AudioEngine {
 ## 🔗 References
 
 - [Tone.js Transport Wiki](https://github.com/tonejs/tone.js/wiki/Transport)
-- [A Tale of Two Clocks - Chris Wilson](https://web.dev/articles/audio-scheduling)
 - [Tone.js Performance Guide](https://github.com/tonejs/tone.js/wiki/Performance)
 - [Playing Note Sequences with Tone.js](https://benfarrell.com/blog/2024-12-01-playing-a-note-sequence/)
 

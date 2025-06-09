@@ -31,7 +31,7 @@ Based on the [Tone.js Transport documentation](https://github.com/tonejs/tone.js
 1. **Transport as Single Source of Truth** - We should use `Tone.Transport` for ALL timing
 2. **Proper Scheduling Patterns** - Use `Transport.schedule()` and `Transport.scheduleRepeat()` 
 3. **Musical Time Notation** - Leverage Tone.js time formats like `"4n"`, `"1m"`, `"16:0:0"`
-4. **Advance Scheduling** - Follow Chris Wilson's [A Tale of Two Clocks](https://web.dev/articles/audio-scheduling) pattern
+4. **Consistent Tone.js Usage** - Eliminate setTimeout-based timing in favor of Transport
 5. **Visual Sync Separation** - Use `Tone.Draw` for visual feedback, not Transport callbacks
 
 ## Target Architecture
@@ -116,10 +116,10 @@ function useAudioPreview(): PreviewAPI
 ### Phase 2: Advanced Features (Week 2)
 **Goal:** Leverage Tone.js advanced capabilities
 
-#### Day 1-2: Proper Scheduling Patterns
-- [ ] Implement [Chris Wilson's scheduling pattern](https://web.dev/articles/audio-scheduling)
-- [ ] Use `requestAnimationFrame` for visual updates
+#### Day 1-2: Enhanced Transport Integration
+- [ ] Create functional audio engine with pure functions
 - [ ] Add `Tone.Draw` for precise visual sync
+- [ ] Implement proper Transport event handling
 - [ ] Follow Tone.js performance guidelines
 
 #### Day 3-4: Musical Features
@@ -307,5 +307,4 @@ The investment in proper Tone.js integration pays dividends in reliability, perf
 *References:*
 - [Tone.js Wiki](https://github.com/Tonejs/Tone.js/wiki)
 - [Transport Documentation](https://github.com/tonejs/tone.js/wiki/Transport)  
-- [A Tale of Two Clocks](https://web.dev/articles/audio-scheduling)
 - [Tone.js Performance Guide](https://github.com/tonejs/tone.js/wiki/Performance) 
