@@ -9,6 +9,23 @@
   border-radius: var(--radius-md);
   font-family: var(--font-ui);
   color: var(--color-text-primary);
+  outline: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-viewer:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.tab-viewer *, .tab-viewer *:focus {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tab-scroll-container {

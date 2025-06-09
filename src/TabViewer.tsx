@@ -125,7 +125,25 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
     }
   }, [handleZoom]);
 
+  // Ensure focus for keyboard input (backup for autoFocus)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const tabViewer = document.querySelector('.tab-viewer') as HTMLElement;
+      if (tabViewer) {
+        tabViewer.focus();
+      }
+    }, 100); // Small delay to ensure DOM is ready
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    // Ensure the tab viewer stays focused
+    const tabViewer = e.currentTarget.closest('.tab-viewer') as HTMLElement;
+    if (tabViewer) {
+      tabViewer.focus();
+    }
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -235,7 +253,19 @@ const TabViewer: React.FC<TabViewerProps> = ({ editor }) => {
 
   // === Main Render ===
   return (
-    <div className="tab-viewer" tabIndex={0} onKeyDown={handleKeyDown}>
+    <div 
+      className="tab-viewer" 
+      tabIndex={0} 
+      autoFocus
+      onKeyDown={handleKeyDown}
+      style={{
+        outline: 'none', // Remove default focus outline
+        userSelect: 'none', // Prevent text selection
+        WebkitUserSelect: 'none', // Safari
+        MozUserSelect: 'none', // Firefox
+        msUserSelect: 'none' // IE/Edge
+      }}
+    >
       {/* Zoom Controls */}
       <div className="zoom-controls">
         <button onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.25))}>−</button>
