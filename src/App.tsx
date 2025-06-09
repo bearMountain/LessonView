@@ -11,6 +11,8 @@ import VideoPlayer from './components/video/VideoPlayer'
 import SplitPane from './components/layout/SplitPane'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { AudioProvider } from './contexts/AudioContext'
+import AudioControls from './components/audio/AudioControls'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
 import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
 import { AutoSave } from './services/AutoSave'
@@ -26,6 +28,7 @@ import {
 } from './hooks/useNoteStackEditor'
 import { useTheme } from './contexts/ThemeContext'
 import { useAppLayout } from './hooks/useAppLayout'
+import { useAudio } from './contexts/AudioContext'
 
 // Main App Content Component (needs to be inside SyncEngineProvider)
 function AppContent() {
@@ -37,6 +40,9 @@ function AppContent() {
   
   // === Theme Management ===
   const { currentTheme, setTheme } = useTheme()
+  
+  // === Audio System Integration ===
+  const { loadSequence } = useAudio()
   
   // === Integration with Legacy Services ===
   const fileManagerRef = useRef<FileManager>(new FileManager())
@@ -83,6 +89,12 @@ function AppContent() {
       player.dispose()
     }
   }, [tabEditor.state.tab, tabEditor.state.bpm])
+
+  // === Load tab data into our functional audio system ===
+  useEffect(() => {
+    // Load the current tab into our functional audio system
+    loadSequence(tabEditor.state.tab)
+  }, [tabEditor.state.tab, loadSequence])
   
   // === Auto-Save Integration ===
   useEffect(() => {
@@ -394,7 +406,10 @@ function AppContent() {
                 isMuted={false} // TODO: Add video mute to NoteStack state
               />,
               <div className="tab-editor-pane">
-                                  <TabViewer 
+                {/* Functional Audio Controls Demo */}
+                <AudioControls />
+                
+                <TabViewer 
                     ref={tabViewerRef}
                     editor={tabEditor}
                   />
@@ -453,9 +468,11 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider defaultTheme="light">
-      <SyncEngineProvider>
-        <AppContent />
-      </SyncEngineProvider>
+      <AudioProvider>
+        <SyncEngineProvider>
+          <AppContent />
+        </SyncEngineProvider>
+      </AudioProvider>
     </ThemeProvider>
   )
 }

@@ -41,9 +41,10 @@ export const ticksToTransportTime = (ticks: number): string => {
   return `${measures}:${beats}:${sixteenths}`
 }
 
-export const fretToFrequency = (fret: number, string: number): number => {
-  const baseTunings = [146.83, 220.00, 293.66] // D3, A3, D4
-  return baseTunings[string] * Math.pow(2, fret / 12)
+export const fretToNoteName = (fret: number, string: number): string => {
+  const baseNotes = ['D3', 'A3', 'D4'] // Strumstick tuning
+  // Convert to Tone.js note names like "D3", "A#4", etc.
+  // Let Tone.js handle frequency calculation internally
 }
 
 export const durationToToneNotation = (duration: Duration): string => {
