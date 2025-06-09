@@ -5,6 +5,7 @@ import { DURATION_VISUALS } from './components/types';
 import type { useNoteStackEditor } from './hooks/useNoteStackEditor';
 import { useThemeObject } from './contexts/ThemeContext';
 import { useAppLayout } from './hooks/useAppLayout';
+import { useAudio } from './contexts/AudioContext';
 
 interface TabViewerProps {
   editor: ReturnType<typeof useNoteStackEditor>;
@@ -53,8 +54,11 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
   // Apply theme
   const theme = useThemeObject();
   
-  // Get layout state (zoom, isPlaying, etc.)
-  const { zoom, setZoom, isPlaying } = useAppLayout();
+  // Get layout state (zoom, etc.)
+  const { zoom, setZoom } = useAppLayout();
+  
+  // Get audio state for playback indicator
+  const { state: audioState } = useAudio();
   
   // === Layout Constants ===
   const layout = useMemo(() => {
@@ -479,7 +483,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
           </g>
 
           {/* Playback Position */}
-          {isPlaying && currentPosition !== undefined && (
+          {audioState.isPlaying && currentPosition !== undefined && (
             <line
               x1={getPositionX(currentPosition)}
               y1={getStringY(2) - 15}
@@ -504,7 +508,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
         Stacks: {tab.length} | 
         Selected: {selectedStacks?.length || 0} | 
         Duration: {selectedDuration} |
-        {isPlaying ? ' ▶️ Playing' : ' ⏸️ Stopped'} |
+        {audioState.isPlaying ? ' ▶️ Playing' : ' ⏸️ Stopped'} |
         Layout Items: {layoutItems.length}
       </div>
     </div>

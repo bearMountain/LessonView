@@ -1,7 +1,8 @@
-import { useImperativeHandle, forwardRef, useEffect, useRef } from 'react'
-import * as Tone from 'tone'
+import React, { forwardRef, useImperativeHandle } from 'react'
+import { useAudio, useNotePreview } from './contexts/AudioContext'
 import type { TabData } from './types'
 
+// Legacy interface preserved for backward compatibility
 interface ControlsProps {
   tabData: TabData
   currentPosition: { timeSlot: number; stringIndex: number }
@@ -25,11 +26,11 @@ export interface ControlsRef {
 }
 
 /**
- * Controls Component - Refactored with Functional Architecture
+ * Controls Component - Functional Audio System Integration
  * 
- * Dramatically simplified from 658 lines to ~150 lines (77% reduction)
- * Uses clean functional patterns while maintaining backward compatibility
- * All complex audio logic extracted into clean, testable functions
+ * Replaced setTimeout-based timing with functional audio system
+ * Clean delegation to AudioContext - no more timing anti-patterns
+ * Maintains backward compatibility with legacy TabViewer
  */
 const Controls = forwardRef<ControlsRef, ControlsProps>(({ 
   tabData, 
@@ -46,148 +47,48 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({
   isMuted 
 }, ref) => {
   
-  // === Core Audio State ===
-  const synthRef = useRef<Tone.Synth | null>(null)
-  const isPlayingRef = useRef(false)
-  const cleanupRef = useRef<(() => void) | null>(null)
+  // === Functional Audio Integration ===
+  const { play, stop, jumpTo, state } = useAudio()
+  const { previewNote } = useNotePreview()
 
-  // === Pure Audio Functions ===
-  
-  /**
-   * Initialize simple audio synthesis
-   * Clean, testable audio setup
-   */
-  const initializeAudio = async () => {
-    try {
-      await Tone.start()
-      if (!synthRef.current) {
-        synthRef.current = new Tone.Synth({
-          oscillator: { type: 'triangle' },
-          envelope: {
-            attack: 0.01,
-            decay: 0.1, 
-            sustain: 0.3,
-            release: 1
-          }
-        }).toDestination()
-      }
-    } catch (error) {
-      console.error('Audio initialization failed:', error)
-    }
-  }
-
-  /**
-   * Clean audio resource management
-   */
-  const cleanupAudio = () => {
-    if (cleanupRef.current) {
-      cleanupRef.current()
-      cleanupRef.current = null
-    }
-    if (synthRef.current) {
-      synthRef.current.dispose()
-      synthRef.current = null
-    }
-    Tone.Transport.stop()
-    Tone.Transport.cancel()
-  }
-
-  /**
-   * Calculate frequency for strumstick fret position
-   * Pure function - easily testable
-   */
-  const getFrequency = (fret: number, stringIndex: number): number => {
-    const baseFrequencies = [146.83, 220.00, 293.66] // Low D, A, Hi D
-    return baseFrequencies[stringIndex] * Math.pow(2, fret / 12)
-  }
-
-  /**
-   * Play single note with clean error handling
-   */
-  const playNote = async (fret: number, stringIndex: number, duration: number = 0.5) => {
-    if (!synthRef.current || isMuted) return
-    
-    try {
-      const frequency = getFrequency(fret, stringIndex)
-      synthRef.current.triggerAttackRelease(frequency, duration)
-      
-      // Visual feedback
-      onNotesPlaying([{ fret, stringIndex }])
-      setTimeout(() => onNotesPlaying([]), duration * 1000)
-    } catch (error) {
-      console.error(`Error playing note: fret ${fret}, string ${stringIndex}`, error)
-    }
-  }
-
-  // === Imperative API Implementation ===
+  // === Legacy API Implementation ===
+  // Clean delegation to functional audio system
   
   const playPreviewNote = async (fret: number, stringIndex: number) => {
     console.log(`🎵 Preview: fret ${fret}, string ${stringIndex}`)
-    await initializeAudio()
-    await playNote(fret, stringIndex, 0.8)
+    
+    // Use functional audio system for preview
+    await previewNote(fret, stringIndex)
+    
+    // Legacy visual feedback
+    onNotesPlaying([{ fret, stringIndex }])
+    // Remove visual feedback after a short delay
+    setTimeout(() => onNotesPlaying([]), 800)
   }
 
   const playTab = async () => {
     console.log('▶️ Playing tab from beginning')
-    await playFromPosition(0)
+    await play()
+    onPlaybackStateChange?.(true)
   }
 
   const playFromPosition = async (startPosition: number) => {
     console.log(`▶️ Playing from position ${startPosition}`)
     
-    try {
-      await initializeAudio()
-      isPlayingRef.current = true
-      onPlaybackStateChange?.(true)
-
-      // Set transport tempo
-      Tone.Transport.bpm.value = tempo
-      
-      // Simple playback implementation
-      let currentSlot = startPosition
-      
-      const scheduleNextNote = () => {
-        if (!isPlayingRef.current || currentSlot >= tabData.length) {
-          // Playback complete
-          stopPlayback()
-          onPlaybackComplete?.()
-          return
-        }
-
-        // Update position indicator
-        onCurrentTimeSlotChange?.(currentSlot)
-
-        // Play notes at current position
-        const currentCell = tabData[currentSlot]
-        if (currentCell && currentCell.notes.length > 0) {
-          currentCell.notes.forEach(note => {
-            if (note.type === 'note' && note.fret !== null) {
-              playNote(note.fret, note.stringIndex, 0.25)
-            }
-          })
-        }
-
-        // Schedule next slot
-        currentSlot++
-        setTimeout(scheduleNextNote, (60 / tempo) * 250) // Quarter note timing
-      }
-
-      scheduleNextNote()
-
-    } catch (error) {
-      console.error('Playback error:', error)
-      stopPlayback()
-    }
+    // Convert time slot to ticks (960 ticks per quarter note)
+    const tickPosition = startPosition * 960
+    
+    // Jump to position first, then play
+    jumpTo(tickPosition)
+    await play()
+    onPlaybackStateChange?.(true)
   }
 
   const stopPlayback = (clearVisualFeedback: boolean = true) => {
     console.log(`🛑 Stopping playback`)
     
-    isPlayingRef.current = false
+    stop()
     onPlaybackStateChange?.(false)
-    
-    Tone.Transport.stop()
-    Tone.Transport.cancel()
     
     if (clearVisualFeedback) {
       onCurrentTimeSlotChange?.(-1)
@@ -202,21 +103,26 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({
     playTab,
     playFromPosition,
     stopPlayback
-  }), [tempo, isMuted, tabData])
+  }), [play, stop, previewNote, onNotesPlaying, onPlaybackStateChange, onCurrentTimeSlotChange])
 
-  // Auto-cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanupAudio()
-    }
-  }, [])
+  // Sync playback state changes to legacy handlers
+  React.useEffect(() => {
+    onPlaybackStateChange?.(state.isPlaying)
+  }, [state.isPlaying, onPlaybackStateChange])
 
-  // Sync tempo changes
-  useEffect(() => {
-    if (Tone.Transport) {
-      Tone.Transport.bpm.value = tempo
+  // Sync position changes to legacy handlers
+  React.useEffect(() => {
+    const timeSlot = Math.floor(state.currentPosition / 960)
+    onCurrentTimeSlotChange?.(timeSlot)
+  }, [state.currentPosition, onCurrentTimeSlotChange])
+
+  // Handle playback completion
+  React.useEffect(() => {
+    if (state.isPlaying === false && state.currentPosition > 0) {
+      // Playback stopped after playing - likely completion
+      onPlaybackComplete?.()
     }
-  }, [tempo])
+  }, [state.isPlaying, state.currentPosition, onPlaybackComplete])
 
   // No UI - pure imperative API
   return null

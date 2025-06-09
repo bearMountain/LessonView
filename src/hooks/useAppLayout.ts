@@ -5,22 +5,20 @@ interface AppLayoutState {
   zoom: number;
   showFretboard: boolean;
   splitRatio: number;
-  isPlaying: boolean; // Playback state affects layout/UI
+  // isPlaying removed - now handled by AudioContext
 }
 
 // App layout actions
 type AppLayoutAction = 
   | { type: 'SET_ZOOM'; payload: number }
   | { type: 'TOGGLE_FRETBOARD' }
-  | { type: 'SET_SPLIT_RATIO'; payload: number }
-  | { type: 'SET_PLAYING'; payload: boolean };
+  | { type: 'SET_SPLIT_RATIO'; payload: number };
 
 // Initial state
 const initialState: AppLayoutState = {
   zoom: 1,
   showFretboard: true,
   splitRatio: 0.5,
-  isPlaying: false,
 };
 
 // App layout reducer
@@ -42,12 +40,6 @@ const appLayoutReducer = (state: AppLayoutState, action: AppLayoutAction): AppLa
       return {
         ...state,
         splitRatio: Math.max(0.1, Math.min(0.9, action.payload))
-      };
-    
-    case 'SET_PLAYING':
-      return {
-        ...state,
-        isPlaying: action.payload
       };
     
     default:
@@ -85,10 +77,7 @@ export const useAppLayout = () => {
     dispatch({ type: 'SET_SPLIT_RATIO', payload: ratio });
   }, []);
   
-  // Playback UI state
-  const setPlaying = useCallback((playing: boolean) => {
-    dispatch({ type: 'SET_PLAYING', payload: playing });
-  }, []);
+  // Playback UI state removed - now handled by AudioContext
   
   return {
     // State
@@ -100,6 +89,6 @@ export const useAppLayout = () => {
     zoomOut,
     toggleFretboard,
     setSplitRatio,
-    setPlaying,
+    // setPlaying removed - now handled by AudioContext
   };
 }; 

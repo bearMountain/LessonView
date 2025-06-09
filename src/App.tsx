@@ -20,7 +20,6 @@ import type { ControlsRef } from './Controls'
 import type { Note } from './types'
 
 import { convertNoteStackToTabData, convertTabDataToNoteStack } from './services/ArchitectureBridge'
-import { getStrumstickPlayer } from './services/StrumstickPlayer'
 
 // Import NoteStack architecture hooks
 import { 
@@ -42,7 +41,7 @@ function AppContent() {
   const { currentTheme, setTheme } = useTheme()
   
   // === Audio System Integration ===
-  const { loadSequence } = useAudio()
+  const { loadSequence, state: audioState } = useAudio()
   
   // === Integration with Legacy Services ===
   const fileManagerRef = useRef<FileManager>(new FileManager())
@@ -76,19 +75,8 @@ function AppContent() {
     }
   }
   
-  // === Initialize Player ===
-  useEffect(() => {
-    const player = getStrumstickPlayer()
-    player.setBPM(tabEditor.state.bpm)
-    player.loadTab(tabEditor.state.tab)
-    player.setPositionChangeCallback((position) => {
-      tabEditor.setCursorPosition(position)
-    })
-    
-    return () => {
-      player.dispose()
-    }
-  }, [tabEditor.state.tab, tabEditor.state.bpm])
+  // === Legacy Player Removed ===
+  // Old StrumstickPlayer.ts integration removed - now using functional AudioProvider
 
   // === Load tab data into our functional audio system ===
   useEffect(() => {
@@ -269,20 +257,20 @@ function AppContent() {
   }
 
   const handlePlayPause = async () => {
-    const player = getStrumstickPlayer()
-    if (layout.isPlaying) {
+    const { state: audioState, play, pause } = useAudio()
+    
+    if (audioState.isPlaying) {
       console.log('⏸️ Pausing playback...')
-      layout.setPlaying(false)
-      player.pause()
+      pause()
     } else {
       console.log('▶️ Starting playback...')
-      layout.setPlaying(true)
-      player.play()
+      await play()
     }
   }
 
   const handlePlaybackStateChange = (playing: boolean) => {
-    layout.setPlaying(playing)
+    // Legacy handler - playback state now managed by AudioContext
+    console.log('Playback state change:', playing)
   }
 
   const handlePositionClick = (timeSlot: number, stringIndex: number, shiftHeld?: boolean, clickedOnMeasureLine?: boolean) => {
@@ -375,17 +363,17 @@ function AppContent() {
         ) : null}
         bottomPanel={
           <PlaybackBar
-            isPlaying={layout.isPlaying}
+            isPlaying={audioState.isPlaying}
             onPlayPause={handlePlayPause}
-            currentTime={tabEditor.state.currentPosition.toString()}
+            currentTime={audioState.currentPosition.toString()}
             totalTime={tabEditor.layoutItems.length.toString()} // Use layout items count as approximation
-            tempo={tabEditor.state.bpm}
+            tempo={audioState.tempo}
             trackTitle={'Untitled Song'} // TODO: Add title to NoteStack state
-            onTempoChange={tabEditor.setBpm}
-            onLoopToggle={() => {}} // TODO: Add looping to NoteStack
+            onTempoChange={tabEditor.setBpm} // TODO: Connect to audio system
+            onLoopToggle={() => {}} // TODO: Connect to audio system
             onFretboardToggle={handleToggleFretboard}
             onCountInToggle={() => {}} // TODO: Add count-in to NoteStack
-            isLooping={false} // TODO: Add looping to NoteStack
+            isLooping={audioState.isLooping}
             showFretboard={layout.showFretboard}
             countInEnabled={false} // TODO: Add count-in to NoteStack
           />
@@ -399,7 +387,7 @@ function AppContent() {
             {[
               <VideoPlayer
                 source={''} // TODO: Add video source to NoteStack state
-                isPlaying={layout.isPlaying}
+                isPlaying={audioState.isPlaying}
                 currentTime={0} // TODO: Add video time to NoteStack state
                 playbackRate={1} // TODO: Add playback rate to NoteStack state
                 onMuteToggle={() => {}} // TODO: Add video mute to NoteStack
@@ -427,7 +415,7 @@ function AppContent() {
                   onCurrentTimeSlotChange={(pos: number) => tabEditor.setCursorPosition(pos * 960)}
                   onPlaybackComplete={() => {
                     console.log('🏁 Tab playback completed')
-                    layout.setPlaying(false)
+                    // Playback state now managed by AudioContext
                   }}
                   countInEnabled={false}
                   timeSignature="4/4"
