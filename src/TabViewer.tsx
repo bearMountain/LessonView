@@ -455,6 +455,18 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
                   
                   return (
                     <g key={`${stack.id}-note-${noteIndex}`} className="note-symbol">
+                      {/* Background circle for open notes to block tab line */}
+                      {visual.isOpen && (
+                        <circle
+                          cx={stackX}
+                          cy={y}
+                          r="12"
+                          fill={theme.bg.workspace}
+                          stroke="none"
+                        />
+                      )}
+                      
+                      {/* Main note circle */}
                       <circle
                         cx={stackX}
                         cy={y}
