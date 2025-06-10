@@ -316,8 +316,9 @@ function AppContent() {
     return 1; // Default to middle string (A)
   };
 
-  // Focus management callback for toolbar actions
+  // === Focus Management ===
   const handleAfterToolbarAction = useCallback(() => {
+    // Restore focus to TabViewer after toolbar interactions
     tabViewerRef.current?.focus();
   }, []);
 
@@ -352,7 +353,7 @@ function AppContent() {
             }}
             noteAtCurrentPosition={null}
             onToggleDotted={() => {}}
-            onAfterSelection={() => {}}
+            onAfterSelection={handleAfterToolbarAction}
           />
         }
         fretboard={layout.showFretboard ? (
