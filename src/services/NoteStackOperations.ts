@@ -124,41 +124,23 @@ export const removeStack = (tab: Tab, stackId: string): Tab => {
 
 /**
  * Get the next available position for Tab key navigation
- * If cursor is on existing note stack, jump forward by that stack's duration
- * If cursor is not on a note stack, don't move (return current position)
+ * Always move forward by one quarter note (960 ticks)
+ * This provides consistent, predictable Tab navigation
  */
 export const getNextAvailablePosition = (tab: Tab, fromPosition: number = 0): number => {
-  // Check if there's a stack at the current cursor position
-  const stackAtPosition = findStackAtPosition(tab, fromPosition);
-  
-  if (stackAtPosition) {
-    // Cursor is on an existing note stack - jump forward by its duration
-    const stackDurationTicks = DURATION_TO_TICKS[stackAtPosition.duration];
-    return fromPosition + stackDurationTicks;
-  } else {
-    // Cursor is not on a note stack - don't move
-    return fromPosition;
-  }
+  // Always move forward by one quarter note for consistent navigation
+  return fromPosition + TICKS_PER_QUARTER;
 };
 
 /**
- * Get the previous note stack position for Shift+Tab navigation
- * Finds the closest note stack before the current position
- * If no previous stack exists, returns current position (don't move)
+ * Get the previous position for Shift+Tab navigation
+ * Always move backward by one quarter note (960 ticks)
+ * This provides consistent, predictable Shift+Tab navigation
  */
 export const getPreviousStackPosition = (tab: Tab, fromPosition: number): number => {
-  // Find all stacks before the current position
-  const stacksBeforePosition = tab
-    .filter(stack => stack.musicalPosition < fromPosition)
-    .sort((a, b) => b.musicalPosition - a.musicalPosition); // Sort descending (closest first)
-  
-  if (stacksBeforePosition.length === 0) {
-    // No previous stacks - don't move
-    return fromPosition;
-  }
-  
-  // Return the position of the closest previous stack
-  return stacksBeforePosition[0].musicalPosition;
+  // Always move backward by one quarter note for consistent navigation
+  // Don't go below 0
+  return Math.max(0, fromPosition - TICKS_PER_QUARTER);
 };
 
 /**

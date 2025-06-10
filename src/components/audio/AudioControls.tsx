@@ -50,6 +50,25 @@ export const AudioControls: React.FC<AudioControlsProps> = ({ className = '' }) 
         🎵 Functional Audio System
       </h3>
 
+      {/* Debug Info */}
+      <div style={{ 
+        marginBottom: '16px', 
+        padding: '8px', 
+        backgroundColor: '#fff3cd', 
+        borderRadius: '4px',
+        fontSize: '12px',
+        color: '#856404'
+      }}>
+        <div><strong>🐛 Debug Info:</strong></div>
+        <div><strong>Sequence Length:</strong> {audioState.sequence.length} note stacks</div>
+        <div><strong>Current Position:</strong> {audioState.currentPosition} ticks</div>
+        <div><strong>Audio State:</strong> {audioState.isPlaying ? 'Playing' : 'Stopped'}</div>
+        <div><strong>Tempo:</strong> {audioState.tempo} BPM</div>
+        {audioState.sequence.length > 0 && (
+          <div><strong>First Stack:</strong> {JSON.stringify(audioState.sequence[0]).substring(0, 100)}...</div>
+        )}
+      </div>
+
       {/* Playback Controls */}
       <div style={{ marginBottom: '16px' }}>
         <h4 style={{ marginBottom: '8px', color: '#555' }}>Playback</h4>
@@ -200,8 +219,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({ className = '' }) 
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px'
+            cursor: 'pointer'
           }}
         >
           🔧 Initialize Audio Context

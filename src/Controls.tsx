@@ -103,18 +103,18 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({
     playTab,
     playFromPosition,
     stopPlayback
-  }), [play, stop, previewNote, onNotesPlaying, onPlaybackStateChange, onCurrentTimeSlotChange])
+  }), [play, stop, previewNote]) // Remove callback functions to prevent recreation loops
 
   // Sync playback state changes to legacy handlers
   React.useEffect(() => {
     onPlaybackStateChange?.(state.isPlaying)
-  }, [state.isPlaying, onPlaybackStateChange])
+  }, [state.isPlaying]) // Remove function from dependencies to prevent loop
 
   // Sync position changes to legacy handlers
   React.useEffect(() => {
     const timeSlot = Math.floor(state.currentPosition / 960)
     onCurrentTimeSlotChange?.(timeSlot)
-  }, [state.currentPosition, onCurrentTimeSlotChange])
+  }, [state.currentPosition]) // Remove function from dependencies to prevent loop
 
   // Handle playback completion
   React.useEffect(() => {
@@ -122,7 +122,7 @@ const Controls = forwardRef<ControlsRef, ControlsProps>(({
       // Playback stopped after playing - likely completion
       onPlaybackComplete?.()
     }
-  }, [state.isPlaying, state.currentPosition, onPlaybackComplete])
+  }, [state.isPlaying, state.currentPosition]) // Remove function from dependencies to prevent loop
 
   // No UI - pure imperative API
   return null

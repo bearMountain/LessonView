@@ -41,7 +41,7 @@ function AppContent() {
   const { currentTheme, setTheme } = useTheme()
   
   // === Audio System Integration ===
-  const { loadSequence, state: audioState } = useAudio()
+  const { loadSequence, state: audioState, play, pause } = useAudio()
   
   // === Integration with Legacy Services ===
   const fileManagerRef = useRef<FileManager>(new FileManager())
@@ -257,8 +257,6 @@ function AppContent() {
   }
 
   const handlePlayPause = async () => {
-    const { state: audioState, play, pause } = useAudio()
-    
     if (audioState.isPlaying) {
       console.log('⏸️ Pausing playback...')
       pause()

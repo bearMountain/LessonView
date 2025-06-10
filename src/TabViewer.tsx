@@ -109,15 +109,6 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
       y: getStringY(1) // Default to middle string (A)
     };
     
-    // Debug logging
-    console.log('getCursorPosition:', {
-      currentPosition,
-      x: position.x,
-      y: position.y,
-      stringIndex: 1,
-      stringY: getStringY(1)
-    });
-    
     return position;
   };
 
@@ -172,17 +163,20 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
   }, []);
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    console.log('🖱️ SVG Click detected!');
+    
     // Ensure the tab viewer stays focused
     const tabViewer = e.currentTarget.closest('.tab-viewer') as HTMLElement;
     if (tabViewer) {
       tabViewer.focus();
+      console.log('🖱️ Tab viewer focused');
     }
     
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    console.log('SVG Click:', { x, y, leftMargin: layout.leftMargin });
+    console.log('🖱️ SVG Click:', { x, y, leftMargin: layout.leftMargin });
     
     // Find closest string
     let closestStringIndex = 0;
@@ -197,7 +191,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
       }
     }
     
-    console.log('Closest String:', { closestStringIndex, minDistance });
+    console.log('🖱️ Closest String:', { closestStringIndex, minDistance });
     
     // Convert click position to musical position (ticks) - accounts for note stack indent
     const clickPosition = getMusicalPositionFromX(x);
@@ -205,14 +199,21 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     // Snap to nearest quarter note (960 ticks)
     const snappedPosition = Math.round(clickPosition / 960) * 960;
     
-    console.log('Position Calculation:', { 
+    console.log('🖱️ Position Calculation:', { 
       clickPosition, 
       snappedPosition,
-      pixelsPerTick: layout.pixelsPerTick 
+      pixelsPerTick: layout.pixelsPerTick,
+      currentEditorPosition: editor.state.currentPosition
     });
     
     // Set cursor position
-    editor.setCursorPosition(snappedPosition);
+    try {
+      console.log('🖱️ Calling setCursorPosition with:', snappedPosition);
+      editor.setCursorPosition(snappedPosition);
+      console.log('🖱️ After setCursorPosition, editor position is:', editor.state.currentPosition);
+    } catch (error) {
+      console.error('🖱️ Error in setCursorPosition:', error);
+    }
     
     if (e.shiftKey) {
       // Handle selection
@@ -226,21 +227,37 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
 
   // Handle keyboard input for adding notes
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    console.log('handleKeyDown:', { key: e.key, currentPosition });
+    console.log('🎹 handleKeyDown:', { 
+      key: e.key, 
+      currentPosition,
+      editorState: editor.state.currentPosition,
+      hasEditor: !!editor
+    });
     
     // Tab key to move to next available position
     if (e.key === 'Tab') {
       e.preventDefault(); // Prevent default tab behavior
-      console.log('Tab pressed - moving cursor right from:', currentPosition);
-      editor.moveCursorRight();
+      console.log('🔸 Tab pressed - moving cursor right from:', currentPosition);
+      console.log('🔸 Editor moveCursorRight available:', typeof editor.moveCursorRight);
+      try {
+        editor.moveCursorRight();
+        console.log('🔸 Tab - New position should be:', editor.state.currentPosition);
+      } catch (error) {
+        console.error('🔸 Error in moveCursorRight:', error);
+      }
       return;
     }
     
     // Shift+Tab to move to previous position
     if (e.key === 'Tab' && e.shiftKey) {
       e.preventDefault(); // Prevent default tab behavior
-      console.log('Shift+Tab pressed - moving cursor left from:', currentPosition);
-      editor.moveCursorLeft();
+      console.log('🔹 Shift+Tab pressed - moving cursor left from:', currentPosition);
+      try {
+        editor.moveCursorLeft();
+        console.log('🔹 Shift+Tab - New position should be:', editor.state.currentPosition);
+      } catch (error) {
+        console.error('🔹 Error in moveCursorLeft:', error);
+      }
       return;
     }
     
@@ -248,25 +265,44 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     if (e.key >= '0' && e.key <= '9') {
       const fret = parseInt(e.key);
       const defaultString = 1; // Middle string (A)
-      console.log('Adding note:', { currentPosition, defaultString, fret, selectedDuration });
-      editor.addNote(currentPosition, defaultString, fret, selectedDuration);
+      console.log('🎵 Adding note:', { currentPosition, defaultString, fret, selectedDuration });
+      try {
+        editor.addNote(currentPosition, defaultString, fret, selectedDuration);
+        console.log('🎵 Note added - New tab length:', editor.state.tab.length);
+      } catch (error) {
+        console.error('🎵 Error adding note:', error);
+      }
     }
     
     // Delete key to remove notes
     if (e.key === 'Delete' || e.key === 'Backspace') {
       const defaultString = 1;
-      console.log('Removing note:', { currentPosition, defaultString });
-      editor.removeNote(currentPosition, defaultString);
+      console.log('🗑️ Removing note:', { currentPosition, defaultString });
+      try {
+        editor.removeNote(currentPosition, defaultString);
+      } catch (error) {
+        console.error('🗑️ Error removing note:', error);
+      }
     }
     
     // Arrow keys for navigation (by selected duration)
     if (e.key === 'ArrowLeft') {
-      console.log('Moving cursor left by duration from:', currentPosition);
-      editor.moveCursorLeftByDuration();
+      console.log('⬅️ Moving cursor left by duration from:', currentPosition);
+      try {
+        editor.moveCursorLeftByDuration();
+        console.log('⬅️ Arrow Left - New position should be:', editor.state.currentPosition);
+      } catch (error) {
+        console.error('⬅️ Error in moveCursorLeftByDuration:', error);
+      }
     }
     if (e.key === 'ArrowRight') {
-      console.log('Moving cursor right by duration from:', currentPosition);
-      editor.moveCursorRightByDuration();
+      console.log('➡️ Moving cursor right by duration from:', currentPosition);
+      try {
+        editor.moveCursorRightByDuration();
+        console.log('➡️ Arrow Right - New position should be:', editor.state.currentPosition);
+      } catch (error) {
+        console.error('➡️ Error in moveCursorRightByDuration:', error);
+      }
     }
   };
 
