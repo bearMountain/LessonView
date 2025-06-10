@@ -12,7 +12,6 @@ import SplitPane from './components/layout/SplitPane'
 import { SyncEngineProvider, useSyncEngine } from './components/sync/SyncEngine'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AudioProvider } from './contexts/AudioContext'
-import AudioControls from './components/audio/AudioControls'
 import { SaveDialog, LoadDialog, NewProjectDialog } from './components/ui/SaveLoadDialog'
 import { FileManager, type AppState, type ProjectMetadata } from './services/FileManager'
 import { AutoSave } from './services/AutoSave'
@@ -392,9 +391,6 @@ function AppContent() {
                 isMuted={false} // TODO: Add video mute to NoteStack state
               />,
               <div className="tab-editor-pane">
-                {/* Functional Audio Controls Demo */}
-                <AudioControls />
-                
                 <TabViewer 
                     ref={tabViewerRef}
                     editor={tabEditor}
