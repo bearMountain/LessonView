@@ -40,7 +40,7 @@ function AppContent() {
   const { currentTheme, setTheme } = useTheme()
   
   // === Audio System Integration ===
-  const { loadSequence, state: audioState, play, pause } = useAudio()
+  const { loadSequence, state: audioState, play, pause, setTempo } = useAudio()
   
   // === Integration with Legacy Services ===
   const fileManagerRef = useRef<FileManager>(new FileManager())
@@ -82,6 +82,22 @@ function AppContent() {
     // Load the current tab into our functional audio system
     loadSequence(tabEditor.state.tab)
   }, [tabEditor.state.tab, loadSequence])
+  
+  // === Sync tempo between audio system and tab editor ===
+  useEffect(() => {
+    // Keep tabEditor BPM in sync with audio system tempo
+    if (audioState.tempo !== tabEditor.state.bpm) {
+      tabEditor.setBpm(audioState.tempo)
+    }
+  }, [audioState.tempo, tabEditor])
+  
+  // === Initialize audio system with tab editor's BPM ===
+  useEffect(() => {
+    // On initial load, sync audio system tempo with tab editor
+    if (tabEditor.state.bpm !== audioState.tempo) {
+      setTempo(tabEditor.state.bpm)
+    }
+  }, []) // Run only once on mount
   
   // === Auto-Save Integration ===
   useEffect(() => {
@@ -321,8 +337,6 @@ function AppContent() {
             onNoteTypeChange={() => {}}
             currentToolMode="note"
             onToolModeChange={() => {}}
-            tempo={tabEditor.state.bpm}
-            onTempoChange={tabEditor.setBpm}
             timeSignature="4/4"
             onTimeSignatureChange={() => {}}
             tieMode={false}
@@ -366,7 +380,7 @@ function AppContent() {
             totalTime={tabEditor.layoutItems.length.toString()} // Use layout items count as approximation
             tempo={audioState.tempo}
             trackTitle={'Untitled Song'} // TODO: Add title to NoteStack state
-            onTempoChange={tabEditor.setBpm} // TODO: Connect to audio system
+            onTempoChange={setTempo} // Use audio system's setTempo for proper sync
             onLoopToggle={() => {}} // TODO: Connect to audio system
             onFretboardToggle={handleToggleFretboard}
             onCountInToggle={() => {}} // TODO: Add count-in to NoteStack

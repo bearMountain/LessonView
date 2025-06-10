@@ -2,7 +2,6 @@ import React from 'react';
 import './ProfessionalToolbar.css';
 import NoteValuePalette from './NoteValuePalette';
 import TimeSignatureSelector from './TimeSignatureSelector';
-import TempoControls from './TempoControls';
 import type { NoteDuration, NoteType, ToolMode, CursorPosition, Note } from '../../types';
 import { availableThemes } from '../../themes';
 
@@ -13,8 +12,8 @@ interface ProfessionalToolbarProps {
   onNoteTypeChange: (type: NoteType) => void;
   currentToolMode: ToolMode;
   onToolModeChange: (mode: ToolMode) => void;
-  tempo: number;
-  onTempoChange: (tempo: number) => void;
+  tempo?: number;
+  onTempoChange?: (tempo: number) => void;
   timeSignature: string;
   onTimeSignatureChange: (signature: string) => void;
   tieMode: boolean;
@@ -49,8 +48,6 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   onNoteTypeChange,
   currentToolMode,
   onToolModeChange,
-  tempo,
-  onTempoChange,
   timeSignature,
   onTimeSignatureChange,
   tieMode,
@@ -205,11 +202,6 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
           <TimeSignatureSelector
             value={timeSignature}
             onChange={onTimeSignatureChange}
-          />
-          <div className="toolbar-separator" />
-          <TempoControls
-            tempo={tempo}
-            onTempoChange={onTempoChange}
           />
         </div>
       ),
