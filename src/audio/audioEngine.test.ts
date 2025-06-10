@@ -27,17 +27,19 @@ describe('Audio Engine Pure Functions', () => {
   describe('fretToNoteName', () => {
     test('converts open strings to correct note names', () => {
       expect(fretToNoteName(0, 0)).toBe('D3') // Low D
-      expect(fretToNoteName(0, 1)).toBe('A3') // A
+      expect(fretToNoteName(0, 1)).toBe('A4') // A
       expect(fretToNoteName(0, 2)).toBe('D4') // High D
     })
 
-    test('converts fretted notes correctly', () => {
-      // Test some basic fret positions
-      expect(fretToNoteName(1, 0)).toBe('D#3') // Low D string, 1st fret
-      expect(fretToNoteName(2, 0)).toBe('E3')  // Low D string, 2nd fret
-      expect(fretToNoteName(12, 0)).toBe('D4') // Low D string, 12th fret (octave)
-      expect(fretToNoteName(12, 1)).toBe('A4') // A string, 12th fret (octave)
-      expect(fretToNoteName(12, 2)).toBe('D5') // High D string, 12th fret (octave)
+    test('converts fretted notes correctly (diatonic strumstick)', () => {
+      // Test diatonic scale positions
+      expect(fretToNoteName(1, 0)).toBe('E3')  // Low D string, 1st fret (2nd degree)
+      expect(fretToNoteName(2, 0)).toBe('F#3') // Low D string, 2nd fret (3rd degree)
+      expect(fretToNoteName(3, 0)).toBe('G3')  // Low D string, 3rd fret (4th degree)
+      expect(fretToNoteName(8, 0)).toBe('D4')  // Low D string, 8th fret (octave)
+      expect(fretToNoteName(12, 0)).toBe('A4') // Low D string, 12th fret (5th above octave)
+      expect(fretToNoteName(12, 1)).toBe('E6') // A string, 12th fret
+      expect(fretToNoteName(8, 2)).toBe('D5')  // High D string, 8th fret (octave)
     })
 
     test('throws error for invalid string', () => {
@@ -47,7 +49,7 @@ describe('Audio Engine Pure Functions', () => {
 
     test('throws error for invalid fret', () => {
       expect(() => fretToNoteName(-1, 0)).toThrow('Invalid fret')
-      expect(() => fretToNoteName(25, 0)).toThrow('Invalid fret')
+      expect(() => fretToNoteName(13, 0)).toThrow('Invalid fret')
     })
   })
 
@@ -86,7 +88,7 @@ describe('Audio Engine Pure Functions', () => {
         duration: '4n',
         notes: [
           { noteName: 'D3', string: 0, fret: 0 },
-          { noteName: 'B3', string: 1, fret: 2 }
+          { noteName: 'C#5', string: 1, fret: 2 }
         ],
         stackId: 'stack1',
         originalPosition: 0
@@ -95,7 +97,7 @@ describe('Audio Engine Pure Functions', () => {
         time: '0:1:0',
         duration: '2n',
         notes: [
-          { noteName: 'G4', string: 2, fret: 5 }
+          { noteName: 'B4', string: 2, fret: 5 }
         ],
         stackId: 'stack2',
         originalPosition: 960
@@ -218,7 +220,7 @@ describe('Audio Engine Pure Functions', () => {
 
     test('throws error for invalid fret', () => {
       const invalidStacks: NoteStack[] = [
-        { id: '1', musicalPosition: 0, duration: 'quarter', notes: [{ string: 0, fret: 25 }] }
+        { id: '1', musicalPosition: 0, duration: 'quarter', notes: [{ string: 0, fret: 13 }] }
       ]
       expect(() => validateNoteStacks(invalidStacks)).toThrow('Invalid fret')
     })

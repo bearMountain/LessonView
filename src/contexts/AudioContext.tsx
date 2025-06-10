@@ -162,6 +162,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         partRef.current = null
       }
       
+      // Clear any existing scheduled events
+      Tone.Transport.cancel()
+      
       if (stacks.length > 0) {
         const events = noteStackToToneEvents(stacks)
         
@@ -185,6 +188,27 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }, events)
         
         partRef.current.start(0)
+        
+        // Calculate sequence end time and schedule completion
+        const sequenceEndTime = calculateSequenceDuration(stacks)
+        const endTimeTransport = ticksToTransportTime(sequenceEndTime)
+        
+        console.log(`🎯 Sequence duration: ${sequenceEndTime} ticks (${endTimeTransport})`)
+        
+        // Schedule sequence completion
+        Tone.Transport.schedule((time) => {
+          console.log('🏁 Sequence completed, stopping playback')
+          
+          // Use Tone.Draw for UI updates
+          Tone.Draw.schedule(() => {
+            dispatch({ type: 'STOP' })
+            dispatch({ type: 'SET_POSITION', payload: 0 })
+          }, time)
+          
+          // Stop transport
+          Tone.Transport.stop()
+          Tone.Transport.position = 0
+        }, endTimeTransport)
       }
       
       console.log(`Loaded ${stacks.length} note stacks for playback`)
@@ -201,6 +225,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const stop = useCallback(() => {
     Tone.Transport.stop()
     Tone.Transport.position = 0
+    Tone.Transport.cancel() // Clear any scheduled completion events
   }, [])
   
   const pause = useCallback(() => {

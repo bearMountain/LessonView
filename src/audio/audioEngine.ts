@@ -32,33 +32,29 @@ export const fretToNoteName = (fret: number, string: number): string => {
     throw new Error(`Invalid string index: ${string}. Must be 0, 1, or 2`)
   }
   
-  if (fret < 0 || fret > 24) {
-    throw new Error(`Invalid fret: ${fret}. Must be 0-24`)
+  if (fret < 0 || fret > 12) {
+    throw new Error(`Invalid fret: ${fret}. Must be 0-12`)
   }
   
-  // Base tunings for 3-string strumstick
-  const baseNotes = ['D3', 'A3', 'D4'] // Low D, A, High D
+  // Diatonic strumstick fret-to-note mapping
+  // String 0 = D3 (Low D), String 1 = A4, String 2 = D4 (High D)
+  const fretToNoteMap: Record<number, [string, string, string]> = {
+    0:  ['D3', 'A4', 'D4'],   // Open strings
+    1:  ['E3', 'B4', 'E4'],   // 2nd degree
+    2:  ['F#3', 'C#5', 'F#4'], // 3rd degree
+    3:  ['G3', 'D5', 'G4'],   // 4th degree
+    4:  ['A3', 'E5', 'A4'],   // 5th degree
+    5:  ['B3', 'F#5', 'B4'],  // 6th degree
+    6:  ['C4', 'G5', 'C5'],   // b7th degree
+    7:  ['C#4', 'G#5', 'C#5'], // 7th degree
+    8:  ['D4', 'A5', 'D5'],   // Octave (8th/1st)
+    9:  ['E4', 'B5', 'E5'],   // 9th (2nd)
+    10: ['F#4', 'C#6', 'F#5'], // 10th (3rd)
+    11: ['G4', 'D6', 'G5'],   // 11th (4th)
+    12: ['A4', 'E6', 'A5']    // 12th (5th)
+  }
   
-  // All chromatic notes in order
-  const chromaticNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-  
-  // Parse base note
-  const baseNote = baseNotes[string]
-  const baseNoteName = baseNote.slice(0, -1) // Remove octave number
-  const baseOctave = parseInt(baseNote.slice(-1)) // Get octave number
-  
-  // Find base note index in chromatic scale
-  const baseNoteIndex = chromaticNotes.indexOf(baseNoteName)
-  
-  // Calculate target note index
-  const targetNoteIndex = (baseNoteIndex + fret) % 12
-  const octaveOffset = Math.floor((baseNoteIndex + fret) / 12)
-  
-  // Build target note name
-  const targetNoteName = chromaticNotes[targetNoteIndex]
-  const targetOctave = baseOctave + octaveOffset
-  
-  return `${targetNoteName}${targetOctave}`
+  return fretToNoteMap[fret][string]
 }
 
 /**
@@ -260,7 +256,7 @@ export const validateNoteStacks = (stacks: NoteStack[]): boolean => {
       if (typeof note.string !== 'number' || note.string < 0 || note.string > 2) {
         throw new Error(`Invalid string ${note.string} in stack ${stack.id}`)
       }
-      if (typeof note.fret !== 'number' || note.fret < 0 || note.fret > 24) {
+      if (typeof note.fret !== 'number' || note.fret < 0 || note.fret > 12) {
         throw new Error(`Invalid fret ${note.fret} in stack ${stack.id}`)
       }
     }

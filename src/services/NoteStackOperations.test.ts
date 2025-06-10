@@ -265,7 +265,7 @@ describe('NoteStack Operations', () => {
   });
 
   describe('getNextAvailablePosition', () => {
-    it('should return input position when no conflict', () => {
+    it('should stay in place when cursor is not on existing stack', () => {
       const tab: Tab = [
         { id: 'stack-1', musicalPosition: 0, duration: 'quarter', notes: [{ string: 0, fret: 1 }] },
         { id: 'stack-2', musicalPosition: 1920, duration: 'quarter', notes: [{ string: 1, fret: 3 }] }
@@ -273,18 +273,18 @@ describe('NoteStack Operations', () => {
       
       const result = getNextAvailablePosition(tab, 960);
       
-      expect(result).toBe(960);
+      expect(result).toBe(960); // Stay in place - no stack at cursor position
     });
 
-    it('should find next available position when conflict exists', () => {
+    it('should jump forward by note duration when cursor is on existing stack', () => {
       const tab: Tab = [
         { id: 'stack-1', musicalPosition: 960, duration: 'quarter', notes: [{ string: 0, fret: 1 }] },
-        { id: 'stack-2', musicalPosition: 1920, duration: 'quarter', notes: [{ string: 1, fret: 3 }] }
+        { id: 'stack-2', musicalPosition: 1920, duration: 'half', notes: [{ string: 1, fret: 3 }] }
       ];
       
       const result = getNextAvailablePosition(tab, 960);
       
-      expect(result).toBe(2880); // Next available position after existing stacks
+      expect(result).toBe(1920); // Jump forward by quarter note duration (960 ticks)
     });
   });
 
@@ -304,14 +304,14 @@ describe('NoteStack Operations', () => {
     it('should detect invalid fret numbers', () => {
       const tab: Tab = [
         { id: 'stack-1', musicalPosition: 0, duration: 'quarter', notes: [{ string: 0, fret: -1 }] },
-        { id: 'stack-2', musicalPosition: 960, duration: 'quarter', notes: [{ string: 1, fret: 25 }] }
+        { id: 'stack-2', musicalPosition: 960, duration: 'quarter', notes: [{ string: 1, fret: 13 }] }
       ];
       
       const result = validateTab(tab);
       
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('Invalid fret number: -1 in stack stack-1');
-      expect(result.errors).toContain('Invalid fret number: 25 in stack stack-2');
+              expect(result.errors).toContain('Invalid fret number: 13 in stack stack-2');
     });
 
     it('should detect invalid string numbers', () => {

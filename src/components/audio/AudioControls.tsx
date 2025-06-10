@@ -209,22 +209,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({ className = '' }) 
         <div><strong>Loop:</strong> {audioState.isLooping ? 'Enabled' : 'Disabled'}</div>
       </div>
 
-      {/* Initialize Audio Button (for testing) */}
-      <div style={{ marginTop: '16px' }}>
-        <button
-          onClick={initializeAudio}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#17a2b8',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          🔧 Initialize Audio Context
-        </button>
-      </div>
+
     </div>
   )
 }
