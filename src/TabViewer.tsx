@@ -16,7 +16,7 @@ export interface TabViewerRef {
 }
 
 // String configuration for 3-string strumstick
-const stringLabels = ['D', 'A', 'd']; // Display order: Hi D, A, Low D
+const stringLabels = ['d', 'A', 'D']; // Display order: d (D4), A (A4), D (D3)
 const stringIndices = [2, 1, 0]; // Data indices: Hi D=2, A=1, Low D=0
 
 // Convert ticks to display position

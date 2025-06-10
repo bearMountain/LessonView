@@ -37,21 +37,21 @@ export const fretToNoteName = (fret: number, string: number): string => {
   }
   
   // Diatonic strumstick fret-to-note mapping
-  // String 0 = D3 (Low D), String 1 = A4, String 2 = D4 (High D)
+  // String 0 = D3 (Low D), String 1 = A3, String 2 = D4 (High D)
   const fretToNoteMap: Record<number, [string, string, string]> = {
-    0:  ['D3', 'A4', 'D4'],   // Open strings
-    1:  ['E3', 'B4', 'E4'],   // 2nd degree
-    2:  ['F#3', 'C#5', 'F#4'], // 3rd degree
-    3:  ['G3', 'D5', 'G4'],   // 4th degree
-    4:  ['A3', 'E5', 'A4'],   // 5th degree
-    5:  ['B3', 'F#5', 'B4'],  // 6th degree
-    6:  ['C4', 'G5', 'C5'],   // b7th degree
-    7:  ['C#4', 'G#5', 'C#5'], // 7th degree
-    8:  ['D4', 'A5', 'D5'],   // Octave (8th/1st)
-    9:  ['E4', 'B5', 'E5'],   // 9th (2nd)
-    10: ['F#4', 'C#6', 'F#5'], // 10th (3rd)
-    11: ['G4', 'D6', 'G5'],   // 11th (4th)
-    12: ['A4', 'E6', 'A5']    // 12th (5th)
+    0:  ['D3', 'A3', 'D4'],   // Open strings
+    1:  ['E3', 'B3', 'E4'],   // 2nd degree
+    2:  ['F#3', 'C#4', 'F#4'], // 3rd degree
+    3:  ['G3', 'D4', 'G4'],   // 4th degree
+    4:  ['A3', 'E4', 'A4'],   // 5th degree
+    5:  ['B3', 'F#4', 'B4'],  // 6th degree
+    6:  ['C4', 'G4', 'C5'],   // b7th degree
+    7:  ['C#4', 'G#4', 'C#5'], // 7th degree
+    8:  ['D4', 'A4', 'D5'],   // Octave (8th/1st)
+    9:  ['E4', 'B4', 'E5'],   // 9th (2nd)
+    10: ['F#4', 'C#5', 'F#5'], // 10th (3rd)
+    11: ['G4', 'D5', 'G5'],   // 11th (4th)
+    12: ['A4', 'E5', 'A5']    // 12th (5th)
   }
   
   return fretToNoteMap[fret][string]
