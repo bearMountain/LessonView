@@ -3,7 +3,6 @@ import './ProfessionalToolbar.css';
 import NoteValuePalette from './NoteValuePalette';
 import TimeSignatureSelector from './TimeSignatureSelector';
 import type { NoteDuration, NoteType, ToolMode, CursorPosition, Note } from '../../types';
-import { availableThemes } from '../../themes';
 
 interface ProfessionalToolbarProps {
   selectedDuration: NoteDuration;
@@ -30,9 +29,6 @@ interface ProfessionalToolbarProps {
   onToggleDotted?: () => void;
   // Focus management
   onAfterSelection?: () => void;
-  // Theme management
-  currentTheme?: string;
-  onThemeChange?: (theme: string) => void;
 }
 
 interface ToolbarSection {
@@ -60,8 +56,6 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
   noteAtCurrentPosition,
   onToggleDotted,
   onAfterSelection,
-  currentTheme = 'dark',
-  onThemeChange,
 }) => {
   const sections: ToolbarSection[] = [
     {
@@ -203,46 +197,6 @@ const ProfessionalToolbar: React.FC<ProfessionalToolbarProps> = ({
             value={timeSignature}
             onChange={onTimeSignatureChange}
           />
-        </div>
-      ),
-    },
-    {
-      id: 'layout',
-      title: 'Layout',
-      component: (
-        <div className="toolbar-section__content">
-          <button className="toolbar-button" title="Zoom In (Ctrl++)">
-            <span className="toolbar-button__icon">🔍</span>
-            <span className="toolbar-button__text">Zoom In</span>
-          </button>
-          <button className="toolbar-button" title="Zoom Out (Ctrl+-)">
-            <span className="toolbar-button__icon">🔍</span>
-            <span className="toolbar-button__text">Zoom Out</span>
-          </button>
-          <button className="toolbar-button" title="Fit Width">
-            <span className="toolbar-button__icon">↔️</span>
-            <span className="toolbar-button__text">Fit Width</span>
-          </button>
-        </div>
-      ),
-    },
-    {
-      id: 'theme',
-      title: 'Theme',
-      component: (
-        <div className="toolbar-section__content">
-          <select 
-            className="theme-selector"
-            value={currentTheme}
-            onChange={(e) => onThemeChange?.(e.target.value)}
-            title="Select Theme"
-          >
-            {availableThemes.map((theme) => (
-              <option key={theme.name} value={theme.name}>
-                {theme.displayName}
-              </option>
-            ))}
-          </select>
         </div>
       ),
     },

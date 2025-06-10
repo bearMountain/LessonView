@@ -32,7 +32,7 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
   showFretboard = true,
   countInEnabled = false,
 }) => {
-  const tempoIntervalRef = useRef<number | null>(null);
+  const tempoIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTempoDecrease = () => {
     const newTempo = Math.max(60, tempo - 5);
@@ -94,7 +94,6 @@ const PlaybackBar: React.FC<PlaybackBarProps> = ({
     onMouseLeave: stopTempoChange,
     onTouchStart: () => startTempoChange(direction),
     onTouchEnd: stopTempoChange,
-    onClick: direction === 'increase' ? handleTempoIncrease : handleTempoDecrease, // Fallback for quick clicks
   });
 
   return (

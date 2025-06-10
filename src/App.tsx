@@ -37,7 +37,7 @@ function AppContent() {
   const layout = useAppLayout()
   
   // === Theme Management ===
-  const { currentTheme, setTheme } = useTheme()
+  // Theme functionality removed from toolbar but kept for future use
   
   // === Audio System Integration ===
   const { loadSequence, state: audioState, play, pause, setTempo } = useAudio()
@@ -333,11 +333,11 @@ function AppContent() {
           <ProfessionalToolbar
             selectedDuration={tabEditor.state.selectedDuration}
             onDurationChange={tabEditor.setSelectedDuration}
-            selectedNoteType="note"
+            selectedNoteType={'note'}
             onNoteTypeChange={() => {}}
-            currentToolMode="note"
+            currentToolMode={'note'}
             onToolModeChange={() => {}}
-            timeSignature="4/4"
+            timeSignature={'4/4'}
             onTimeSignatureChange={() => {}}
             tieMode={false}
             onTieModeChange={() => {}}
@@ -350,11 +350,9 @@ function AppContent() {
               timeSlot: Math.floor(tabEditor.state.currentPosition / 960),
               stringIndex: getCurrentStringIndex()
             }}
-            noteAtCurrentPosition={getNoteAtCurrentPosition()}
+            noteAtCurrentPosition={null}
             onToggleDotted={() => {}}
-            onAfterSelection={handleAfterToolbarAction}
-            currentTheme={currentTheme}
-            onThemeChange={setTheme}
+            onAfterSelection={() => {}}
           />
         }
         fretboard={layout.showFretboard ? (
