@@ -31,6 +31,7 @@ import { calculateDisplayPositions, getTotalTabWidth } from '../services/NoteSta
 interface ExtendedAppState extends NoteStackAppState {
   // Current input state
   selectedDuration: Duration;
+  selectedString: number; // 0=Low D, 1=A, 2=High D
   currentFretInput: string;
   
   // File management
@@ -53,6 +54,7 @@ type NoteStackAction =
   | { type: 'SET_BPM'; payload: number }
   | { type: 'SET_TIME_SIGNATURE'; payload: { numerator: number; denominator: number } }
   | { type: 'SET_SELECTED_DURATION'; payload: Duration }
+  | { type: 'SET_SELECTED_STRING'; payload: number }
   | { type: 'SET_FRET_INPUT'; payload: string }
   | { type: 'CLEAR_FRET_INPUT' }
   | { type: 'SET_SELECTION'; payload: NoteSelection }
@@ -77,6 +79,7 @@ const initialState: ExtendedAppState = {
   
   // Input state
   selectedDuration: 'quarter',
+  selectedString: 2, // 0=Low D, 1=A, 2=High D
   currentFretInput: '',
   
   // File management
@@ -173,6 +176,12 @@ const noteStackReducer = (state: ExtendedAppState, action: NoteStackAction): Ext
       return {
         ...state,
         selectedDuration: action.payload
+      };
+    
+    case 'SET_SELECTED_STRING':
+      return {
+        ...state,
+        selectedString: Math.max(0, Math.min(2, action.payload)) // Clamp to 0-2
       };
     
     case 'SET_FRET_INPUT':
@@ -279,17 +288,17 @@ export const useNoteStackEditor = () => {
   
   // === Note management actions ===
   
-  const addNote = useCallback((position: number, string: number, fret: number, duration?: Duration) => {
+  const addNote = useCallback((position: number, string: number, fret: number, duration: Duration) => {
     dispatch({
       type: 'ADD_NOTE',
       payload: {
         position,
         string,
         fret,
-        duration: duration || state.selectedDuration
+        duration
       }
     });
-  }, [state.selectedDuration]);
+  }, []);
   
   const removeNote = useCallback((position: number, string: number) => {
     dispatch({
@@ -352,6 +361,39 @@ export const useNoteStackEditor = () => {
     });
     setCursorPosition(newPosition);
   }, [state.currentPosition, state.selectedDuration, setCursorPosition]);
+  
+  // === String navigation (up/down arrows) ===
+  
+  const moveStringUp = useCallback(() => {
+    // Visual "up" means higher pitch, higher string index
+    // Display order: Hi D (2), A (1), Low D (0)
+    const newString = state.selectedString + 1;
+    if (newString <= 2) {
+      console.log('moveStringUp (Arrow Up):', { 
+        from: state.selectedString, 
+        to: newString 
+      });
+      dispatch({
+        type: 'SET_SELECTED_STRING',
+        payload: newString
+      });
+    }
+  }, [state.selectedString]);
+
+  const moveStringDown = useCallback(() => {
+    // Visual "down" means lower pitch, lower string index
+    const newString = state.selectedString - 1;
+    if (newString >= 0) {
+      console.log('moveStringDown (Arrow Down):', { 
+        from: state.selectedString, 
+        to: newString 
+      });
+      dispatch({
+        type: 'SET_SELECTED_STRING',
+        payload: newString
+      });
+    }
+  }, [state.selectedString]);
   
   // === Selection operations ===
   
@@ -470,6 +512,10 @@ export const useNoteStackEditor = () => {
     // Arrow key navigation (by selected duration)
     moveCursorLeftByDuration,
     moveCursorRightByDuration,
+    
+    // String navigation (up/down arrows)
+    moveStringUp,
+    moveStringDown,
     
     // Selection
     selectNotesInString,

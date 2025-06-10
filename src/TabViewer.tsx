@@ -47,6 +47,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     tab, 
     currentPosition, 
     selectedDuration, 
+    selectedString,
     selectedStacks,
     bpm
   } = state;
@@ -106,7 +107,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
   const getCursorPosition = () => {
     const position = {
       x: getPositionX(currentPosition),
-      y: getStringY(1) // Default to middle string (A)
+      y: getStringY(selectedString) // Use selected string
     };
     
     return position;
@@ -264,10 +265,9 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     // Number keys 0-9 for frets
     if (e.key >= '0' && e.key <= '9') {
       const fret = parseInt(e.key);
-      const defaultString = 1; // Middle string (A)
-      console.log('🎵 Adding note:', { currentPosition, defaultString, fret, selectedDuration });
+      console.log('🎵 Adding note:', { currentPosition, selectedString, fret, selectedDuration });
       try {
-        editor.addNote(currentPosition, defaultString, fret, selectedDuration);
+        editor.addNote(currentPosition, selectedString, fret, selectedDuration);
         console.log('🎵 Note added - New tab length:', editor.state.tab.length);
       } catch (error) {
         console.error('🎵 Error adding note:', error);
@@ -276,16 +276,15 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     
     // Delete key to remove notes
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      const defaultString = 1;
-      console.log('🗑️ Removing note:', { currentPosition, defaultString });
+      console.log('🗑️ Removing note:', { currentPosition, selectedString });
       try {
-        editor.removeNote(currentPosition, defaultString);
+        editor.removeNote(currentPosition, selectedString);
       } catch (error) {
         console.error('🗑️ Error removing note:', error);
       }
     }
     
-    // Arrow keys for navigation (by selected duration)
+    // Arrow keys for navigation
     if (e.key === 'ArrowLeft') {
       console.log('⬅️ Moving cursor left by duration from:', currentPosition);
       try {
@@ -302,6 +301,24 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
         console.log('➡️ Arrow Right - New position should be:', editor.state.currentPosition);
       } catch (error) {
         console.error('➡️ Error in moveCursorRightByDuration:', error);
+      }
+    }
+    if (e.key === 'ArrowUp') {
+      console.log('⬆️ Moving to higher string from:', selectedString);
+      try {
+        editor.moveStringUp();
+        console.log('⬆️ Arrow Up - New string should be:', editor.state.selectedString);
+      } catch (error) {
+        console.error('⬆️ Error in moveStringUp:', error);
+      }
+    }
+    if (e.key === 'ArrowDown') {
+      console.log('⬇️ Moving to lower string from:', selectedString);
+      try {
+        editor.moveStringDown();
+        console.log('⬇️ Arrow Down - New string should be:', editor.state.selectedString);
+      } catch (error) {
+        console.error('⬇️ Error in moveStringDown:', error);
       }
     }
   };
@@ -544,6 +561,7 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
         Stacks: {tab.length} | 
         Selected: {selectedStacks?.length || 0} | 
         Duration: {selectedDuration} |
+        String: {stringLabels[stringIndices.indexOf(selectedString)]} ({selectedString}) |
         {audioState.isPlaying ? ' ▶️ Playing' : ' ⏸️ Stopped'} |
         Layout Items: {layoutItems.length}
       </div>
