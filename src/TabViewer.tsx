@@ -58,8 +58,8 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
   // Get layout state (zoom, etc.)
   const { zoom, setZoom } = useAppLayout();
   
-  // Get audio state for playback indicator
-  const { state: audioState } = useAudio();
+  // Get audio state for playback indicator and note preview
+  const { state: audioState, previewNote } = useAudio();
   
   // === Layout Constants ===
   const layout = useMemo(() => {
@@ -269,6 +269,15 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
     if (e.key >= '0' && e.key <= '9') {
       const fret = parseInt(e.key);
       console.log('🎵 Adding note:', { currentPosition, selectedString, fret, selectedDuration });
+      
+      // Preview the note first
+      try {
+        previewNote(fret, selectedString);
+      } catch (error) {
+        console.warn('🎵 Note preview failed:', error);
+      }
+      
+      // Then add the note
       try {
         editor.addNote(currentPosition, selectedString, fret, selectedDuration);
         console.log('🎵 Note added - New tab length:', editor.state.tab.length);

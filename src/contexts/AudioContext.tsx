@@ -12,6 +12,7 @@ import {
   validateNoteStacks,
   calculateSequenceDuration
 } from '../audio/audioEngine'
+import { GuitarSynth } from '../audio/GuitarSynth'
 import type { AudioState, AudioAction } from '../audio/audioEngine'
 import type { NoteStack } from '../types/notestack'
 
@@ -59,8 +60,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Pure functional state management
   const [state, dispatch] = useReducer(audioReducer, initialAudioState)
   
-  // Tone.js instances (kept in refs, not state - these are stateful audio objects)
-  const synthRef = useRef<Tone.PolySynth | null>(null)
+  // Audio instances (kept in refs, not state - these are stateful audio objects)
+  const guitarSynthRef = useRef<GuitarSynth | null>(null)
   const partRef = useRef<Tone.Part | null>(null)
   const isInitializedRef = useRef(false)
   
@@ -72,31 +73,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (isInitializedRef.current) return
     
     try {
-      // Start audio context (required for modern browsers)
-      if (Tone.context.state !== 'running') {
-        await Tone.start()
+      // Get the guitar synth instance
+      if (!guitarSynthRef.current) {
+        guitarSynthRef.current = GuitarSynth.getInstance()
       }
       
-      // Create synth if not exists
-      if (!synthRef.current) {
-        synthRef.current = new Tone.PolySynth({
-          voice: Tone.Synth,
-          options: {
-            oscillator: {
-              type: 'triangle'
-            },
-            envelope: {
-              attack: 0.02,
-              decay: 0.3,
-              sustain: 0.3,
-              release: 0.8
-            }
-          }
-        }).toDestination()
-      }
+      // Initialize the guitar synth (starts Tone.js context)
+      await guitarSynthRef.current.initialize()
       
       isInitializedRef.current = true
-      console.log('Audio context initialized successfully')
+      console.log('🎸 Audio context with GuitarSynth initialized successfully')
     } catch (error) {
       console.error('Failed to initialize audio context:', error)
     }
@@ -138,10 +124,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // ===============================
   
   useEffect(() => {
-    // Sync volume with synth
-    if (synthRef.current) {
-      synthRef.current.volume.value = Tone.gainToDb(state.volume)
-    }
+    // Note: GuitarSynth manages its own volume internally
+    // Volume sync is handled within each note's velocity parameter
+    console.log(`🔊 Volume updated to: ${state.volume}`)
   }, [state.volume])
   
   // ===============================
@@ -169,12 +154,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const events = noteStackToToneEvents(stacks)
         
         partRef.current = new Tone.Part((time, event) => {
-          // Play all notes in the stack simultaneously
+          // Play all notes in the stack simultaneously using GuitarSynth
           event.notes.forEach(note => {
-            synthRef.current?.triggerAttackRelease(
-              note.noteName, 
-              event.duration, 
-              time
+            guitarSynthRef.current?.playNote(
+              note.fret, 
+              note.string, 
+              event.duration as Tone.Unit.Time,
+              state.volume
             )
           })
           
@@ -265,11 +251,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [])
   
   const previewNote = useCallback(async (fret: number, string: number) => {
-    await initializeAudio()
+    if (!isInitializedRef.current) {
+      await initializeAudio()
+    }
     
     try {
-      const noteName = fretToNoteName(fret, string)
-      synthRef.current?.triggerAttackRelease(noteName, 0.5)
+      guitarSynthRef.current?.previewNote(fret, string)
     } catch (error) {
       console.warn('Failed to preview note:', error)
     }
@@ -285,14 +272,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (partRef.current) {
         partRef.current.dispose()
       }
-      if (synthRef.current) {
-        synthRef.current.dispose()
-      }
+      // Note: GuitarSynth uses singleton pattern and manages its own cleanup
       
-      // Stop transport
-      if (Tone.Transport.state === 'started') {
-        Tone.Transport.stop()
-      }
+      console.log('🧹 AudioContext cleanup complete')
     }
   }, [])
   
