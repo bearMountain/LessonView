@@ -207,13 +207,16 @@ const TabViewer = forwardRef<TabViewerRef, TabViewerProps>(({ editor }, ref) => 
       currentEditorPosition: editor.state.currentPosition
     });
     
-    // Set cursor position
+    // Set cursor position and selected string
     try {
       console.log('🖱️ Calling setCursorPosition with:', snappedPosition);
       editor.setCursorPosition(snappedPosition);
       console.log('🖱️ After setCursorPosition, editor position is:', editor.state.currentPosition);
+      
+      console.log('🖱️ Setting selected string to:', closestStringIndex);
+      editor.setSelectedString(closestStringIndex);
     } catch (error) {
-      console.error('🖱️ Error in setCursorPosition:', error);
+      console.error('🖱️ Error in setCursorPosition or setSelectedString:', error);
     }
     
     if (e.shiftKey) {

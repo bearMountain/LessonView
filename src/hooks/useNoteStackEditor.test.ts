@@ -148,6 +148,51 @@ describe('useNoteStackEditor Hook', () => {
       
       expect(result.current.state.selectedDuration).toBe('eighth');
     });
+
+    it('should update selected string', () => {
+      const { result } = renderHook(() => useNoteStackEditor());
+      
+      // Initially should be string 2 (High D)
+      expect(result.current.state.selectedString).toBe(2);
+      
+      act(() => {
+        result.current.setSelectedString(1); // A string
+      });
+      
+      expect(result.current.state.selectedString).toBe(1);
+      
+      act(() => {
+        result.current.setSelectedString(0); // Low D string
+      });
+      
+      expect(result.current.state.selectedString).toBe(0);
+    });
+
+    it('should update both cursor position and selected string for mouse clicks', () => {
+      const { result } = renderHook(() => useNoteStackEditor());
+      
+      // Initially at position 0, string 2
+      expect(result.current.state.currentPosition).toBe(0);
+      expect(result.current.state.selectedString).toBe(2);
+      
+      // Simulate a mouse click on string 1 at position 960
+      act(() => {
+        result.current.setCursorPosition(960);
+        result.current.setSelectedString(1);
+      });
+      
+      expect(result.current.state.currentPosition).toBe(960);
+      expect(result.current.state.selectedString).toBe(1);
+      
+      // Simulate another click on string 0 at position 1920
+      act(() => {
+        result.current.setCursorPosition(1920);
+        result.current.setSelectedString(0);
+      });
+      
+      expect(result.current.state.currentPosition).toBe(1920);
+      expect(result.current.state.selectedString).toBe(0);
+    });
   });
 
   describe('File Operations', () => {

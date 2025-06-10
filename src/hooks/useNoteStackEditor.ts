@@ -471,6 +471,13 @@ export const useNoteStackEditor = () => {
     });
   }, []);
   
+  const setSelectedString = useCallback((string: number) => {
+    dispatch({
+      type: 'SET_SELECTED_STRING',
+      payload: string
+    });
+  }, []);
+  
   // === File operations ===
   
   const loadTab = useCallback((tab: Tab) => {
@@ -536,6 +543,7 @@ export const useNoteStackEditor = () => {
     setBpm,
     setTimeSignature,
     setSelectedDuration,
+    setSelectedString,
     
     // File operations
     loadTab,
